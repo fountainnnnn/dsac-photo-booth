@@ -13,7 +13,6 @@ export default function CapturePage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [composedDataUrl, setComposedDataUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [linkedInShareUrl, setLinkedInShareUrl] = useState<string | null>(null);
 
   const resetFlow = useCallback(() => {
@@ -21,7 +20,6 @@ export default function CapturePage() {
     setUploadError(null);
     setComposedDataUrl(null);
     setDownloadUrl(null);
-    setQrUrl(null);
     setLinkedInShareUrl(null);
     setStep('camera');
   }, []);
@@ -54,7 +52,6 @@ export default function CapturePage() {
       const data = await uploadRes.json() as ComposedUploadResponse;
       setCaptured(prev => prev ? { ...prev, composedId: data.token, composedUrl: data.downloadUrl } : prev);
       setDownloadUrl(data.downloadUrl);
-      setQrUrl(data.qrUrl ?? null);
       setLinkedInShareUrl(data.linkedInShareUrl ?? null);
       setStep('qr-download');
     } catch (err) {
@@ -108,7 +105,6 @@ export default function CapturePage() {
         <QrDownloadScreen
           composedDataUrl={composedDataUrl}
           downloadUrl={downloadUrl}
-          qrUrl={qrUrl ?? undefined}
           linkedInShareUrl={linkedInShareUrl ?? undefined}
           onDone={resetFlow}
           onRetake={resetFlow}

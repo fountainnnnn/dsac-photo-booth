@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import QrDownloadScreen from './QrDownloadScreen';
 
 // ---------------------------------------------------------------------------
-// Mock qrcode — canvas operations are not available in jsdom
+// Mock qrcode — canvas operations are not available in jsdom.
+// toCanvas returns a Promise when called without a callback, so the mock must
+// resolve one; a bare vi.fn() returning undefined does not match the real API.
 // ---------------------------------------------------------------------------
 const toCanvasMock = vi.hoisted(() => vi.fn());
 vi.mock('qrcode', () => ({ default: { toCanvas: toCanvasMock }, toCanvas: toCanvasMock }));
@@ -14,6 +16,7 @@ const FAKE_DOWNLOAD = 'https://example.com/download/abc-123';
 describe('QrDownloadScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    toCanvasMock.mockResolvedValue(undefined);
   });
 
   it('renders the root container', () => {
@@ -158,5 +161,44 @@ describe('QrDownloadScreen', () => {
     );
 
     expect(screen.getByTestId('qr-screen-retake').textContent).toBe('Retake');
+  });
+
+  // The screen must never show a blank white square. Before this, a failed QR
+  // left exactly that — with no message and no way to reach the photo.
+  it('shows an error and the raw link when QR rendering fails', async () => {
+    toCanvasMock.mockRejectedValue(new Error('encode failed'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(
+      <QrDownloadScreen
+        composedDataUrl={FAKE_COMPOSED}
+        downloadUrl={FAKE_DOWNLOAD}
+        onDone={vi.fn()}
+        onRetake={vi.fn()}
+      />
+    );
+
+    const err = await screen.findByTestId('qr-screen-qr-error');
+    expect(err.textContent).toContain('Could not draw the QR code');
+    // the photo must still be reachable
+    expect(screen.getByRole('link', { name: FAKE_DOWNLOAD })).toBeDefined();
+  });
+
+  it('surfaces a message when no download link was returned', async () => {
+    render(
+      <QrDownloadScreen
+        composedDataUrl={FAKE_COMPOSED}
+        downloadUrl=""
+        onDone={vi.fn()}
+        onRetake={vi.fn()}
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('qr-screen-qr-error').textContent).toContain(
+        'No download link',
+      )
+    );
+    expect(toCanvasMock).not.toHaveBeenCalled();
   });
 });
