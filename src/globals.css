@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+/*
+ * DSAC Photo Booth — glow-card design system.
+ * SP red is the single accent; amber and iris exist only to rotate card glows.
+ * Tuned for a kiosk read at TV distance: heavier ink contrast, larger hit areas.
+ */
+:root {
+  /* Surfaces */
+  --background: #f7f6f8; /* page canvas — faintly warm neutral */
+  --surface: #ffffff; /* panels, solid text beds */
+  --card: #f8f7fa; /* glow-card base, tinted a hair toward the brand */
+  --stage: #0b0a0c; /* deep brand tone for dark bands & photo backdrops */
+
+  /* Ink */
+  --ink: #17161a; /* display + primary */
+  --ink-2: #53515b; /* secondary copy */
+  --ink-3: #a3a1ab; /* hints, meta, eyebrow fallback */
+  --border: #e6e4e9; /* hairlines */
+
+  /* Accent */
+  --accent: #e1262f; /* SP DSAC red */
+  --accent-hover: #c11f27;
+  --accent-ink: #8f1219; /* red dark enough for text on light surfaces */
+
+  /* Glow hues — pale washes only, never used as fills */
+  --glow-rose: #ff6b73;
+  --glow-amber: #ffa94d;
+  --glow-iris: #7c86f5;
+
+  --font-dsac-sans: Aptos, "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-dsac-mono: "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--ink);
+  --font-sans: var(--font-dsac-sans);
+  --font-mono: var(--font-dsac-mono);
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background: var(--background);
+  color: var(--ink);
+  font-family: var(--font-dsac-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--ink);
+  color: #ffffff;
+}
+
+/* ── Gradient text ──────────────────────────────────────────────────────────
+   Eyebrows and the odd highlighted phrase only. Two or three per screen. */
+.dsac-gradient-text {
+  background: linear-gradient(90deg, var(--accent), var(--glow-amber), var(--glow-iris));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────────
+   Transform and opacity only, so nothing triggers layout. */
+@keyframes dsac-orb-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(4vw, -3vh, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-3vw, 3vh, 0) scale(0.95);
+  }
+}
+
+@keyframes dsac-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes dsac-countdown-ring {
+  0% {
+    transform: scale(0.82);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.24);
+    opacity: 0;
+  }
+}
+
+@keyframes dsac-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.dsac-rise {
+  animation: dsac-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ── Range inputs ───────────────────────────────────────────────────────────
+   Native accent-color leaves the track too faint on a TV; draw it explicitly. */
+.dsac-range {
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  cursor: pointer;
+}
+
+.dsac-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 3px rgba(11, 10, 12, 0.28);
+}
+
+.dsac-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 3px rgba(11, 10, 12, 0.28);
+}
+
+.dsac-range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

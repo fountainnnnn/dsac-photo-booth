@@ -1,0 +1,146 @@
+Meeting Transcript
+
+Alex:
+Thanks everyone. Today, we need to align on what this software app should do. The main purpose is to create a simple and engaging photo experience for users, especially for DSAC-related events or activities.
+
+Sarah:
+Right. From an event perspective, we want users to be able to take a photo on the spot, almost like a mini photo booth. It should feel quick and easy.
+
+Maya:
+So the first step in the app flow would be: the user opens the app and uses the camera to take a photo in real time.
+
+Ryan:
+Yes, and technically we can use the device camera or a connected webcam, depending on whether this is running on mobile, tablet, or a kiosk setup.
+
+Alex:
+Good point. After the user takes the photo, we should immediately show them a preview.
+
+Maya:
+Exactly. The preview screen is important. Users should be able to see the photo clearly and decide whether they’re happy with it.
+
+Sarah:
+And if they don’t like it, there should be a simple option to retake the photo.
+
+Ryan:
+That’s straightforward. So after capture, the app presents two actions: Retake or Confirm.
+
+Alex:
+Perfect. Once they confirm the photo, the app should automatically insert a predefined DSAC-themed background.
+
+Maya:
+When we say DSAC-themed background, are we talking about a fixed branded frame or a full background replacement?
+
+Sarah:
+Ideally, a branded background that reflects DSAC – Data Science and Analytics Centre. It could include the DSAC logo, visual elements related to analytics, maybe some futuristic or data-themed graphics.
+
+Alex:
+Yes, and to keep it simple for version one, we can start with a predefined background template instead of multiple options.
+
+Ryan:
+That makes implementation easier too. The app can take the confirmed photo and overlay it onto a preset template. If needed, we can later expand to support multiple templates.
+
+Maya:
+We should also add the date automatically onto the final photo.
+
+Sarah:
+Yes, that’s important because this will likely be used during events, so the date makes the image feel commemorative.
+
+Ryan:
+No problem. Once the user confirms the image, the system can stamp the current date onto the final composition before generating the output.
+
+Alex:
+Great. So to summarize so far:
+
+User takes a photo in real time.
+User sees a preview.
+If not satisfied, they retake it.
+If satisfied, the app adds the predefined DSAC background.
+The app inserts the date.
+
+Maya:
+After that, we need a way for users to receive the final photo without typing in their email or phone number.
+
+Sarah:
+That’s where the QR code comes in.
+
+Ryan:
+Right. After the final image is generated, the app should create a download link for that image, then generate a QR code that points to that link.
+
+Alex:
+So the user can simply scan the QR code with their phone and download the photo instantly.
+
+Maya:
+That’s a nice touch. It keeps the experience contactless and fast.
+
+Sarah:
+Exactly. At events, we don’t want queues building up. People should be able to take the photo, confirm it, scan the QR code, and move on.
+
+Ryan:
+From the backend side, we’ll need temporary storage for the generated image and a mechanism to host the file long enough for the user to download it.
+
+Alex:
+How long should the download link remain active?
+
+Sarah:
+Maybe a limited time, like a few hours or one day, just enough for users to scan and save it.
+
+Ryan:
+That works. We can set an expiry time so the image and QR code link are temporary.
+
+Maya:
+On the interface side, after the final photo is ready, the screen should show:
+
+A preview of the final edited photo
+A QR code
+A short instruction like: “Scan this QR code to download your photo”
+
+Alex:
+That sounds clear. We may also want a “Done” or “Next User” button, especially if this is used at a booth or kiosk.
+
+Sarah:
+Definitely. For event usage, after one user finishes, the app should reset automatically or allow staff to start the next session.
+
+Ryan:
+We can add an auto-reset timer after the QR code is displayed, or a manual reset button for the operator.
+
+Alex:
+Good. Are there any optional enhancements we should note for future versions?
+
+Maya:
+Maybe later we can support:
+
+Multiple DSAC backgrounds
+Filters or light adjustments
+Face alignment guides before taking the photo
+Option to add event name in addition to the date
+
+Ryan:
+And maybe analytics too — number of photos taken, downloads, and most-used template.
+
+Sarah:
+That would be useful for reporting after events.
+
+Alex:
+Excellent. For now, let’s keep the MVP simple and focused on the core flow.
+
+Alex (closing summary):
+So the app will do the following:
+
+Open camera for real-time photo capture
+Let the user preview the photo
+Allow retake if unsatisfied
+If satisfied, apply a predefined DSAC background
+Automatically insert the current date
+Generate the final image
+Create a QR code linked to the downloadable photo
+Let the user scan and download the image on their phone
+Then reset for the next user
+
+Sarah:
+That sounds exactly like what we need.
+
+Maya:
+Agreed — simple, branded, and user-friendly.
+
+Ryan:
+Technically feasible. We can move forward with this as the functional scope.
