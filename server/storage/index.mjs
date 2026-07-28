@@ -26,12 +26,24 @@ export function createStorage() {
     case 'local': {
       const __dirname = path.dirname(fileURLToPath(import.meta.url));
       const rootDir = path.join(__dirname, '..', '..');
-      // STORAGE_DIR must point at a mounted volume on any host with an
-      // ephemeral filesystem (Railway, Fly, Heroku). Without it a redeploy
-      // wipes every photo and every download link 404s mid-event.
-      const baseDir = process.env.STORAGE_DIR
-        ? path.resolve(process.env.STORAGE_DIR)
-        : rootDir;
+
+      // On any host with an ephemeral filesystem (Railway, Fly, Heroku) this
+      // must resolve to a mounted volume. Otherwise a redeploy wipes every
+      // photo and QR codes already handed out at the event start 404-ing.
+      //
+      // RAILWAY_VOLUME_MOUNT_PATH is injected automatically once a volume is
+      // attached, so attaching one is enough — there is no variable to forget.
+      const mountPath = process.env.STORAGE_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH;
+      const baseDir = mountPath ? path.resolve(mountPath) : rootDir;
+
+      if (!mountPath && process.env.RAILWAY_ENVIRONMENT) {
+        console.warn(
+          '[storage] Running on Railway with no volume attached — photos are ' +
+          'written to the container filesystem and WILL be destroyed on the ' +
+          'next redeploy. Attach a volume, or set STORAGE_DIR.',
+        );
+      }
+
       return createLocalStorage(baseDir);
     }
     // case 'r2': return createR2Storage({ bucket, kv });  // add adapter here
