@@ -2,6 +2,9 @@
   "name": "dsac-photo-booth",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "concurrently -k -n backend,frontend -c red,blue \"npm:server\" \"npm:client\"",
     "client": "vite --host 0.0.0.0",
