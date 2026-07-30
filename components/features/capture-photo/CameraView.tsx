@@ -7,6 +7,7 @@ import {
   CircleHalf,
   DiceFive,
   Drop,
+  Eye,
   Image as ImageIcon,
   Palette,
   Sun,
@@ -65,9 +66,17 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
 
   const { frames } = useFrameCatalogue();
 
-  // No frame until the wheel decides one.
-  const [activeFrame, setActiveFrame] = useState<FrameConfig | null>(null);
-  const [wheelOpen, setWheelOpen]     = useState(false);
+  // Only the wheel can award a frame. Tapping a swatch in the Frames card is a
+  // preview — it changes what you see, never what gets baked into the photo.
+  //   undefined -> not previewing, show whatever was won
+  //   null      -> previewing "no frame"
+  //   frame     -> previewing that frame
+  const [wonFrame, setWonFrame] = useState<FrameConfig | null>(null);
+  const [preview, setPreview]   = useState<FrameConfig | null | undefined>(undefined);
+  const [wheelOpen, setWheelOpen] = useState(false);
+
+  const displayFrame = preview !== undefined ? preview : wonFrame;
+  const isPreviewing = preview !== undefined && (preview?.id ?? null) !== (wonFrame?.id ?? null);
   const [filters, setFilters]         = useState<ImageFilters>(DEFAULT_FILTERS);
   const [filterThumb, setFilterThumb] = useState<string | null>(null);
   const [lastCapture, setLastCapture] = useState<string | null>(null);
@@ -75,12 +84,11 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
   const [timerSecs, setTimerSecs]     = useState<TimerOption>(0);
   const [countdown, setCountdown]     = useState<number | null>(null);
 
-  // Keep the chosen frame pointing at a live catalogue entry (weights can change).
+  // Drop references to frames an operator deleted while the kiosk was open.
   useEffect(() => {
-    if (!activeFrame) return;
-    const still = frames.find((f) => f.id === activeFrame.id);
-    if (!still) setActiveFrame(null);
-  }, [frames, activeFrame]);
+    if (wonFrame && !frames.some(f => f.id === wonFrame.id)) setWonFrame(null);
+    if (preview && !frames.some(f => f.id === preview.id)) setPreview(undefined);
+  }, [frames, wonFrame, preview]);
 
   // ── Camera ───────────────────────────────────────────────────────────────────
 
@@ -199,13 +207,15 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(liveCanvas, 0, 0);
 
-      if (activeFrame) {
-        const cached = frameCache.current.get(activeFrame.src);
+      // Only a frame that was actually won is baked in. A preview is for
+      // looking at, so it must never reach the photo.
+      if (wonFrame) {
+        const cached = frameCache.current.get(wonFrame.src);
         if (isDrawable(cached)) {
           ctx.drawImage(cached, 0, 0, output.width, output.height);
-          drawDateStamp(ctx, activeFrame, output.width, output.height);
+          drawDateStamp(ctx, wonFrame, output.width, output.height);
         } else {
-          console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
+          console.warn('[DSAC] Frame not ready; capturing without it:', wonFrame.src);
         }
       }
 
@@ -239,11 +249,11 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     ctx.filter = 'none';
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    if (activeFrame) {
-      const cachedFrame = frameCache.current.get(activeFrame.src);
+    if (wonFrame) {
+      const cachedFrame = frameCache.current.get(wonFrame.src);
       if (isDrawable(cachedFrame)) {
         ctx.drawImage(cachedFrame, 0, 0, sw, sh);
-        drawDateStamp(ctx, activeFrame, sw, sh);
+        drawDateStamp(ctx, wonFrame, sw, sh);
       }
     }
 
@@ -252,7 +262,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     rememberCapture(dataUrl);
     const blob = await canvasToBlob(canvas);
     onCapture(blob, dataUrl);
-  }, [isStreaming, canvasRef, filters, activeFrame, onCapture]);
+  }, [isStreaming, canvasRef, filters, wonFrame, onCapture]);
 
   const handleCapturePress = useCallback(() => {
     if (countdown !== null) {
@@ -284,8 +294,8 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
   const navigate = useCallback((section: StudioSection) => {
     if (section === 'settings') { window.location.href = '/settings'; return; }
     if (section === 'gallery')  { window.location.href = '/gallery'; return; }
-    const target = section === 'frames' ? framesCardRef
-      : section === 'filters' ? filtersCardRef
+    if (section === 'frames')   { window.location.href = '/frames'; return; }
+    const target = section === 'filters' ? filtersCardRef
       : section === 'adjust' ? adjustCardRef
       : null;
     target?.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -349,17 +359,32 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
               width: '100%',
               maxHeight: '100%',
               containerType: 'size',
+              // A hairline plus a soft drop shadow. Without these, a frame with
+              // a white border (or a blown-out feed) runs straight into the
+              // light panel behind it and the photo loses its edge.
+              boxShadow:
+                '0 0 0 1px rgba(11,10,12,0.10), 0 10px 30px -10px rgba(11,10,12,0.32)',
             }}
           >
             <canvas ref={canvasRef} className="absolute inset-0 h-full w-full"
               style={{ background: 'var(--shell-bg)' }} />
 
-            {activeFrame && (
+            {displayFrame && (
               <>
-                <img src={activeFrame.src} alt="" draggable={false}
+                <img src={displayFrame.src} alt="" draggable={false}
                   className="pointer-events-none absolute inset-0 z-10 h-full w-full" />
-                <LiveDateStamp frame={activeFrame} />
+                <LiveDateStamp frame={displayFrame} />
               </>
+            )}
+
+            {/* Say plainly that a previewed frame is not the one you'll get. */}
+            {isPreviewing && (
+              <div className="pointer-events-none absolute left-1/2 top-4 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/20 bg-black/65 px-4 py-2 backdrop-blur-md">
+                <Eye size={15} className="text-white/80" />
+                <span className="text-[0.75rem] font-semibold text-white">
+                  Preview only — spin to win a frame
+                </span>
+              </div>
             )}
 
             {countdown !== null && (
@@ -415,7 +440,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
             className="mt-7 inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-[var(--border)] px-4 text-[0.9rem] font-semibold text-[var(--ink)] transition hover:border-[var(--ink-3)] hover:bg-[var(--shell-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           >
             <DiceFive size={19} />
-            {activeFrame ? 'Spin again' : 'Spin for a frame'}
+            {wonFrame ? 'Spin again' : 'Spin for a frame'}
           </button>
 
           <a
@@ -444,22 +469,27 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
           </div>
 
           <p className="mt-auto pt-4 text-center text-[0.72rem] text-[var(--ink-3)]">
-            {activeFrame ? <>Frame: <strong className="font-semibold text-[var(--ink)]">{activeFrame.label}</strong></> : 'No frame yet'}
+            {wonFrame
+              ? <>Frame: <strong className="font-semibold text-[var(--ink)]">{wonFrame.label}</strong></>
+              : isPreviewing
+                ? <>Previewing <strong className="font-semibold text-[var(--ink)]">{displayFrame?.label ?? 'no frame'}</strong> — not yours yet</>
+                : 'No frame yet'}
           </p>
         </aside>
       </div>
 
       {/* Bottom cards */}
       <div className="mt-5 grid shrink-0 grid-cols-3 gap-5">
-        <Card ref={framesCardRef} title="Frames" actionLabel="View all" onAction={() => setWheelOpen(true)}>
+        <Card ref={framesCardRef} title="Frames" actionLabel="View all"
+          onAction={() => { window.location.href = '/frames'; }}>
           <div className="flex items-end gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            <Swatch active={!activeFrame} label="None" onClick={() => setActiveFrame(null)}>
+            <Swatch active={!displayFrame} label="None" onClick={() => setPreview(null)}>
               <span className="absolute inset-0 flex items-center justify-center">
                 <span className="h-8 w-px rotate-45 bg-[var(--ink-3)]" />
               </span>
             </Swatch>
             {enabledFrames.map((f) => (
-              <Swatch key={f.id} active={activeFrame?.id === f.id} label={f.label} onClick={() => setActiveFrame(f)}>
+              <Swatch key={f.id} active={displayFrame?.id === f.id} label={f.label} onClick={() => setPreview(f)}>
                 <img src={f.src} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
               </Swatch>
             ))}
@@ -512,7 +542,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
       <FrameWheelModal
         open={wheelOpen}
         frames={enabledFrames}
-        onPicked={setActiveFrame}
+        onPicked={(f) => { setWonFrame(f); setPreview(undefined); }}
         onClose={() => setWheelOpen(false)}
       />
     </StudioShell>

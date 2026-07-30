@@ -90,9 +90,10 @@ export default function StudioShell({ active, onNavigate, children }: StudioShel
         </div>
       </aside>
 
-      {/* Main panel */}
-      <main className="min-w-0 flex-1 py-4 pr-4">
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[26px] bg-white px-8 py-7 shadow-[0_1px_2px_rgba(11,10,12,0.04)]">
+      {/* Main panel — padded on every side so the card floats clear of the
+          rail instead of butting up against it. */}
+      <main className="min-w-0 flex-1 p-4">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[26px] bg-white px-8 py-7 shadow-[0_1px_3px_rgba(11,10,12,0.06),0_12px_32px_-16px_rgba(11,10,12,0.14)]">
           {children}
         </div>
       </main>

@@ -43,10 +43,41 @@ export default function SettingsPage() {
   );
 
   const setWeight = (id: string, weight: number) =>
-    setDraft(d => ({ ...d, [id]: { weight, enabled: d[id]?.enabled !== false } }));
+    setDraft(d => ({
+      ...d,
+      [id]: {
+        weight: Math.max(0, Math.min(100, Number.isFinite(weight) ? weight : 0)),
+        enabled: d[id]?.enabled !== false,
+      },
+    }));
 
   const setEnabled = (id: string, enabled: boolean) =>
     setDraft(d => ({ ...d, [id]: { weight: d[id]?.weight ?? 1, enabled } }));
+
+  /**
+   * Scale the entered numbers so the enabled frames sum to exactly 100.
+   * Values are relative, so 70/30 already behaves as 70%/30% — this just makes
+   * what is typed match what actually happens when the two have drifted apart.
+   */
+  const balance = useCallback(() => {
+    const enabled = frames.filter(f => (draft[f.id]?.enabled ?? true));
+    const total = enabled.reduce((s, f) => s + (draft[f.id]?.weight ?? 0), 0);
+    if (enabled.length === 0) return;
+
+    setDraft(d => {
+      const next = { ...d };
+      if (total <= 0) {
+        const even = Math.round((100 / enabled.length) * 10) / 10;
+        for (const f of enabled) next[f.id] = { weight: even, enabled: true };
+        return next;
+      }
+      for (const f of enabled) {
+        const w = d[f.id]?.weight ?? 0;
+        next[f.id] = { weight: Math.round((w / total) * 1000) / 10, enabled: true };
+      }
+      return next;
+    });
+  }, [frames, draft]);
 
   const save = useCallback(async () => {
     setBusy(true); setStatus(null);
@@ -133,11 +164,28 @@ export default function SettingsPage() {
       <div className="mt-6 grid min-h-0 flex-1 grid-cols-[1fr_320px] gap-5 overflow-hidden">
         {/* Frame list */}
         <section className="flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-[var(--border)]">
-          <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-5 py-4">
+          <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-5 py-4">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame pool</p>
             <p className="text-[0.78rem] text-[var(--ink-3)]">
               {frames.filter(f => draft[f.id]?.enabled !== false).length} of {frames.length} in the wheel
             </p>
+
+            <div className="ml-auto flex items-center gap-2.5">
+              <span className={`text-[0.78rem] tabular-nums ${
+                Math.abs(totalWeight - 100) < 0.05 ? 'text-[var(--ink-3)]' : 'text-[var(--accent-ink)]'
+              }`}>
+                Totals {totalWeight.toFixed(1)}%
+              </span>
+              {Math.abs(totalWeight - 100) >= 0.05 && (
+                <button
+                  type="button" onClick={balance}
+                  title="Scale the entered values so they add up to 100%"
+                  className="rounded-lg border border-[var(--border)] px-2.5 py-1 text-[0.75rem] font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                >
+                  Balance to 100%
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
@@ -163,21 +211,28 @@ export default function SettingsPage() {
                         )}
                       </p>
                       <p className="mt-0.5 text-[0.75rem] text-[var(--ink-3)]">
-                        {d.enabled ? `${share.toFixed(0)}% of spins` : 'Not in the wheel'}
+                        {d.enabled ? `actually ${share.toFixed(1)}% of spins` : 'Not in the wheel'}
                         {frame.dateStamp ? ' · stamps the date' : ''}
                       </p>
                     </div>
 
-                    <div className="flex w-[190px] shrink-0 items-center gap-2.5">
+                    <div className="flex w-[250px] shrink-0 items-center gap-3">
                       <input
-                        type="range" min={0} max={10} step={1} value={d.weight}
+                        type="range" min={0} max={100} step={0.5} value={d.weight}
                         disabled={!d.enabled}
                         onChange={e => setWeight(frame.id, Number(e.target.value))}
-                        className="dsac-range" aria-label={`${frame.label} weight`}
+                        className="dsac-range" aria-label={`${frame.label} probability`}
                       />
-                      <span className="w-5 text-right text-[0.8rem] font-semibold tabular-nums text-[var(--ink)]">
-                        {d.weight}
-                      </span>
+                      <label className="relative shrink-0">
+                        <input
+                          type="number" min={0} max={100} step={0.1} value={d.weight}
+                          disabled={!d.enabled}
+                          onChange={e => setWeight(frame.id, Number(e.target.value))}
+                          aria-label={`${frame.label} probability, percent`}
+                          className="w-[76px] rounded-lg border border-[var(--border)] py-1.5 pl-2.5 pr-6 text-right text-[0.82rem] font-semibold tabular-nums text-[var(--ink)] outline-none transition focus:border-[var(--accent)] disabled:opacity-40"
+                        />
+                        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[0.75rem] text-[var(--ink-3)]">%</span>
+                      </label>
                     </div>
 
                     <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[0.78rem] font-medium text-[var(--ink-2)]">
@@ -240,9 +295,15 @@ export default function SettingsPage() {
           <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How the odds work</p>
             <p className="mt-2 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              Weights are relative. A frame at <strong>3</strong> comes up three times
-              as often as one at <strong>1</strong>. Set a weight to <strong>0</strong>,
-              or switch it off, to keep it out of the draw entirely.
+              Type the percentage you want each frame to come up. Set one to
+              <strong> 0</strong>, or switch it off, to keep it out of the draw.
+            </p>
+            <p className="mt-2 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
+              The numbers are relative, so they do not have to add to 100 —
+              <strong> 70</strong> and <strong>30</strong> behave the same as
+              <strong> 7</strong> and <strong>3</strong>. When they do not total 100
+              the real odds are shown under each frame, and{' '}
+              <em>Balance to 100%</em> rescales them to match.
             </p>
             <p className="mt-3 rounded-xl bg-[var(--shell-bg)] px-3.5 py-3 text-[0.75rem] leading-[1.6] text-[var(--ink-2)]">
               The wheel never reveals this. Every segment is drawn the same size, so a

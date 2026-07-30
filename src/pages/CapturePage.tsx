@@ -61,9 +61,11 @@ export default function CapturePage() {
   }, [composedDataUrl]);
 
   return (
-    <main
+    // A plain div, not <main>: StudioShell renders the page's <main>, and
+    // nesting one inside another is invalid and confuses assistive tech.
+    <div
       data-testid="capture-page-root"
-      className="flex h-dvh w-full flex-col overflow-hidden bg-[var(--background)] text-[var(--ink)]"
+      className="relative flex h-dvh w-full flex-col overflow-hidden text-[var(--ink)]"
     >
       {step === 'camera' && (
         <>
@@ -110,6 +112,6 @@ export default function CapturePage() {
           onRetake={resetFlow}
         />
       )}
-    </main>
+    </div>
   );
 }
