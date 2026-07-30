@@ -1,0 +1,101 @@
+import {
+  CaretDown,
+  Camera,
+  CirclesThree,
+  FadersHorizontal,
+  FrameCorners,
+  Gear,
+  Images,
+} from '@phosphor-icons/react';
+
+/**
+ * StudioShell — the persistent left rail and page frame.
+ *
+ * Icons come from Phosphor rather than the app's usual set, at the designer's
+ * request. The rail is deliberately wider than the reference mockup.
+ */
+
+export type StudioSection = 'capture' | 'gallery' | 'frames' | 'filters' | 'adjust' | 'settings';
+
+const NAV: { id: StudioSection; label: string; Icon: React.ComponentType<{ size?: number; weight?: 'regular' | 'fill' | 'bold' }> }[] = [
+  { id: 'capture', label: 'Capture', Icon: Camera },
+  { id: 'gallery', label: 'Gallery', Icon: Images },
+  { id: 'frames', label: 'Frames', Icon: FrameCorners },
+  { id: 'filters', label: 'Filters', Icon: CirclesThree },
+  { id: 'adjust', label: 'Adjust', Icon: FadersHorizontal },
+];
+
+export interface StudioShellProps {
+  active: StudioSection;
+  onNavigate: (section: StudioSection) => void;
+  children: React.ReactNode;
+}
+
+export default function StudioShell({ active, onNavigate, children }: StudioShellProps) {
+  return (
+    <div className="flex h-dvh w-full overflow-hidden" style={{ background: 'var(--shell-bg)' }}>
+      {/* Left rail */}
+      <aside className="flex w-[272px] flex-shrink-0 flex-col bg-white px-5 py-6">
+        <div className="flex items-center gap-3 px-2">
+          <img src="/sp-dsac-logo.png" alt="SP DSAC" className="h-9 w-auto" />
+          <span className="text-[0.9rem] font-semibold leading-[1.15] tracking-tight text-[var(--ink)]">
+            Photo<br />Booth
+          </span>
+        </div>
+
+        <nav className="mt-9 flex flex-col gap-1.5">
+          {NAV.map(({ id, label, Icon }) => {
+            const on = active === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => onNavigate(id)}
+                aria-current={on ? 'page' : undefined}
+                className={`flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-left text-[0.9rem] font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                  on
+                    ? 'bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent)]'
+                    : 'text-[var(--ink-2)] hover:bg-[var(--shell-bg)] hover:text-[var(--ink)]'
+                }`}
+              >
+                <Icon size={20} weight={on ? 'fill' : 'regular'} />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="mt-auto flex flex-col gap-1.5 border-t border-[var(--border)] pt-4">
+          <button
+            type="button"
+            onClick={() => onNavigate('settings')}
+            aria-current={active === 'settings' ? 'page' : undefined}
+            className={`flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-left text-[0.9rem] font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+              active === 'settings'
+                ? 'bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent)]'
+                : 'text-[var(--ink-2)] hover:bg-[var(--shell-bg)] hover:text-[var(--ink)]'
+            }`}
+          >
+            <Gear size={20} weight={active === 'settings' ? 'fill' : 'regular'} />
+            Settings
+          </button>
+
+          <div className="mt-1 flex items-center gap-3 rounded-xl px-2.5 py-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--shell-bg)] text-[0.7rem] font-bold text-[var(--ink)]">
+              SP
+            </span>
+            <span className="text-[0.85rem] font-semibold text-[var(--ink)]">Studio Pro</span>
+            <CaretDown size={14} weight="bold" className="ml-auto text-[var(--ink-3)]" />
+          </div>
+        </div>
+      </aside>
+
+      {/* Main panel */}
+      <main className="min-w-0 flex-1 py-4 pr-4">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[26px] bg-white px-8 py-7 shadow-[0_1px_2px_rgba(11,10,12,0.04)]">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}

@@ -40,7 +40,13 @@ export interface FrameConfig {
   label: string;
   src: string;
   /** Omit for a frame that already carries its own date. */
-  dateStamp?: DateStamp;
+  dateStamp?: DateStamp | null;
+  /** Relative spin weight. Never shown to the person spinning. */
+  weight?: number;
+  /** Excluded from the wheel entirely when false. */
+  enabled?: boolean;
+  /** Built-ins ship with the app and cannot be deleted. */
+  builtIn?: boolean;
 }
 
 /**
@@ -50,7 +56,9 @@ export interface FrameConfig {
 export const STAMP_FONT_STACK =
   "'Ink Free','Segoe Script','Bradley Hand','Comic Sans MS',cursive";
 
-export const FRAMES: FrameConfig[] = [
+/** Ships with the app. Geometry is measured off the artboards, so it lives here
+ *  rather than in the database an operator can edit. */
+const BUILT_IN_SOURCE: FrameConfig[] = [
   {
     id: 'tech',
     label: 'Tech',
@@ -85,6 +93,33 @@ export const FRAMES: FrameConfig[] = [
     },
   },
 ];
+
+export const BUILT_IN_FRAMES: FrameConfig[] = BUILT_IN_SOURCE.map((f) => ({
+  ...f, builtIn: true, weight: 1, enabled: true,
+}));
+
+/**
+ * Pick a frame using its weight.
+ *
+ * Weights are an operator setting and are deliberately invisible on the wheel —
+ * every segment is drawn the same size, so a rare frame looks exactly as likely
+ * as a common one. The odds live here, not in the geometry.
+ */
+export function pickWeighted(
+  frames: FrameConfig[],
+  random: () => number = Math.random,
+): FrameConfig | null {
+  const pool = frames.filter((f) => f.enabled !== false && (f.weight ?? 1) > 0);
+  if (pool.length === 0) return null;
+
+  const total = pool.reduce((sum, f) => sum + (f.weight ?? 1), 0);
+  let ticket = random() * total;
+  for (const frame of pool) {
+    ticket -= frame.weight ?? 1;
+    if (ticket <= 0) return frame;
+  }
+  return pool[pool.length - 1]; // floating-point guard
+}
 
 /** "19/5/2026" — day/month/year, no leading zeros, matching the mockup. */
 export function formatEventDate(date: Date = new Date()): string {

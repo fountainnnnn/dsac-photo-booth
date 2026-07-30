@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight } from '@phosphor-icons/react';
 import AmbientOrb from '@/components/ui/AmbientOrb';
 import SectionHeader from '@/components/ui/SectionHeader';
 import GlowCard, { MeshOverlay } from '@/components/ui/GlowCard';
@@ -99,7 +99,6 @@ export default function HomePage() {
         Start
         <ArrowRight
           className="h-[18px] w-[18px] transition-transform duration-150 group-hover:translate-x-0.5"
-          strokeWidth={2}
         />
       </a>
 

@@ -1,6 +1,8 @@
 import CapturePage from './pages/CapturePage';
 import DownloadPage from './pages/DownloadPage';
+import GalleryPage from './pages/GalleryPage';
 import HomePage from './pages/HomePage';
+import SettingsPage from './pages/SettingsPage';
 
 function getDownloadToken(pathname: string): string | null {
   const prefix = '/download/';
@@ -14,13 +16,10 @@ export default function App() {
   const { pathname } = window.location;
   const downloadToken = getDownloadToken(pathname);
 
-  if (pathname === '/capture') {
-    return <CapturePage />;
-  }
-
-  if (downloadToken) {
-    return <DownloadPage token={downloadToken} />;
-  }
+  if (pathname === '/capture') return <CapturePage />;
+  if (pathname === '/settings') return <SettingsPage />;
+  if (pathname === '/gallery') return <GalleryPage />;
+  if (downloadToken) return <DownloadPage token={downloadToken} />;
 
   return <HomePage />;
 }

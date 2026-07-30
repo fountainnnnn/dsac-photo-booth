@@ -1,4 +1,4 @@
-import { ArrowRight, Loader2, RotateCcw } from 'lucide-react';
+import { ArrowRight, ArrowCounterClockwise, CircleNotch } from '@phosphor-icons/react';
 import AmbientOrb from '@/components/ui/AmbientOrb';
 import SectionHeader from '@/components/ui/SectionHeader';
 import Button from '@/components/ui/Button';
@@ -89,7 +89,7 @@ export default function ComposedPreview({
           onClick={onRetake}
           className="w-[180px]"
         >
-          <RotateCcw className="h-4 w-4" strokeWidth={2} />
+          <ArrowCounterClockwise className="h-4 w-4" />
           Retake
         </Button>
 
@@ -102,7 +102,7 @@ export default function ComposedPreview({
         >
           {isUploading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
+              <CircleNotch className="h-4 w-4 animate-spin" />
               Uploading…
             </>
           ) : (
@@ -110,7 +110,6 @@ export default function ComposedPreview({
               Continue
               <ArrowRight
                 className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5"
-                strokeWidth={2}
               />
             </>
           )}

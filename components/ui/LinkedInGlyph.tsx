@@ -2,7 +2,7 @@ interface LinkedInGlyphProps {
   className?: string;
 }
 
-/** LinkedIn brand mark — kept as inline SVG since lucide omits brand logos. */
+/** LinkedIn brand mark — kept as inline SVG since icon sets omit brand logos. */
 export default function LinkedInGlyph({ className = 'h-4 w-4' }: LinkedInGlyphProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

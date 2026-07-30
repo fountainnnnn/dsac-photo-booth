@@ -8,6 +8,7 @@ import express from 'express';
 import multer from 'multer';
 import QRCode from 'qrcode';
 import { createStorage } from './storage/index.mjs';
+import { createFrameCatalogue } from './frames.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.join(__dirname, '..');
@@ -50,6 +51,7 @@ const PHOTO_TTL_DAYS = Number.parseFloat(process.env.PHOTO_TTL_DAYS ?? '7');
 const TTL_MS = PHOTO_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 const storage = createStorage();
+const frames = createFrameCatalogue(storage);
 
 // When a production build exists we serve it from this same process, so the
 // kiosk and the phone download page share one origin (and one Railway service).
@@ -255,6 +257,75 @@ app.get('/api/qr/:token', (req, res) => {
   res.setHeader('Content-Type', 'image/png');
   res.setHeader('Cache-Control', 'public, max-age=86400');
   return res.send(buffer);
+});
+
+// ── Frame catalogue ──────────────────────────────────────────────────────────
+
+app.get('/api/frames', (_req, res) => {
+  const { settings, custom } = frames.get();
+  res.json({
+    settings,
+    // Never leak the storage key to the client.
+    custom: custom.map(({ id, label, mimeType, dateStamp, createdAt }) => ({
+      id, label, mimeType, dateStamp, createdAt,
+      src: `/api/frames/${encodeURIComponent(id)}/image`,
+    })),
+  });
+});
+
+app.put('/api/frames/settings', (req, res) => {
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({ error: 'Expected a settings object' });
+  }
+  const config = frames.saveSettings(req.body.settings ?? req.body);
+  return res.json({ settings: config.settings });
+});
+
+app.post('/api/frames', upload.single('file'), validateImage, (req, res, next) => {
+  try {
+    let dateStamp = null;
+    if (req.body?.dateStamp) {
+      try { dateStamp = JSON.parse(req.body.dateStamp); } catch { dateStamp = null; }
+    }
+    const frame = frames.addCustom({
+      buffer: req.file.buffer,
+      mimeType: req.file.mimetype,
+      label: req.body?.label,
+      dateStamp,
+    });
+    return res.status(201).json({
+      id: frame.id,
+      label: frame.label,
+      mimeType: frame.mimeType,
+      dateStamp: frame.dateStamp,
+      createdAt: frame.createdAt,
+      src: `/api/frames/${encodeURIComponent(frame.id)}/image`,
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+app.patch('/api/frames/:id', (req, res) => {
+  const frame = frames.updateCustom(req.params.id, req.body ?? {});
+  if (!frame) return res.status(404).json({ error: 'Frame not found' });
+  return res.json({ id: frame.id, label: frame.label, dateStamp: frame.dateStamp });
+});
+
+app.delete('/api/frames/:id', (req, res) => {
+  if (!frames.removeCustom(req.params.id)) {
+    return res.status(404).json({ error: 'Frame not found (built-in frames cannot be deleted)' });
+  }
+  return res.status(204).end();
+});
+
+app.get('/api/frames/:id/image', (req, res) => {
+  const image = frames.imageFor(req.params.id);
+  if (!image) return res.status(404).json({ error: 'Frame image not found' });
+
+  res.setHeader('Content-Type', image.mimeType);
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  return res.send(image.buffer);
 });
 
 app.get('/api/share/:token', (req, res) => {

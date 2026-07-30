@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { RotateCcw, ScanLine } from 'lucide-react';
+import { ArrowCounterClockwise, Scan } from '@phosphor-icons/react';
 import LinkedInGlyph from '@/components/ui/LinkedInGlyph';
 import AmbientOrb from '@/components/ui/AmbientOrb';
 import SectionHeader from '@/components/ui/SectionHeader';
@@ -119,7 +119,7 @@ export default function QrDownloadScreen({
               data-testid="qr-screen-instruction"
               className="flex max-w-[34ch] items-center justify-center gap-1.5 text-center text-[0.75rem] leading-[1.5] text-[var(--ink-3)]"
             >
-              <ScanLine className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+              <Scan className="h-3.5 w-3.5 shrink-0" />
               Opens a private download page. The link is available for 7 days.
             </p>
           </div>
@@ -149,7 +149,7 @@ export default function QrDownloadScreen({
             onClick={onRetake}
             className="flex-1"
           >
-            <RotateCcw className="h-4 w-4" strokeWidth={2} />
+            <ArrowCounterClockwise className="h-4 w-4" />
             Retake
           </Button>
           <Button

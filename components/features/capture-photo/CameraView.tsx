@@ -1,24 +1,32 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Aperture, CameraOff, Dices, RotateCcw, SlidersHorizontal, Timer } from 'lucide-react';
-import CaptureButton from '@/components/ui/CaptureButton';
-import AmbientOrb from '@/components/ui/AmbientOrb';
-import SectionHeader from '@/components/ui/SectionHeader';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowClockwise,
+  Camera,
+  CameraSlash,
+  CaretRight,
+  CircleHalf,
+  DiceFive,
+  Drop,
+  Image as ImageIcon,
+  Palette,
+  Sun,
+  Timer as TimerIcon,
+} from '@phosphor-icons/react';
+import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import FrameWheelModal from '@/components/ui/FrameWheelModal';
 import { useLivePreview } from './useLivePreview';
+import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
+import { rememberCapture } from '@/components/features/gallery/galleryStore';
 import type { FrameConfig } from '@/types/frame';
 import {
-  FRAMES, FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
+  FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
   STAMP_FONT_STACK, drawDateStamp, stampFontPx, stampText,
 } from '@/types/frame';
 import type { ImageFilters } from '@/types/editor';
 import { DEFAULT_FILTERS, FILTER_PRESETS, filtersToCSS } from '@/types/editor';
 
-// ── Preset data ───────────────────────────────────────────────────────────────
-
-const TIMER_OPTIONS = [0, 5, 10] as const;
+const TIMER_OPTIONS = [0, 3, 5, 10] as const;
 type TimerOption = typeof TIMER_OPTIONS[number];
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 type PermissionStatus = 'prompt' | 'granted' | 'denied' | 'unsupported';
 
@@ -27,8 +35,6 @@ export interface CameraViewProps {
   onCapture: (blob: Blob, dataUrl: string) => void;
   onError?: (error: Error) => void;
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 0.92): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -44,29 +50,39 @@ function isDrawable(img: HTMLImageElement | undefined): img is HTMLImageElement 
   return !!img && img.complete && img.naturalWidth > 0;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export default function CameraView({ facingMode = 'user', onCapture, onError }: CameraViewProps) {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const countdownRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const framesCardRef = useRef<HTMLDivElement>(null);
+  const filtersCardRef = useRef<HTMLDivElement>(null);
+  const adjustCardRef = useRef<HTMLDivElement>(null);
 
   const [permission, setPermission]     = useState<PermissionStatus>('prompt');
   const [isStreaming, setIsStreaming]   = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const { frames } = useFrameCatalogue();
+
   // No frame until the wheel decides one.
   const [activeFrame, setActiveFrame] = useState<FrameConfig | null>(null);
   const [wheelOpen, setWheelOpen]     = useState(false);
   const [filters, setFilters]         = useState<ImageFilters>(DEFAULT_FILTERS);
-  const [filterThumb, setFilterThumb] = useState<string | null>(null); // neutral live frame for filter previews
+  const [filterThumb, setFilterThumb] = useState<string | null>(null);
+  const [lastCapture, setLastCapture] = useState<string | null>(null);
 
-  // Timer
   const [timerSecs, setTimerSecs]     = useState<TimerOption>(0);
   const [countdown, setCountdown]     = useState<number | null>(null);
 
-  // ── Camera init ──────────────────────────────────────────────────────────────
+  // Keep the chosen frame pointing at a live catalogue entry (weights can change).
+  useEffect(() => {
+    if (!activeFrame) return;
+    const still = frames.find((f) => f.id === activeFrame.id);
+    if (!still) setActiveFrame(null);
+  }, [frames, activeFrame]);
+
+  // ── Camera ───────────────────────────────────────────────────────────────────
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop());
@@ -109,26 +125,24 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
   }, [startCamera, stopStream]);
 
   // ── Frame preloading ─────────────────────────────────────────────────────────
-  // Decode every frame up front and keep the elements around. The shutter must
-  // never await a network image: a slow or failed PNG would otherwise leave the
-  // button doing nothing at all.
+  // The shutter must never await a network image: a slow or failed PNG would
+  // otherwise leave the button doing nothing at all.
   const frameCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
   useEffect(() => {
-    for (const frame of FRAMES) {
+    for (const frame of frames) {
       if (frameCache.current.has(frame.src)) continue;
       const img = new Image();
       img.onerror = () => console.warn('[DSAC] Frame failed to preload:', frame.src);
       img.src = frame.src;
       frameCache.current.set(frame.src, img);
     }
-  }, []);
+  }, [frames]);
 
   // ── Live preview ─────────────────────────────────────────────────────────────
 
   const { canvasRef } = useLivePreview(videoRef, { filters });
 
-  // Size canvas to match container exactly — eliminates object-contain letterboxing
   useEffect(() => {
     const container = canvasAreaRef.current;
     if (!container) return;
@@ -136,7 +150,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
       const rect = container.getBoundingClientRect();
       if (canvasRef.current) {
         canvasRef.current.width = Math.round(rect.width || 1280);
-        canvasRef.current.height = Math.round(rect.height || 720);
+        canvasRef.current.height = Math.round(rect.height || 800);
       }
       return;
     }
@@ -151,17 +165,14 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     return () => ro.disconnect();
   }, [canvasRef]);
 
-  // ── Filter preview thumbnail ──────────────────────────────────────────────────
-  // Snapshot a small *unfiltered* frame from the feed so each preset chip can show
-  // the effect via its own CSS filter. Refreshed occasionally; previews stay live-ish.
+  // Small unfiltered snapshot so each preset chip can preview itself.
   useEffect(() => {
     if (!isStreaming) return;
     const grab = () => {
       const video = videoRef.current;
       if (!video?.videoWidth) return;
       const c = document.createElement('canvas');
-      c.width = 96;
-      c.height = 54;
+      c.width = 96; c.height = 60;
       const ctx = c.getContext('2d');
       if (!ctx) return;
       ctx.drawImage(video, 0, 0, c.width, c.height);
@@ -172,7 +183,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     return () => clearInterval(id);
   }, [isStreaming]);
 
-  // ── Capture (with timer) ─────────────────────────────────────────────────────
+  // ── Capture ──────────────────────────────────────────────────────────────────
 
   const doCapture = useCallback(async () => {
     const video = videoRef.current;
@@ -199,6 +210,8 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
       }
 
       const dataUrl = output.toDataURL('image/jpeg', 0.92);
+      setLastCapture(dataUrl);
+      rememberCapture(dataUrl);
       const blob = await canvasToBlob(output);
       onCapture(blob, dataUrl);
       return;
@@ -231,19 +244,18 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
       if (isDrawable(cachedFrame)) {
         ctx.drawImage(cachedFrame, 0, 0, sw, sh);
         drawDateStamp(ctx, activeFrame, sw, sh);
-      } else {
-        console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
       }
     }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    setLastCapture(dataUrl);
+    rememberCapture(dataUrl);
     const blob = await canvasToBlob(canvas);
     onCapture(blob, dataUrl);
   }, [isStreaming, canvasRef, filters, activeFrame, onCapture]);
 
   const handleCapturePress = useCallback(() => {
     if (countdown !== null) {
-      // Cancel in-flight countdown
       if (countdownRef.current) clearInterval(countdownRef.current);
       setCountdown(null);
       return;
@@ -251,7 +263,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     if (timerSecs === 0) { void doCapture(); return; }
 
     setCountdown(timerSecs);
-    let remaining = timerSecs;
+    let remaining: number = timerSecs;
     countdownRef.current = setInterval(() => {
       remaining -= 1;
       if (remaining <= 0) {
@@ -267,293 +279,313 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
 
   useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current); }, []);
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  // ── Navigation ───────────────────────────────────────────────────────────────
+
+  const navigate = useCallback((section: StudioSection) => {
+    if (section === 'settings') { window.location.href = '/settings'; return; }
+    if (section === 'gallery')  { window.location.href = '/gallery'; return; }
+    const target = section === 'frames' ? framesCardRef
+      : section === 'filters' ? filtersCardRef
+      : section === 'adjust' ? adjustCardRef
+      : null;
+    target?.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    target?.current?.animate?.(
+      [{ boxShadow: '0 0 0 0 rgba(225,38,47,0.5)' }, { boxShadow: '0 0 0 6px rgba(225,38,47,0)' }],
+      { duration: 700, easing: 'ease-out' },
+    );
+  }, []);
+
+  const enabledFrames = useMemo(() => frames.filter((f) => f.enabled !== false), [frames]);
 
   return (
-    <div
-      data-testid="capture-camera-root"
-      className="flex h-dvh w-full overflow-hidden"
-      style={{ background: 'var(--stage)' }}
-    >
-      {/* Hidden video */}
+    <StudioShell active="capture" onNavigate={navigate}>
       <video ref={videoRef} data-testid="capture-video-element" autoPlay playsInline muted
         onCanPlay={() => setIsStreaming(true)} className="hidden" />
 
-      {/* ── Live canvas column ── */}
-      {/* Chrome lives above and below the stage, never on it: what you see
-          inside the 16:9 rectangle is exactly what gets captured. */}
-      <div
-        className="relative flex min-w-0 flex-1 select-none flex-col overflow-hidden px-8 py-6"
-        style={{ background: 'var(--stage)' }}
-      >
-        <AmbientOrb tone="dark" />
+      {/* Header */}
+      <header className="flex shrink-0 items-center gap-6">
+        <h1 className="text-[1.6rem] font-semibold tracking-[-0.02em] text-[var(--ink)]">
+          Make it yours<span className="text-[var(--accent)]">.</span>
+        </h1>
 
-        {/* Chrome row — above the stage */}
-        <div className="relative z-10 flex shrink-0 items-center pb-5">
-          <img src="/sp-dsac-logo.png" alt="SP DSAC" className="h-9 w-auto opacity-90" />
+        <div className="ml-auto flex items-center gap-1 rounded-full border border-[var(--border)] p-1.5 pl-4">
+          <TimerIcon size={19} className="mr-1.5 text-[var(--ink-2)]" />
+          <span className="mr-1.5 text-[0.85rem] font-semibold text-[var(--ink-2)]">Timer</span>
+          {TIMER_OPTIONS.map(s => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setTimerSecs(s)}
+              className={`min-w-[62px] rounded-full px-4 py-2 text-[0.85rem] font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                timerSecs === s
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'text-[var(--ink-2)] hover:bg-[var(--shell-bg)]'
+              }`}
+            >
+              {s === 0 ? 'Off' : `${s}s`}
+            </button>
+          ))}
         </div>
 
-        {/* Stage row — flexes to fill, centres the 16:9 rectangle */}
-        <div className="relative flex min-h-0 flex-1 items-center justify-center">
+        <button
+          type="button"
+          onClick={() => setFilters(DEFAULT_FILTERS)}
+          aria-label="Reset adjustments"
+          className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--ink-2)] transition hover:border-[var(--ink-3)] hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+        >
+          <Sun size={19} />
+        </button>
+      </header>
+
+      {/* Stage + capture rail */}
+      <div data-testid="capture-camera-root" className="mt-6 flex min-h-0 flex-1 gap-5">
+        <div className="flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[20px]"
+          style={{ background: 'var(--shell-bg)' }}>
           <div
             ref={canvasAreaRef}
-            className="relative overflow-hidden rounded-[20px]"
-            // width-driven so aspect-ratio actually governs the height. A definite
-            // height here would win over aspect-ratio and letterbox the 16:9 frame
-            // SVGs against the photo edges.
+            className="relative overflow-hidden rounded-[16px]"
             style={{
               aspectRatio: `${FRAME_ASPECT}`,
               width: '100%',
               maxHeight: '100%',
-              boxShadow: '0 30px 80px -24px rgba(0,0,0,0.8)',
-              // lets the date stamp size itself in cqh, so preview and capture agree
               containerType: 'size',
             }}
           >
-            <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" style={{ background: '#0b0a0c' }} />
+            <canvas ref={canvasRef} className="absolute inset-0 h-full w-full"
+              style={{ background: 'var(--shell-bg)' }} />
 
-          {/* Active frame — full-bleed, never intercepts pointer events */}
-          {/* Frame + its date stamp. object-fill (the default) because capture
-              composites the frame stretched to the full canvas; object-contain
-              would letterbox here and disagree with the photo. */}
-          {activeFrame && (
-            <>
-              <img
-                src={activeFrame.src}
-                alt=""
-                className="pointer-events-none absolute inset-0 z-10 h-full w-full"
-                draggable={false}
-              />
-              <LiveDateStamp frame={activeFrame} />
-            </>
-          )}
+            {activeFrame && (
+              <>
+                <img src={activeFrame.src} alt="" draggable={false}
+                  className="pointer-events-none absolute inset-0 z-10 h-full w-full" />
+                <LiveDateStamp frame={activeFrame} />
+              </>
+            )}
 
-          {/* Countdown overlay */}
-          {countdown !== null && (
-            <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-4">
-              <div className="relative flex items-center justify-center">
-                <div className="absolute h-40 w-40 rounded-full border-2 border-[var(--accent)]/50"
-                  style={{ animation: 'dsac-countdown-ring 1s ease-out infinite' }} />
-                <div className="flex h-32 w-32 items-center justify-center rounded-full border border-white/15 bg-black/40 backdrop-blur-xl">
-                  <span className="text-7xl font-medium leading-none tabular-nums text-white"
-                    style={{ textShadow: '0 2px 16px rgba(0,0,0,0.6)' }}>
-                    {countdown}
-                  </span>
+            {countdown !== null && (
+              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+                <div className="flex h-32 w-32 items-center justify-center rounded-full border border-white/20 bg-black/45 backdrop-blur-md">
+                  <span className="text-7xl font-medium leading-none tabular-nums text-white">{countdown}</span>
                 </div>
               </div>
-              <span className="rounded-xl border border-white/15 bg-black/35 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/80 backdrop-blur-xl">
-                Tap to cancel
-              </span>
-            </div>
-          )}
+            )}
 
-          {/* Error overlay — stays on the stage, it replaces the feed */}
-          {errorMessage && (
-            <div data-testid="capture-permission-notice" role="alert"
-              className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-5 px-8 text-center"
-              style={{ background: 'color-mix(in srgb, var(--stage) 95%, transparent)' }}>
-              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10">
-                <CameraOff className="h-6 w-6 text-[var(--accent)]" strokeWidth={1.75} />
+            {errorMessage && (
+              <div data-testid="capture-permission-notice" role="alert"
+                className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 px-8 text-center"
+                style={{ background: 'var(--shell-bg)' }}>
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent)]">
+                  <CameraSlash size={26} />
+                </span>
+                <p className="max-w-[38ch] text-[0.95rem] font-medium leading-[1.5] text-[var(--ink)]">{errorMessage}</p>
+                {permission !== 'denied' && permission !== 'unsupported' && (
+                  <button type="button" onClick={startCamera}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-6 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
+                    <ArrowClockwise size={17} />
+                    Try again
+                  </button>
+                )}
               </div>
-              <p className="max-w-[38ch] text-base font-medium leading-[1.5] text-white">{errorMessage}</p>
-              {permission !== 'denied' && permission !== 'unsupported' && (
-                <button onClick={startCamera}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 px-6 text-sm font-semibold text-white transition-all duration-150 hover:border-white/40 hover:bg-white/10 active:translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
-                  <RotateCcw className="h-4 w-4" strokeWidth={2} />
-                  Try again
-                </button>
-              )}
-            </div>
-          )}
-          </div>{/* end 16:9 stage */}
-        </div>{/* end stage row */}
-
-        {/* Shutter row — below the stage, so it never lands in the photo */}
-        {!errorMessage && (
-          <div
-            data-testid="capture-controls"
-            className="relative z-10 flex shrink-0 flex-col items-center gap-2.5 pt-5"
-          >
-            <CaptureButton
-              onClick={handleCapturePress}
-              disabled={!isStreaming}
-              ariaLabel={countdown !== null ? 'Cancel timer' : 'Take photo'}
-            />
-            <span className="text-[0.6875rem] font-semibold uppercase tracking-[0.24em] text-white/45">
-              {!isStreaming
-                ? 'Starting camera…'
-                : countdown !== null
-                  ? 'Tap to cancel'
-                  : timerSecs > 0
-                    ? `${timerSecs}s timer set`
-                    : 'Press to capture'}
-            </span>
+            )}
           </div>
-        )}
-      </div>{/* end camera column */}
-
-      {/* ── Right editing panel ── */}
-      <aside
-        className="flex w-80 flex-shrink-0 flex-col overflow-y-auto border-l border-[var(--border)]"
-        style={{ background: 'var(--background)' }}
-      >
-        <div className="flex items-start gap-3 border-b border-[var(--border)] px-5 py-5">
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--ink)] shadow-[0_1px_2px_rgba(11,10,12,0.06)]">
-            <Aperture className="h-4 w-4" strokeWidth={2} />
-          </span>
-          <SectionHeader
-            size="sm"
-            align="left"
-            eyebrow="Customize"
-            title={
-              <>
-                Make it yours<span className="text-[var(--accent)]">.</span>
-              </>
-            }
-          />
         </div>
 
-        {/* Timer section */}
-        <Section label="Timer" icon={Timer}>
-          <div className="flex gap-2">
-            {TIMER_OPTIONS.map(s => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setTimerSecs(s)}
-                className={`min-h-11 flex-1 rounded-xl text-sm font-semibold transition-all duration-150 active:translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
-                  timerSecs === s
-                    ? 'bg-[var(--accent)] text-white shadow-[0_1px_2px_rgba(11,10,12,0.18),0_6px_18px_rgba(225,38,47,0.26)]'
-                    : 'border border-[var(--border)] bg-white text-[var(--ink-2)] hover:border-[var(--ink-3)] hover:text-[var(--ink)]'
-                }`}
-              >
-                {s === 0 ? 'Off' : `${s}s`}
-              </button>
-            ))}
-          </div>
-        </Section>
+        {/* Capture rail */}
+        <aside data-testid="capture-controls"
+          className="flex w-[266px] shrink-0 flex-col rounded-[20px] border border-[var(--border)] px-6 py-6">
+          <p className="text-center text-[1.05rem] font-semibold text-[var(--ink)]">Capture</p>
 
-        {/* Frame section — the wheel lives in its own full-screen moment */}
-        <Section label="Frame" icon={Dices}>
+          <div className="mt-5 flex justify-center">
+            <button
+              data-testid="capture-button"
+              type="button"
+              onClick={handleCapturePress}
+              disabled={!isStreaming}
+              aria-label={countdown !== null ? 'Cancel timer' : 'Take photo'}
+              className="group flex h-[108px] w-[108px] items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_10px_30px_-8px_rgba(225,38,47,0.55)] ring-[6px] ring-white transition-all duration-150 hover:-translate-y-px hover:bg-[var(--accent-hover)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-[6px] focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,white)]"
+            >
+              <Camera size={40} weight="fill" />
+            </button>
+          </div>
+
           <button
-            type="button"
             data-testid="open-frame-wheel"
+            type="button"
             onClick={() => setWheelOpen(true)}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 text-sm font-semibold text-white shadow-[0_1px_2px_rgba(11,10,12,0.18),0_6px_18px_rgba(225,38,47,0.26)] transition-all duration-150 hover:-translate-y-px hover:bg-[var(--accent-hover)] active:translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
+            className="mt-7 inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-[var(--border)] px-4 text-[0.9rem] font-semibold text-[var(--ink)] transition hover:border-[var(--ink-3)] hover:bg-[var(--shell-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           >
-            <Dices className="h-4 w-4" strokeWidth={2} />
+            <DiceFive size={19} />
             {activeFrame ? 'Spin again' : 'Spin for a frame'}
           </button>
-          <p aria-live="polite" className="mt-2.5 text-[0.6875rem] leading-[1.5] text-[var(--ink-3)]">
-            {activeFrame
-              ? <>Frame: <strong className="font-semibold text-[var(--ink)]">{activeFrame.label}</strong></>
-              : 'No frame yet — spin to get one.'}
-          </p>
-        </Section>
 
-        {/* Filters section */}
-        <Section label="Filters" icon={SlidersHorizontal}>
-          {/* Preset grid — each chip previews the filter on a live frame.
-              4 columns keeps all 12 presets in 3 rows so the panel never scrolls. */}
-          <div className="mb-3 grid grid-cols-4 gap-1.5">
-            {FILTER_PRESETS.map(p => {
-              const active =
-                filters.brightness === p.filters.brightness &&
-                filters.contrast   === p.filters.contrast   &&
-                filters.saturation === p.filters.saturation &&
-                filters.hue        === p.filters.hue;
+          <a
+            href="/gallery"
+            className="mt-2.5 inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-[var(--border)] px-4 text-[0.9rem] font-semibold text-[var(--ink)] transition hover:border-[var(--ink-3)] hover:bg-[var(--shell-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          >
+            <ImageIcon size={19} />
+            Last capture
+          </a>
+
+          <div className="mt-6 border-t border-[var(--border)] pt-5">
+            <p className="text-[0.78rem] font-medium text-[var(--ink-3)]">Last capture</p>
+            <div className="mt-3 flex items-start gap-3">
+              <div className="h-[52px] w-[74px] shrink-0 overflow-hidden rounded-lg"
+                style={{ background: 'var(--shell-bg)' }}>
+                {lastCapture && <img src={lastCapture} alt="Most recent capture" className="h-full w-full object-cover" />}
+              </div>
+              <p className="text-[0.75rem] leading-[1.45] text-[var(--ink-3)]">
+                {lastCapture ? (
+                  <>Saved<br />Ready to share.</>
+                ) : (
+                  <>No captures yet<br />Your latest photo will appear here.</>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-auto pt-4 text-center text-[0.72rem] text-[var(--ink-3)]">
+            {activeFrame ? <>Frame: <strong className="font-semibold text-[var(--ink)]">{activeFrame.label}</strong></> : 'No frame yet'}
+          </p>
+        </aside>
+      </div>
+
+      {/* Bottom cards */}
+      <div className="mt-5 grid shrink-0 grid-cols-3 gap-5">
+        <Card ref={framesCardRef} title="Frames" actionLabel="View all" onAction={() => setWheelOpen(true)}>
+          <div className="flex items-end gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            <Swatch active={!activeFrame} label="None" onClick={() => setActiveFrame(null)}>
+              <span className="absolute inset-0 flex items-center justify-center">
+                <span className="h-8 w-px rotate-45 bg-[var(--ink-3)]" />
+              </span>
+            </Swatch>
+            {enabledFrames.map((f) => (
+              <Swatch key={f.id} active={activeFrame?.id === f.id} label={f.label} onClick={() => setActiveFrame(f)}>
+                <img src={f.src} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+              </Swatch>
+            ))}
+            <button
+              type="button"
+              onClick={() => setWheelOpen(true)}
+              aria-label="Open the frame wheel"
+              className="mb-5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-white text-[var(--ink-2)] shadow-sm transition hover:border-[var(--ink-3)] hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            >
+              <CaretRight size={15} weight="bold" />
+            </button>
+          </div>
+        </Card>
+
+        <Card ref={filtersCardRef} title="Filters" actionLabel="View all"
+          onAction={() => setFilters(DEFAULT_FILTERS)}>
+          <div className="flex items-end gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {FILTER_PRESETS.slice(0, 6).map(p => {
+              const on = filters.brightness === p.filters.brightness
+                && filters.contrast === p.filters.contrast
+                && filters.saturation === p.filters.saturation
+                && filters.hue === p.filters.hue;
               return (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => setFilters(p.filters)}
-                  className="group flex flex-col items-center gap-1 rounded-lg p-0.5 focus:outline-none"
-                >
-                  <span
-                    className={`block w-full overflow-hidden rounded-lg border transition-all duration-150 ${
-                      active
-                        ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/25'
-                        : 'border-[var(--border)] group-hover:border-[var(--ink-3)]'
-                    }`}
-                    style={{ aspectRatio: '16 / 9' }}
-                  >
-                    {filterThumb ? (
-                      <img
-                        src={filterThumb}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        style={{ filter: filtersToCSS(p.filters) }}
-                        draggable={false}
-                      />
-                    ) : (
-                      <span
-                        className="block h-full w-full bg-[var(--border)]"
-                        style={{ filter: filtersToCSS(p.filters) }}
-                      />
-                    )}
-                  </span>
-                  <span
-                    className={`text-[0.625rem] font-semibold ${
-                      active ? 'text-[var(--accent-ink)]' : 'text-[var(--ink-2)]'
-                    }`}
-                  >
-                    {p.label}
-                  </span>
-                </button>
+                <Swatch key={p.label} active={on} label={p.label} onClick={() => setFilters(p.filters)}>
+                  {filterThumb
+                    ? <img src={filterThumb} alt="" className="absolute inset-0 h-full w-full object-cover"
+                        style={{ filter: filtersToCSS(p.filters) }} draggable={false} />
+                    : <span className="absolute inset-0" style={{ background: '#dcdce0', filter: filtersToCSS(p.filters) }} />}
+                </Swatch>
               );
             })}
           </div>
+        </Card>
 
-          {/* Manual sliders */}
-          <div className="flex flex-col gap-3">
-            <FilterSlider label="Brightness" value={filters.brightness} min={50}   max={150} onChange={v => setFilters(f => ({ ...f, brightness: v }))} />
-            <FilterSlider label="Contrast"   value={filters.contrast}   min={50}   max={150} onChange={v => setFilters(f => ({ ...f, contrast: v }))} />
-            <FilterSlider label="Saturation" value={filters.saturation} min={0}    max={200} onChange={v => setFilters(f => ({ ...f, saturation: v }))} />
-            <FilterSlider label="Hue shift"  value={filters.hue}        min={-180} max={180} onChange={v => setFilters(f => ({ ...f, hue: v }))} unit="°" />
-            <button type="button" onClick={() => setFilters(DEFAULT_FILTERS)}
-              className="mt-1 inline-flex min-h-9 items-center gap-1.5 self-start rounded-lg px-2.5 text-[0.6875rem] font-semibold text-[var(--ink-3)] transition-all duration-150 hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
-              <RotateCcw className="h-3 w-3" strokeWidth={2} />
-              Reset
-            </button>
+        <Card ref={adjustCardRef} title="Adjustments" actionLabel="Reset"
+          onAction={() => setFilters(DEFAULT_FILTERS)}>
+          <div className="flex flex-col gap-2">
+            <Slider icon={<Sun size={16} />} label="Brightness" value={filters.brightness} min={50} max={150}
+              onChange={v => setFilters(f => ({ ...f, brightness: v }))} />
+            <Slider icon={<CircleHalf size={16} weight="fill" />} label="Contrast" value={filters.contrast} min={50} max={150}
+              onChange={v => setFilters(f => ({ ...f, contrast: v }))} />
+            <Slider icon={<Drop size={16} />} label="Saturation" value={filters.saturation} min={0} max={200}
+              onChange={v => setFilters(f => ({ ...f, saturation: v }))} />
+            <Slider icon={<Palette size={16} />} label="Hue" value={filters.hue} min={-180} max={180} unit="°" hue
+              onChange={v => setFilters(f => ({ ...f, hue: v }))} />
           </div>
-        </Section>
-      </aside>
+        </Card>
+      </div>
 
       <FrameWheelModal
         open={wheelOpen}
-        frames={FRAMES}
+        frames={enabledFrames}
         onPicked={setActiveFrame}
         onClose={() => setWheelOpen(false)}
       />
-    </div>
+    </StudioShell>
   );
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function Section({ label, icon: Icon, children }: {
-  label: string;
-  icon?: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-  children: React.ReactNode;
+function Card({ ref, title, actionLabel, onAction, children }: {
+  ref?: React.Ref<HTMLDivElement>;
+  title: string; actionLabel: string; onAction: () => void; children: React.ReactNode;
 }) {
   return (
-    <div className="border-b border-[var(--border)] px-5 py-4">
-      <div className="mb-3 flex items-center gap-1.5 text-[var(--ink-2)]">
-        {Icon && <Icon className="h-3.5 w-3.5" strokeWidth={2} />}
-        <p className="text-[0.6875rem] font-semibold uppercase tracking-[1px]">{label}</p>
+    <div ref={ref} className="min-w-0 rounded-[18px] border border-[var(--border)] px-5 py-4">
+      <div className="mb-3.5 flex items-center justify-between">
+        <p className="text-[0.92rem] font-semibold text-[var(--ink)]">{title}</p>
+        <button type="button" onClick={onAction}
+          className="text-[0.8rem] font-semibold text-[var(--accent)] transition hover:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
+          {actionLabel}
+        </button>
       </div>
       {children}
     </div>
   );
 }
 
+function Swatch({ active, label, onClick, children }: {
+  active: boolean; label: string; onClick: () => void; children: React.ReactNode;
+}) {
+  return (
+    <button type="button" onClick={onClick} title={label}
+      className="group flex shrink-0 flex-col items-center gap-1.5 focus:outline-none">
+      <span
+        className={`relative block h-[74px] w-[62px] overflow-hidden rounded-[10px] border transition-all duration-150 ${
+          active ? 'border-[var(--accent)] ring-2 ring-[color-mix(in_srgb,var(--accent)_28%,transparent)]'
+                 : 'border-[var(--border)] group-hover:border-[var(--ink-3)]'
+        }`}
+        style={{ background: '#e6e6ea' }}
+      >
+        {children}
+      </span>
+      <span className={`max-w-[64px] truncate text-[0.72rem] font-semibold ${active ? 'text-[var(--accent)]' : 'text-[var(--ink-2)]'}`}>
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function Slider({ icon, label, value, min, max, unit = '', hue = false, onChange }: {
+  icon: React.ReactNode; label: string; value: number; min: number; max: number;
+  unit?: string; hue?: boolean; onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="text-[var(--ink-2)]">{icon}</span>
+      <span className="w-[74px] shrink-0 text-[0.8rem] font-medium text-[var(--ink-2)]">{label}</span>
+      <input
+        type="range" min={min} max={max} value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        className={hue ? 'dsac-range dsac-range-hue' : 'dsac-range'}
+        aria-label={label}
+      />
+      <span className="w-9 shrink-0 text-right text-[0.78rem] tabular-nums text-[var(--ink-2)]">
+        {hue ? value : value - 100}{unit}
+      </span>
+    </div>
+  );
+}
+
 /**
- * The event date, drawn over the live feed so the preview matches the photo.
- *
- * Sized in cqh against the stage (container-type: size), which is the same
- * fraction-of-height the canvas stamp uses — so the two cannot drift. The
- * auto-shrink for a tight frame is replicated via an offscreen measuring
- * context so the preview shows the same size the capture will use.
+ * The event date over the live feed, so the preview matches the photo.
+ * Sized in cqh against the stage — the same fraction-of-height the canvas stamp
+ * uses — so the two cannot drift.
  */
 function LiveDateStamp({ frame }: { frame: FrameConfig }) {
   const stamp = frame.dateStamp;
@@ -563,7 +595,6 @@ function LiveDateStamp({ frame }: { frame: FrameConfig }) {
     if (!stamp?.maxWidthFrac) { setShrink(1); return; }
     const ctx = document.createElement('canvas').getContext('2d');
     if (!ctx) return;
-    // Measure against the artboard, then express the result as a ratio.
     const full = Math.round(stamp.sizeFrac * FRAME_H_PX);
     const fitted = stampFontPx(ctx, frame, FRAME_W_PX, FRAME_H_PX);
     setShrink(full > 0 ? fitted / full : 1);
@@ -589,20 +620,3 @@ function LiveDateStamp({ frame }: { frame: FrameConfig }) {
     </span>
   );
 }
-
-function FilterSlider({ label, value, min, max, onChange, unit = '%' }: {
-  label: string; value: number; min: number; max: number; onChange: (v: number) => void; unit?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex justify-between">
-        <span className="text-[0.6875rem] font-semibold text-[var(--ink)]">{label}</span>
-        <span className="font-mono text-[0.6875rem] tabular-nums text-[var(--ink-3)]">{value}{unit}</span>
-      </div>
-      <input type="range" min={min} max={max} value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        className="dsac-range" />
-    </div>
-  );
-}
-

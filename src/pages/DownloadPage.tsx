@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Copy, Download } from 'lucide-react';
+import { Check, Copy, DownloadSimple } from '@phosphor-icons/react';
 import BrandMark from '@/components/ui/BrandMark';
 import LinkedInGlyph from '@/components/ui/LinkedInGlyph';
 
@@ -63,7 +63,7 @@ export default function DownloadPage({ token }: DownloadPageProps) {
               download="dsac-photo.jpg"
               className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#18181b] px-8 text-sm font-semibold text-white shadow-[0_1px_2px_rgba(24,24,27,0.16),0_8px_24px_rgba(24,24,27,0.12)] transition duration-200 hover:bg-[#e1262f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e1262f]"
             >
-              <Download className="h-4 w-4" strokeWidth={2} />
+              <DownloadSimple className="h-4 w-4" />
               Save photo
             </a>
           </section>
@@ -88,7 +88,7 @@ export default function DownloadPage({ token }: DownloadPageProps) {
                 onClick={handleCopy}
                 className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e5e5e8] bg-white px-3 text-xs font-semibold text-[#52525b] transition hover:border-[#18181b] hover:text-[#18181b]"
               >
-                {copied ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : <Copy className="h-3.5 w-3.5" strokeWidth={2} />}
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? 'Copied!' : 'Copy text'}
               </button>
 

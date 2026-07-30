@@ -7,6 +7,7 @@
  */
 :root {
   /* Surfaces */
+  --shell-bg: #eff0f2; /* studio canvas behind the white panels */
   --background: #f7f6f8; /* page canvas — faintly warm neutral */
   --surface: #ffffff; /* panels, solid text beds */
   --card: #f8f7fa; /* glow-card base, tinted a hair toward the brand */
@@ -167,4 +168,25 @@ a {
 .dsac-range:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+.dsac-range:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Hue is a position on the colour wheel, so show the wheel in the track. */
+.dsac-range-hue {
+  background: linear-gradient(
+    90deg,
+    #00e0d0 0%,
+    #0090ff 14%,
+    #7a3cf0 28%,
+    #ff3ba7 42%,
+    #ff4d4d 50%,
+    #ff9a3c 64%,
+    #ffe14d 78%,
+    #6ee04d 90%,
+    #00e0d0 100%
+  );
 }

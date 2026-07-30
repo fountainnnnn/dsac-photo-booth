@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, Dices, X } from 'lucide-react';
+import { ArrowRight, Check, DiceFive, X } from '@phosphor-icons/react';
 import type { FrameConfig } from '@/types/frame';
+import { pickWeighted } from '@/types/frame';
 
 /**
  * FrameWheelModal — the frame is decided by chance, so the pick gets its own
  * card rather than a control tucked in the sidebar.
  *
- * The random variable is the landing ANGLE, not the winning segment: the wheel
- * stops anywhere inside a segment rather than always dead-centre, which is what
- * makes it read as a real spin. The winner is derived arithmetically from that
- * same angle — never read back off the rendered transform, which is what would
- * let a rounding error disagree with what the user sees. Angles landing within
- * a guard of a segment edge are redrawn so the pointer is never ambiguous.
+ * Two independent random steps:
+ *
+ *   1. WHICH frame wins, drawn from the operator's weights. Segments are all
+ *      the same size regardless, so the wheel never reveals that one frame is
+ *      rarer than another.
+ *   2. WHERE inside that segment the pointer stops, so it never parks
+ *      dead-centre and the spin reads as genuine. Kept clear of the segment
+ *      edges, where the pointer would look ambiguous.
+ *
+ * The winner is known before the animation starts and is never read back off
+ * the rendered transform, so a rounding error cannot make the wheel disagree
+ * with the frame that gets applied.
  */
 
 /** Pastel fills with an ink tone dark enough to read on them. */
@@ -80,15 +87,20 @@ export default function FrameWheelModal({
     const base = Math.ceil(rotation / 360) * 360; // always travel forwards
     const n = frames.length;
 
-    let target = base + FULL_TURNS * 360;
-    let winner = 0;
-    for (let attempt = 0; attempt < 32; attempt++) {
-      const candidate = base + FULL_TURNS * 360 + Math.random() * 360;
-      const { index, offsetInSeg, seg } = segmentAtPointer(candidate, n);
-      target = candidate;
-      winner = index;
-      if (offsetInSeg > BOUNDARY_GUARD_DEG && seg - offsetInSeg > BOUNDARY_GUARD_DEG) break;
-    }
+    // The odds come from the weights; the wheel only has to land there.
+    // Segments are all drawn the same size, so nothing on screen betrays that
+    // one frame is rarer than another.
+    const picked = pickWeighted(frames);
+    const winner = Math.max(0, frames.findIndex((f) => f.id === picked?.id));
+
+    // Randomise WHERE inside the winning segment we stop, so the pointer never
+    // parks dead-centre and the spin reads as genuine. The guard keeps it clear
+    // of the segment edges, where the pointer would look ambiguous.
+    const seg = 360 / n;
+    const usable = Math.max(0, seg - BOUNDARY_GUARD_DEG * 2);
+    const offset = BOUNDARY_GUARD_DEG + Math.random() * usable;
+    const landing = -(winner * seg + offset);
+    const target = base + FULL_TURNS * 360 + landing;
 
     setRotation(target);
 
@@ -131,7 +143,7 @@ export default function FrameWheelModal({
           aria-label="Close"
           className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-xl text-[var(--ink-3)] transition hover:bg-[var(--border)] hover:text-[var(--ink)] disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
         >
-          <X className="h-5 w-5" strokeWidth={2} />
+          <X className="h-5 w-5" />
         </button>
 
         <p className="dsac-gradient-text text-[0.75rem] font-semibold uppercase tracking-[1px]">
@@ -240,7 +252,7 @@ export default function FrameWheelModal({
                     />
                     {won && (
                       <span className="absolute bottom-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] shadow">
-                        <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                        <Check className="h-3 w-3 text-white" />
                       </span>
                     )}
                   </div>
@@ -266,7 +278,7 @@ export default function FrameWheelModal({
             disabled={spinning}
             className="inline-flex min-h-13 items-center justify-center gap-2.5 rounded-xl bg-[var(--accent)] px-8 text-[0.95rem] font-semibold text-white shadow-[0_1px_2px_rgba(11,10,12,0.18),0_8px_24px_rgba(225,38,47,0.28)] transition-all duration-150 hover:-translate-y-px hover:bg-[var(--accent-hover)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
           >
-            <Dices className="h-4 w-4" strokeWidth={2} />
+            <DiceFive className="h-4 w-4" />
             {spinning ? 'Spinning…' : result ? 'Spin again' : 'Spin'}
           </button>
 
@@ -278,7 +290,7 @@ export default function FrameWheelModal({
               className="inline-flex min-h-13 items-center justify-center gap-2.5 rounded-xl border border-[var(--border)] bg-white px-8 text-[0.95rem] font-semibold text-[var(--ink-2)] transition-all duration-150 hover:border-[var(--ink)] hover:text-[var(--ink)] active:translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
             >
               Continue
-              <ArrowRight className="h-4 w-4" strokeWidth={2} />
+              <ArrowRight className="h-4 w-4" />
             </button>
           )}
         </div>

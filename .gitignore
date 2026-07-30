@@ -24,6 +24,7 @@
 # local event data
 /photos/
 /qrs/
+/frames/
 /email-logs.ndjson
 
 # misc
