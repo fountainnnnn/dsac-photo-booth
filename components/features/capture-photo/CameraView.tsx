@@ -395,9 +395,12 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
 
       {/* Stage + capture rail */}
       <div data-testid="capture-camera-root" className="mt-6 flex min-h-0 flex-1 gap-5">
+        {/* No background here. A 16:10 frame cannot fill a wider box without
+            cropping its logos and caption, so it centres — a grey bed would
+            just show pillarbox bars beside it. On the white panel the leftover
+            space is invisible and the frame's own shadow gives it definition. */}
         <div ref={stageBoxRef}
-          className="flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[20px]"
-          style={{ background: 'var(--shell-bg)' }}>
+          className="flex min-w-0 flex-1 items-center justify-center overflow-hidden">
           <div
             ref={canvasAreaRef}
             className="relative overflow-hidden rounded-[16px]"

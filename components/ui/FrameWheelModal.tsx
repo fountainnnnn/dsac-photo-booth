@@ -29,8 +29,11 @@ const SEGMENT_FILLS = [
   { fill: '#c6cbf5', ink: '#333a94' }, // periwinkle
 ];
 
-const SPIN_MS = 3000;
-const FULL_TURNS = 5;
+const SPIN_MS = 30000;
+// Scaled up with the duration: a 30s spin at the old 5 turns would barely
+// move and read as broken. More rotations keep it whipping round before the
+// ease-out settles it on the winner.
+const FULL_TURNS = 26;
 /** Keep the pointer at least this far from a segment edge, in degrees. */
 const BOUNDARY_GUARD_DEG = 4;
 

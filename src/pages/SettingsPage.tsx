@@ -3,13 +3,38 @@ import { CheckCircle, LockSimple, Trash, UploadSimple, Warning } from '@phosphor
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useFrameCatalogue, type FrameSetting } from '@/components/features/frames/useFrameCatalogue';
 
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Rescale the enabled frames so their percentages sum to exactly 100, keeping
+ * their ratios. Disabled frames are left untouched (and excluded).
+ */
+function normalise(
+  draft: Record<string, FrameSetting>,
+  ids: string[],
+): Record<string, FrameSetting> {
+  const enabled = ids.filter(id => draft[id]?.enabled !== false);
+  if (enabled.length === 0) return draft;
+
+  const sum = enabled.reduce((s, id) => s + (draft[id]?.weight ?? 0), 0);
+  const next = { ...draft };
+  for (const id of enabled) {
+    const cur = draft[id]?.weight ?? 0;
+    next[id] = {
+      weight: round1(sum > 0 ? (cur / sum) * 100 : 100 / enabled.length),
+      enabled: true,
+    };
+  }
+  return next;
+}
+
 /**
  * Settings — upload frames and set how often each one comes up.
  *
- * Weights are relative, not percentages: a frame at 3 is three times as likely
- * as one at 1. The share column converts them so an operator can see the real
- * odds, but none of this is ever shown on the wheel — every segment there is
- * drawn the same size, so a rare frame looks exactly as likely as a common one.
+ * The number on each frame IS its percentage chance. The enabled frames always
+ * add up to 100, so raising one lowers the others to make room. None of this
+ * shows on the wheel — every segment there is the same size, so a rare frame
+ * looks exactly as likely as a common one.
  */
 export default function SettingsPage() {
   const { frames, loading, error, saveSettings, uploadFrame, deleteFrame } = useFrameCatalogue();
@@ -20,64 +45,53 @@ export default function SettingsPage() {
   const [label, setLabel] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Seed the draft from the server, but never clobber edits in progress.
+  // Seed the draft from the server, but never clobber edits in progress. Stored
+  // weights may be raw (e.g. 1/1) so normalise them to real percentages first.
   useEffect(() => {
     setDraft((prev) => {
       const next = { ...prev };
+      const isFirstSeed = Object.keys(prev).length === 0;
       for (const f of frames) {
         if (!(f.id in next)) next[f.id] = { weight: f.weight ?? 1, enabled: f.enabled !== false };
       }
       for (const id of Object.keys(next)) {
         if (!frames.some((f) => f.id === id)) delete next[id];
       }
-      return next;
+      return isFirstSeed ? normalise(next, frames.map(f => f.id)) : next;
     });
   }, [frames]);
 
   const totalWeight = useMemo(
     () => frames.reduce((sum, f) => {
       const d = draft[f.id];
-      return d?.enabled === false ? sum : sum + (d?.weight ?? 1);
+      return d?.enabled === false ? sum : sum + (d?.weight ?? 0);
     }, 0),
     [frames, draft],
   );
 
+  // The number typed is the percentage. Keep the edited frame exact and share
+  // the remaining 100 - value across the other enabled frames by their ratios,
+  // so the set always totals 100 and only the others move.
   const setWeight = (id: string, weight: number) =>
-    setDraft(d => ({
-      ...d,
-      [id]: {
-        weight: Math.max(0, Math.min(100, Number.isFinite(weight) ? weight : 0)),
-        enabled: d[id]?.enabled !== false,
-      },
-    }));
-
-  const setEnabled = (id: string, enabled: boolean) =>
-    setDraft(d => ({ ...d, [id]: { weight: d[id]?.weight ?? 1, enabled } }));
-
-  /**
-   * Scale the entered numbers so the enabled frames sum to exactly 100.
-   * Values are relative, so 70/30 already behaves as 70%/30% — this just makes
-   * what is typed match what actually happens when the two have drifted apart.
-   */
-  const balance = useCallback(() => {
-    const enabled = frames.filter(f => (draft[f.id]?.enabled ?? true));
-    const total = enabled.reduce((s, f) => s + (draft[f.id]?.weight ?? 0), 0);
-    if (enabled.length === 0) return;
-
     setDraft(d => {
-      const next = { ...d };
-      if (total <= 0) {
-        const even = Math.round((100 / enabled.length) * 10) / 10;
-        for (const f of enabled) next[f.id] = { weight: even, enabled: true };
-        return next;
-      }
-      for (const f of enabled) {
-        const w = d[f.id]?.weight ?? 0;
-        next[f.id] = { weight: Math.round((w / total) * 1000) / 10, enabled: true };
+      const val = Math.max(0, Math.min(100, Number.isFinite(weight) ? weight : 0));
+      const next = { ...d, [id]: { weight: val, enabled: d[id]?.enabled !== false } };
+
+      const others = frames.filter(f => f.id !== id && (next[f.id]?.enabled !== false));
+      const remaining = 100 - val;
+      const otherSum = others.reduce((s, f) => s + (next[f.id]?.weight ?? 0), 0);
+      for (const f of others) {
+        const cur = next[f.id]?.weight ?? 0;
+        next[f.id] = {
+          weight: round1(otherSum > 0 ? (cur / otherSum) * remaining : remaining / others.length),
+          enabled: true,
+        };
       }
       return next;
     });
-  }, [frames, draft]);
+
+  const setEnabled = (id: string, enabled: boolean) =>
+    setDraft(d => normalise({ ...d, [id]: { weight: d[id]?.weight ?? 0, enabled } }, frames.map(f => f.id)));
 
   const save = useCallback(async () => {
     setBusy(true); setStatus(null);
@@ -170,29 +184,15 @@ export default function SettingsPage() {
               {frames.filter(f => draft[f.id]?.enabled !== false).length} of {frames.length} in the wheel
             </p>
 
-            <div className="ml-auto flex items-center gap-2.5">
-              <span className={`text-[0.78rem] tabular-nums ${
-                Math.abs(totalWeight - 100) < 0.05 ? 'text-[var(--ink-3)]' : 'text-[var(--accent-ink)]'
-              }`}>
-                Totals {totalWeight.toFixed(1)}%
-              </span>
-              {Math.abs(totalWeight - 100) >= 0.05 && (
-                <button
-                  type="button" onClick={balance}
-                  title="Scale the entered values so they add up to 100%"
-                  className="rounded-lg border border-[var(--border)] px-2.5 py-1 text-[0.75rem] font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-                >
-                  Balance to 100%
-                </button>
-              )}
-            </div>
+            <span className="ml-auto text-[0.78rem] tabular-nums text-[var(--ink-3)]">
+              Totals {totalWeight.toFixed(0)}%
+            </span>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             <div className="flex flex-col gap-3">
               {frames.map((frame) => {
                 const d = draft[frame.id] ?? { weight: frame.weight ?? 1, enabled: true };
-                const share = d.enabled && totalWeight > 0 ? (d.weight / totalWeight) * 100 : 0;
                 return (
                   <div
                     key={frame.id}
@@ -211,7 +211,7 @@ export default function SettingsPage() {
                         )}
                       </p>
                       <p className="mt-0.5 text-[0.75rem] text-[var(--ink-3)]">
-                        {d.enabled ? `actually ${share.toFixed(1)}% of spins` : 'Not in the wheel'}
+                        {d.enabled ? `${d.weight}% chance` : 'Not in the wheel'}
                         {frame.dateStamp ? ' · stamps the date' : ''}
                       </p>
                     </div>
@@ -295,15 +295,13 @@ export default function SettingsPage() {
           <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How the odds work</p>
             <p className="mt-2 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              Type the percentage you want each frame to come up. Set one to
-              <strong> 0</strong>, or switch it off, to keep it out of the draw.
+              The number on each frame is its chance of coming up. The enabled
+              frames always add up to 100%, so raising one lowers the others to
+              make room.
             </p>
             <p className="mt-2 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              The numbers are relative, so they do not have to add to 100 —
-              <strong> 70</strong> and <strong>30</strong> behave the same as
-              <strong> 7</strong> and <strong>3</strong>. When they do not total 100
-              the real odds are shown under each frame, and{' '}
-              <em>Balance to 100%</em> rescales them to match.
+              Set a frame to <strong>0</strong>, or switch it off, to keep it out
+              of the draw.
             </p>
             <p className="mt-3 rounded-xl bg-[var(--shell-bg)] px-3.5 py-3 text-[0.75rem] leading-[1.6] text-[var(--ink-2)]">
               The wheel never reveals this. Every segment is drawn the same size, so a
@@ -315,8 +313,7 @@ export default function SettingsPage() {
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Current odds</p>
             <div className="mt-3 flex flex-col gap-2">
               {frames.filter(f => (draft[f.id]?.enabled ?? true)).map(f => {
-                const w = draft[f.id]?.weight ?? 1;
-                const pct = totalWeight > 0 ? (w / totalWeight) * 100 : 0;
+                const pct = draft[f.id]?.weight ?? 0;
                 return (
                   <div key={f.id}>
                     <div className="flex justify-between text-[0.75rem]">
