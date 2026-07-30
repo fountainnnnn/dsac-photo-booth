@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowClockwise,
   Camera,
@@ -55,6 +55,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
   const videoRef      = useRef<HTMLVideoElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
+  const stageBoxRef   = useRef<HTMLDivElement>(null);
   const countdownRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const framesCardRef = useRef<HTMLDivElement>(null);
   const filtersCardRef = useRef<HTMLDivElement>(null);
@@ -80,6 +81,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
   const [filters, setFilters]         = useState<ImageFilters>(DEFAULT_FILTERS);
   const [filterThumb, setFilterThumb] = useState<string | null>(null);
   const [lastCapture, setLastCapture] = useState<string | null>(null);
+  const [stageSize, setStageSize]     = useState({ w: 0, h: 0 });
 
   const [timerSecs, setTimerSecs]     = useState<TimerOption>(0);
   const [countdown, setCountdown]     = useState<number | null>(null);
@@ -149,27 +151,53 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
 
   // ── Live preview ─────────────────────────────────────────────────────────────
 
-  const { canvasRef } = useLivePreview(videoRef, { filters });
+  // The photo is drawn inside the frame's cut-out, so the frame wraps it
+  // rather than covering its edges.
+  const { canvasRef } = useLivePreview(videoRef, {
+    filters,
+    contentRect: displayFrame?.window ?? null,
+  });
 
-  useEffect(() => {
-    const container = canvasAreaRef.current;
-    if (!container) return;
-    if (typeof ResizeObserver === 'undefined') {
-      const rect = container.getBoundingClientRect();
+  // Size the stage in JS rather than with aspect-ratio + max-height. Those two
+  // fight: whichever axis is binding wins and the other is left over-long, so
+  // the frame artwork gets stretched. Fitting the artboard into the available
+  // box keeps it exact on both axes.
+  useLayoutEffect(() => {
+    const box = stageBoxRef.current;
+    if (!box) return;
+
+    const fit = (width: number, height: number) => {
+      if (width <= 0 || height <= 0) return;
+      const scale = Math.min(width / FRAME_W_PX, height / FRAME_H_PX);
+      const w = Math.max(1, Math.floor(FRAME_W_PX * scale));
+      const h = Math.max(1, Math.floor(FRAME_H_PX * scale));
+      setStageSize({ w, h });
       if (canvasRef.current) {
-        canvasRef.current.width = Math.round(rect.width || 1280);
-        canvasRef.current.height = Math.round(rect.height || 800);
+        canvasRef.current.width = w;
+        canvasRef.current.height = h;
       }
-      return;
+    };
+
+    // Measure straight away. ResizeObserver callbacks are delivered as part of
+    // the rendering steps, so a backgrounded or not-yet-composited tab never
+    // gets one — relying on it alone would leave the stage collapsed to 0x0.
+    const initial = box.getBoundingClientRect();
+    fit(initial.width, initial.height);
+
+    if (typeof ResizeObserver === 'undefined') {
+      const onResize = () => {
+        const r = box.getBoundingClientRect();
+        fit(r.width, r.height);
+      };
+      window.addEventListener('resize', onResize);
+      return () => window.removeEventListener('resize', onResize);
     }
+
     const ro = new ResizeObserver(entries => {
-      const rect = entries[0]?.contentRect;
-      if (rect && canvasRef.current) {
-        canvasRef.current.width  = Math.round(rect.width);
-        canvasRef.current.height = Math.round(rect.height);
-      }
+      const r = entries[0]?.contentRect;
+      if (r) fit(r.width, r.height);
     });
-    ro.observe(container);
+    ro.observe(box);
     return () => ro.disconnect();
   }, [canvasRef]);
 
@@ -227,33 +255,51 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
       return;
     }
 
-    const vw = video.videoWidth  || 1920;
-    const vh = video.videoHeight || 1200;
-    const targetAspect = FRAME_ASPECT;
-    const sourceAspect = vw / vh;
-    let sx = 0, sy = 0, sw = vw, sh = vh;
-    if (Math.abs(sourceAspect - targetAspect) > 0.01) {
-      if (sourceAspect > targetAspect) { sw = Math.round(vh * targetAspect); sx = Math.round((vw - sw) / 2); }
-      else                              { sh = Math.round(vw / targetAspect); sy = Math.round((vh - sh) / 2); }
-    }
-
+    // Fallback path (no live canvas yet). Render at the artboard size so the
+    // frame lands pixel-for-pixel.
+    const outW = FRAME_W_PX;
+    const outH = FRAME_H_PX;
     const canvas = document.createElement('canvas');
-    canvas.width = sw; canvas.height = sh;
+    canvas.width = outW; canvas.height = outH;
     const ctx = canvas.getContext('2d')!;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.translate(sw, 0);
-    ctx.scale(-1, 1);
+
+    // The photo goes inside the frame's cut-out; the frame wraps it.
+    const win = wonFrame?.window;
+    const dx = win ? Math.round(win.x * outW) : 0;
+    const dy = win ? Math.round(win.y * outH) : 0;
+    const dw = win ? Math.round(win.w * outW) : outW;
+    const dh = win ? Math.round(win.h * outH) : outH;
+
+    if (win) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, outW, outH);
+    }
+
+    const vw = video.videoWidth  || dw;
+    const vh = video.videoHeight || dh;
+    const sourceAspect = vw / vh;
+    const destAspect = dw / dh;
+    let sx = 0, sy = 0, sw = vw, sh = vh;
+    if (sourceAspect > destAspect) {
+      sw = Math.round(vh * destAspect); sx = Math.round((vw - sw) / 2);
+    } else {
+      sh = Math.round(vw / destAspect); sy = Math.round((vh - sh) / 2);
+    }
+
+    ctx.save();
     ctx.filter = filtersToCSS(filters);
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-    ctx.filter = 'none';
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.translate(dx + dw, dy);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
+    ctx.restore();
 
     if (wonFrame) {
       const cachedFrame = frameCache.current.get(wonFrame.src);
       if (isDrawable(cachedFrame)) {
-        ctx.drawImage(cachedFrame, 0, 0, sw, sh);
-        drawDateStamp(ctx, wonFrame, sw, sh);
+        ctx.drawImage(cachedFrame, 0, 0, outW, outH);
+        drawDateStamp(ctx, wonFrame, outW, outH);
       }
     }
 
@@ -349,15 +395,15 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
 
       {/* Stage + capture rail */}
       <div data-testid="capture-camera-root" className="mt-6 flex min-h-0 flex-1 gap-5">
-        <div className="flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[20px]"
+        <div ref={stageBoxRef}
+          className="flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[20px]"
           style={{ background: 'var(--shell-bg)' }}>
           <div
             ref={canvasAreaRef}
             className="relative overflow-hidden rounded-[16px]"
             style={{
-              aspectRatio: `${FRAME_ASPECT}`,
-              width: '100%',
-              maxHeight: '100%',
+              width: stageSize.w || undefined,
+              height: stageSize.h || undefined,
               containerType: 'size',
               // A hairline plus a soft drop shadow. Without these, a frame with
               // a white border (or a blown-out feed) runs straight into the

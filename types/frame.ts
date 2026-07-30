@@ -35,10 +35,24 @@ export interface DateStamp {
   maxWidthFrac?: number;
 }
 
+/** The transparent cut-out a photo sits inside, as fractions of the frame. */
+export interface FrameWindow {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface FrameConfig {
   id: string;
   label: string;
   src: string;
+  /**
+   * Where the photo goes. The frame wraps the photo rather than covering it,
+   * so the image is drawn into this cut-out instead of full-bleed. Measured
+   * from each artboard's alpha channel. Omit to fill the whole frame.
+   */
+  window?: FrameWindow;
   /** Omit for a frame that already carries its own date. */
   dateStamp?: DateStamp | null;
   /** Relative spin weight. Never shown to the person spinning. */
@@ -63,6 +77,8 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     id: 'tech',
     label: 'Tech',
     src: '/frames/frame-tech.png',
+    // Cut-out at 163,192 sized 1610x781 on the 1921x1201 artboard.
+    window: { x: 0.08485, y: 0.15987, w: 0.83811, h: 0.65029 },
     // The artboard already sets "Transformation Made Possible" / "on" across
     // two lines; we only append the date. Measured off the artwork: the baked
     // "on" ends at x=852 on a baseline of y=1136, with a 24px x-height.
@@ -79,6 +95,9 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     id: 'doodle',
     label: 'Doodle',
     src: '/frames/frame-doodle.png',
+    // Cut-out at 137,160 sized 1644x923. The brush edge is irregular, so this
+    // is its bounding box — the artwork covers the corners the photo overshoots.
+    window: { x: 0.07132, y: 0.13322, w: 0.8558, h: 0.76853 },
     // One line here: "Transformation Made Possible on" ends at x=1204 on a
     // baseline of y=1154, 32px x-height. Capped so a long date can never run
     // into the magnifier doodle that starts around x=1650.
