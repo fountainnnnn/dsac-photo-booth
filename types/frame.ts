@@ -55,33 +55,33 @@ export const FRAMES: FrameConfig[] = [
     id: 'tech',
     label: 'Tech',
     src: '/frames/frame-tech.png',
-    // Caption "Transformation Made Possible" ends at y=1096 with 105px clear
-    // below it, so the date goes on a second line, centred like the mockup.
+    // The artboard already sets "Transformation Made Possible" / "on" across
+    // two lines; we only append the date. Measured off the artwork: the baked
+    // "on" ends at x=852 on a baseline of y=1136, with a 24px x-height.
     dateStamp: {
-      xFrac: 0.5,
-      yFrac: 0.963,
-      align: 'center',
-      sizeFrac: 0.053,
-      colour: '#b8e9e8',
-      prefix: 'on ',
+      xFrac: 0.4508, // just past the "on", plus a word space
+      yFrac: 0.9459, // shares the baked baseline
+      align: 'left',
+      sizeFrac: 0.0425, // matches the 24px x-height of the baked "on"
+      colour: '#abdddd', // sampled from the caption ink
+      prefix: '',
     },
   },
   {
     id: 'doodle',
     label: 'Doodle',
     src: '/frames/frame-doodle.png',
-    // This artboard has no room for a second line (11px below the caption) and
-    // only x=1322..1552 clear to its right before the magnifier doodle. The
-    // date sits centred in that gap, without the "on " prefix, auto-shrunk to
-    // fit. A roomier stamp needs the caption shifted left on the artboard.
+    // One line here: "Transformation Made Possible on" ends at x=1204 on a
+    // baseline of y=1154, 32px x-height. Capped so a long date can never run
+    // into the magnifier doodle that starts around x=1650.
     dateStamp: {
-      xFrac: 0.7480,
-      yFrac: 0.963,
-      align: 'center',
-      sizeFrac: 0.048,
-      colour: '#12817b',
+      xFrac: 0.6361,
+      yFrac: 0.9609,
+      align: 'left',
+      sizeFrac: 0.0566,
+      colour: '#218684',
       prefix: '',
-      maxWidthFrac: 0.112,
+      maxWidthFrac: 0.21,
     },
   },
 ];

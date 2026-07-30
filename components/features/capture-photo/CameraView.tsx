@@ -3,7 +3,7 @@ import { Aperture, CameraOff, Dices, RotateCcw, SlidersHorizontal, Timer } from 
 import CaptureButton from '@/components/ui/CaptureButton';
 import AmbientOrb from '@/components/ui/AmbientOrb';
 import SectionHeader from '@/components/ui/SectionHeader';
-import FrameWheel from '@/components/ui/FrameWheel';
+import FrameWheelModal from '@/components/ui/FrameWheelModal';
 import { useLivePreview } from './useLivePreview';
 import type { FrameConfig } from '@/types/frame';
 import {
@@ -56,12 +56,9 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
   const [isStreaming, setIsStreaming]   = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // The frame is decided by the wheel, not chosen. Start on a random one so the
-  // very first photo of the day is still varied if nobody spins.
-  const [activeFrame, setActiveFrame] = useState<FrameConfig>(
-    () => FRAMES[Math.floor(Math.random() * FRAMES.length)],
-  );
-  const [isSpinning, setIsSpinning]   = useState(false);
+  // No frame until the wheel decides one.
+  const [activeFrame, setActiveFrame] = useState<FrameConfig | null>(null);
+  const [wheelOpen, setWheelOpen]     = useState(false);
   const [filters, setFilters]         = useState<ImageFilters>(DEFAULT_FILTERS);
   const [filterThumb, setFilterThumb] = useState<string | null>(null); // neutral live frame for filter previews
 
@@ -191,12 +188,14 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(liveCanvas, 0, 0);
 
-      const cached = frameCache.current.get(activeFrame.src);
-      if (isDrawable(cached)) {
-        ctx.drawImage(cached, 0, 0, output.width, output.height);
-        drawDateStamp(ctx, activeFrame, output.width, output.height);
-      } else {
-        console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
+      if (activeFrame) {
+        const cached = frameCache.current.get(activeFrame.src);
+        if (isDrawable(cached)) {
+          ctx.drawImage(cached, 0, 0, output.width, output.height);
+          drawDateStamp(ctx, activeFrame, output.width, output.height);
+        } else {
+          console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
+        }
       }
 
       const dataUrl = output.toDataURL('image/jpeg', 0.92);
@@ -227,12 +226,14 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     ctx.filter = 'none';
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    const cachedFrame = frameCache.current.get(activeFrame.src);
-    if (isDrawable(cachedFrame)) {
-      ctx.drawImage(cachedFrame, 0, 0, sw, sh);
-      drawDateStamp(ctx, activeFrame, sw, sh);
-    } else {
-      console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
+    if (activeFrame) {
+      const cachedFrame = frameCache.current.get(activeFrame.src);
+      if (isDrawable(cachedFrame)) {
+        ctx.drawImage(cachedFrame, 0, 0, sw, sh);
+        drawDateStamp(ctx, activeFrame, sw, sh);
+      } else {
+        console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
+      }
     }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
@@ -315,13 +316,17 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
           {/* Frame + its date stamp. object-fill (the default) because capture
               composites the frame stretched to the full canvas; object-contain
               would letterbox here and disagree with the photo. */}
-          <img
-            src={activeFrame.src}
-            alt=""
-            className="pointer-events-none absolute inset-0 z-10 h-full w-full"
-            draggable={false}
-          />
-          <LiveDateStamp frame={activeFrame} />
+          {activeFrame && (
+            <>
+              <img
+                src={activeFrame.src}
+                alt=""
+                className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+                draggable={false}
+              />
+              <LiveDateStamp frame={activeFrame} />
+            </>
+          )}
 
           {/* Countdown overlay */}
           {countdown !== null && (
@@ -428,15 +433,22 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
           </div>
         </Section>
 
-        {/* Frame section — decided by the wheel, not picked from a list */}
+        {/* Frame section — the wheel lives in its own full-screen moment */}
         <Section label="Frame" icon={Dices}>
-          <FrameWheel
-            frames={FRAMES}
-            active={activeFrame}
-            spinning={isSpinning}
-            onSpinStart={() => setIsSpinning(true)}
-            onSpinEnd={(frame) => { setActiveFrame(frame); setIsSpinning(false); }}
-          />
+          <button
+            type="button"
+            data-testid="open-frame-wheel"
+            onClick={() => setWheelOpen(true)}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 text-sm font-semibold text-white shadow-[0_1px_2px_rgba(11,10,12,0.18),0_6px_18px_rgba(225,38,47,0.26)] transition-all duration-150 hover:-translate-y-px hover:bg-[var(--accent-hover)] active:translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
+          >
+            <Dices className="h-4 w-4" strokeWidth={2} />
+            {activeFrame ? 'Spin again' : 'Spin for a frame'}
+          </button>
+          <p aria-live="polite" className="mt-2.5 text-[0.6875rem] leading-[1.5] text-[var(--ink-3)]">
+            {activeFrame
+              ? <>Frame: <strong className="font-semibold text-[var(--ink)]">{activeFrame.label}</strong></>
+              : 'No frame yet — spin to get one.'}
+          </p>
         </Section>
 
         {/* Filters section */}
@@ -506,6 +518,13 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
           </div>
         </Section>
       </aside>
+
+      <FrameWheelModal
+        open={wheelOpen}
+        frames={FRAMES}
+        onPicked={setActiveFrame}
+        onClose={() => setWheelOpen(false)}
+      />
     </div>
   );
 }
