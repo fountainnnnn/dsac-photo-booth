@@ -5,7 +5,7 @@ import GlowCard, { MeshOverlay } from '@/components/ui/GlowCard';
 import CursorArrow from '@/components/ui/CursorArrow';
 
 /** The real event frame, shown in the "Add the frame" card. */
-const EVENT_FRAME = '/frames/frame-polaroid.svg';
+const EVENT_FRAME = '/frames/frame-tech.png';
 
 export default function HomePage() {
   return (

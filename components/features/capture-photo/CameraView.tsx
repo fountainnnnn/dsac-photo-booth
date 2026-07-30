@@ -1,21 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Aperture, CameraOff, Check, Frame, RotateCcw, SlidersHorizontal, Timer } from 'lucide-react';
+import { Aperture, CameraOff, Dices, RotateCcw, SlidersHorizontal, Timer } from 'lucide-react';
 import CaptureButton from '@/components/ui/CaptureButton';
 import AmbientOrb from '@/components/ui/AmbientOrb';
 import SectionHeader from '@/components/ui/SectionHeader';
+import FrameWheel from '@/components/ui/FrameWheel';
 import { useLivePreview } from './useLivePreview';
-import type { OverlayConfig, ActiveOverlay } from '@/types/overlay';
+import type { FrameConfig } from '@/types/frame';
+import {
+  FRAMES, FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
+  STAMP_FONT_STACK, drawDateStamp, stampFontPx, stampText,
+} from '@/types/frame';
 import type { ImageFilters } from '@/types/editor';
 import { DEFAULT_FILTERS, FILTER_PRESETS, filtersToCSS } from '@/types/editor';
 
 // ── Preset data ───────────────────────────────────────────────────────────────
-
-// Frames are full-bleed 16:9 overlays with a transparent centre. One at a time.
-const FRAMES: OverlayConfig[] = [
-  { id: 'polaroid', label: 'Polaroid', src: '/frames/frame-polaroid.svg', position: 'full' },
-];
-
-const FULL_TRANSFORM = { x: 0, y: 0, w: 1, h: 1 };
 
 const TIMER_OPTIONS = [0, 5, 10] as const;
 type TimerOption = typeof TIMER_OPTIONS[number];
@@ -24,14 +22,9 @@ type TimerOption = typeof TIMER_OPTIONS[number];
 
 type PermissionStatus = 'prompt' | 'granted' | 'denied' | 'unsupported';
 
-export interface CameraSelections {
-  overlays: ActiveOverlay[];
-  filters: ImageFilters;
-}
-
 export interface CameraViewProps {
   facingMode?: 'user' | 'environment';
-  onCapture: (blob: Blob, dataUrl: string, selections: CameraSelections) => void;
+  onCapture: (blob: Blob, dataUrl: string) => void;
   onError?: (error: Error) => void;
 }
 
@@ -46,13 +39,9 @@ function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 
   });
 }
 
-function loadDrawableImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Could not load frame: ${src}`));
-    img.src = src;
-  });
+/** True once an <img> holds decoded pixels we can safely draw. */
+function isDrawable(img: HTMLImageElement | undefined): img is HTMLImageElement {
+  return !!img && img.complete && img.naturalWidth > 0;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -67,8 +56,12 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
   const [isStreaming, setIsStreaming]   = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Editing selections
-  const [activeFrame, setActiveFrame] = useState<OverlayConfig | null>(null);
+  // The frame is decided by the wheel, not chosen. Start on a random one so the
+  // very first photo of the day is still varied if nobody spins.
+  const [activeFrame, setActiveFrame] = useState<FrameConfig>(
+    () => FRAMES[Math.floor(Math.random() * FRAMES.length)],
+  );
+  const [isSpinning, setIsSpinning]   = useState(false);
   const [filters, setFilters]         = useState<ImageFilters>(DEFAULT_FILTERS);
   const [filterThumb, setFilterThumb] = useState<string | null>(null); // neutral live frame for filter previews
 
@@ -92,7 +85,8 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, aspectRatio: 16 / 9, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        // 16:10 to match the frame artboards (1921x1201).
+        video: { facingMode, aspectRatio: FRAME_ASPECT, width: { ideal: 1920 }, height: { ideal: 1200 } },
         audio: false,
       });
       streamRef.current = stream;
@@ -116,6 +110,22 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     queueMicrotask(() => { void startCamera(); });
     return () => stopStream();
   }, [startCamera, stopStream]);
+
+  // ── Frame preloading ─────────────────────────────────────────────────────────
+  // Decode every frame up front and keep the elements around. The shutter must
+  // never await a network image: a slow or failed PNG would otherwise leave the
+  // button doing nothing at all.
+  const frameCache = useRef<Map<string, HTMLImageElement>>(new Map());
+
+  useEffect(() => {
+    for (const frame of FRAMES) {
+      if (frameCache.current.has(frame.src)) continue;
+      const img = new Image();
+      img.onerror = () => console.warn('[DSAC] Frame failed to preload:', frame.src);
+      img.src = frame.src;
+      frameCache.current.set(frame.src, img);
+    }
+  }, []);
 
   // ── Live preview ─────────────────────────────────────────────────────────────
 
@@ -165,20 +175,11 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     return () => clearInterval(id);
   }, [isStreaming]);
 
-  const toggleFrame = useCallback((config: OverlayConfig) => {
-    setActiveFrame(prev => (prev?.id === config.id ? null : config));
-  }, []);
-
   // ── Capture (with timer) ─────────────────────────────────────────────────────
 
   const doCapture = useCallback(async () => {
     const video = videoRef.current;
     if (!video || !isStreaming) return;
-
-    const selections: CameraSelections = {
-      overlays: activeFrame ? [{ config: activeFrame, transform: FULL_TRANSFORM }] : [],
-      filters,
-    };
 
     const liveCanvas = canvasRef.current;
     if (liveCanvas?.width && liveCanvas.height) {
@@ -190,24 +191,23 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(liveCanvas, 0, 0);
 
-      if (activeFrame) {
-        try {
-          const img = await loadDrawableImage(activeFrame.src);
-          ctx.drawImage(img, 0, 0, output.width, output.height);
-        } catch (err) {
-          console.warn('[DSAC] Skipping frame during capture:', err);
-        }
+      const cached = frameCache.current.get(activeFrame.src);
+      if (isDrawable(cached)) {
+        ctx.drawImage(cached, 0, 0, output.width, output.height);
+        drawDateStamp(ctx, activeFrame, output.width, output.height);
+      } else {
+        console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
       }
 
       const dataUrl = output.toDataURL('image/jpeg', 0.92);
       const blob = await canvasToBlob(output);
-      onCapture(blob, dataUrl, selections);
+      onCapture(blob, dataUrl);
       return;
     }
 
     const vw = video.videoWidth  || 1920;
-    const vh = video.videoHeight || 1080;
-    const targetAspect = 16 / 9;
+    const vh = video.videoHeight || 1200;
+    const targetAspect = FRAME_ASPECT;
     const sourceAspect = vw / vh;
     let sx = 0, sy = 0, sw = vw, sh = vh;
     if (Math.abs(sourceAspect - targetAspect) > 0.01) {
@@ -227,18 +227,17 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     ctx.filter = 'none';
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    if (activeFrame) {
-      try {
-        const img = await loadDrawableImage(activeFrame.src);
-        ctx.drawImage(img, 0, 0, sw, sh);
-      } catch (err) {
-        console.warn('[DSAC] Skipping frame during capture:', err);
-      }
+    const cachedFrame = frameCache.current.get(activeFrame.src);
+    if (isDrawable(cachedFrame)) {
+      ctx.drawImage(cachedFrame, 0, 0, sw, sh);
+      drawDateStamp(ctx, activeFrame, sw, sh);
+    } else {
+      console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
     }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
     const blob = await canvasToBlob(canvas);
-    onCapture(blob, dataUrl, selections);
+    onCapture(blob, dataUrl);
   }, [isStreaming, canvasRef, filters, activeFrame, onCapture]);
 
   const handleCapturePress = useCallback(() => {
@@ -302,27 +301,27 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
             // height here would win over aspect-ratio and letterbox the 16:9 frame
             // SVGs against the photo edges.
             style={{
-              aspectRatio: '16/9',
+              aspectRatio: `${FRAME_ASPECT}`,
               width: '100%',
               maxHeight: '100%',
               boxShadow: '0 30px 80px -24px rgba(0,0,0,0.8)',
+              // lets the date stamp size itself in cqh, so preview and capture agree
+              containerType: 'size',
             }}
           >
             <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" style={{ background: '#0b0a0c' }} />
 
           {/* Active frame — full-bleed, never intercepts pointer events */}
-          {/* object-fill (the default), not object-contain: the frame SVG is
-              preserveAspectRatio="none" and capture composites it stretched to
-              the full canvas. object-contain letterboxed it, leaving strips of
-              bare camera feed at the edges that never appeared in the photo. */}
-          {activeFrame && (
-            <img
-              src={activeFrame.src}
-              alt=""
-              className="pointer-events-none absolute inset-0 z-10 h-full w-full"
-              draggable={false}
-            />
-          )}
+          {/* Frame + its date stamp. object-fill (the default) because capture
+              composites the frame stretched to the full canvas; object-contain
+              would letterbox here and disagree with the photo. */}
+          <img
+            src={activeFrame.src}
+            alt=""
+            className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+            draggable={false}
+          />
+          <LiveDateStamp frame={activeFrame} />
 
           {/* Countdown overlay */}
           {countdown !== null && (
@@ -429,28 +428,15 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
           </div>
         </Section>
 
-        {/* Frames section — single-select, full-bleed */}
-        <Section label="Frame" icon={Frame}>
-          <div className="grid grid-cols-2 gap-2">
-            <FrameChip active={!activeFrame} label="None" onClick={() => setActiveFrame(null)}>
-              <span className="absolute inset-0 flex items-center justify-center text-[0.625rem] font-medium text-white/45">
-                No frame
-              </span>
-            </FrameChip>
-            {FRAMES.map(f => (
-              <FrameChip
-                key={f.id}
-                active={activeFrame?.id === f.id}
-                label={f.label}
-                onClick={() => toggleFrame(f)}
-              >
-                <img src={f.src} alt={f.label} className="absolute inset-0 h-full w-full" draggable={false} />
-              </FrameChip>
-            ))}
-          </div>
-          <p className="mt-2.5 text-[0.6875rem] leading-[1.5] text-[var(--ink-3)]">
-            The frame covers the whole photo.
-          </p>
+        {/* Frame section — decided by the wheel, not picked from a list */}
+        <Section label="Frame" icon={Dices}>
+          <FrameWheel
+            frames={FRAMES}
+            active={activeFrame}
+            spinning={isSpinning}
+            onSpinStart={() => setIsSpinning(true)}
+            onSpinEnd={(frame) => { setActiveFrame(frame); setIsSpinning(false); }}
+          />
         </Section>
 
         {/* Filters section */}
@@ -542,35 +528,46 @@ function Section({ label, icon: Icon, children }: {
   );
 }
 
-function FrameChip({ active, label, onClick, children }: {
-  active: boolean; label: string; onClick: () => void; children: React.ReactNode;
-}) {
+/**
+ * The event date, drawn over the live feed so the preview matches the photo.
+ *
+ * Sized in cqh against the stage (container-type: size), which is the same
+ * fraction-of-height the canvas stamp uses — so the two cannot drift. The
+ * auto-shrink for a tight frame is replicated via an offscreen measuring
+ * context so the preview shows the same size the capture will use.
+ */
+function LiveDateStamp({ frame }: { frame: FrameConfig }) {
+  const stamp = frame.dateStamp;
+  const [shrink, setShrink] = useState(1);
+
+  useEffect(() => {
+    if (!stamp?.maxWidthFrac) { setShrink(1); return; }
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return;
+    // Measure against the artboard, then express the result as a ratio.
+    const full = Math.round(stamp.sizeFrac * FRAME_H_PX);
+    const fitted = stampFontPx(ctx, frame, FRAME_W_PX, FRAME_H_PX);
+    setShrink(full > 0 ? fitted / full : 1);
+  }, [frame, stamp]);
+
+  if (!stamp) return null;
+
   return (
-    <button type="button" title={label} onClick={onClick}
-      className="group flex flex-col items-center gap-1 focus:outline-none">
-      <span
-        className={`relative block w-full overflow-hidden rounded-lg border transition-all duration-150 ${
-          active
-            ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/25'
-            : 'border-[var(--border)] group-hover:border-[var(--ink-3)]'
-        }`}
-        style={{ aspectRatio: '16 / 9', background: 'var(--stage)' }}
-      >
-        {children}
-        {active && (
-          <span className="absolute bottom-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)]">
-            <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
-          </span>
-        )}
-      </span>
-      <span
-        className={`text-[0.625rem] font-semibold ${
-          active ? 'text-[var(--accent-ink)]' : 'text-[var(--ink-2)]'
-        }`}
-      >
-        {label}
-      </span>
-    </button>
+    <span
+      aria-hidden
+      className="pointer-events-none absolute z-20 whitespace-nowrap"
+      style={{
+        left: `${stamp.xFrac * 100}%`,
+        top: `${stamp.yFrac * 100}%`,
+        transform: `translate(${stamp.align === 'center' ? '-50%' : '0'}, -100%)`,
+        fontFamily: STAMP_FONT_STACK,
+        fontSize: `${stamp.sizeFrac * shrink * 100}cqh`,
+        color: stamp.colour,
+        lineHeight: 1,
+      }}
+    >
+      {stampText(frame)}
+    </span>
   );
 }
 
