@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, dialog, shell, session } = require('electron');
 const fs = require('node:fs');
+const net = require('node:net');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
@@ -75,6 +76,25 @@ function teeConsoleToLogFile() {
     };
   }
   return file;
+}
+
+/**
+ * Whether something else already holds the port.
+ *
+ * This has to be checked *before* starting our own server, because otherwise
+ * the failure is silent and deeply confusing: our Express gets EADDRINUSE and
+ * dies quietly, but the health check below still succeeds — answered by the
+ * other server — so the window opens onto someone else's booth, showing their
+ * settings and their (possibly dead) tunnel URL. Everything looks fine and
+ * nothing works.
+ */
+function portInUse(port) {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.once('error', (err) => resolve(err.code === 'EADDRINUSE'));
+    probe.once('listening', () => probe.close(() => resolve(false)));
+    probe.listen(port, '0.0.0.0');
+  });
 }
 
 /** Resolves once the server answers, so the window never opens on a dead port. */
@@ -160,6 +180,20 @@ app.whenReady().then(async () => {
   const logFile = teeConsoleToLogFile();
   allowCameraOnOurOriginOnly();
   installMenu();
+
+  if (await portInUse(PORT)) {
+    dialog.showErrorBox(
+      'Port ' + PORT + ' is already in use',
+      'Another program is already using port ' + PORT + ', so the booth cannot '
+      + 'start its own server.\n\n'
+      + 'That is usually a second copy of the booth, or `npm start` left running '
+      + 'in a terminal. Close it and open the booth again.\n\n'
+      + 'The booth stops here on purpose: if it carried on, this window would '
+      + 'show the other program instead, and its QR codes would point at the '
+      + 'wrong place.',
+    );
+    return app.exit(1);
+  }
 
   // Starting the server is a side effect of importing it, exactly as `npm
   // start` does. Keeping it in this process means no stray node.exe survives

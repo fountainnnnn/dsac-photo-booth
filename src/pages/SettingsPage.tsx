@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle, LockSimple, Trash, UploadSimple, Warning } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useFrameCatalogue, type FrameSetting } from '@/components/features/frames/useFrameCatalogue';
-import CaptureSettingsCard from '@/components/features/remote/CaptureSettingsCard';
+import {
+  EventSettingsCard, LookSettingsCard, useCaptureSettingsControl,
+} from '@/components/features/remote/CaptureSettingsCard';
 import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -40,6 +42,9 @@ function normalise(
  */
 export default function SettingsPage() {
   const { frames, loading, error, saveSettings, uploadFrame, deleteFrame } = useFrameCatalogue();
+  // Owned here, not in the cards: they sit in different columns but must write
+  // to one snapshot, or each would save over the other's edits.
+  const capture = useCaptureSettingsControl();
 
   const [draft, setDraft] = useState<Record<string, FrameSetting>>({});
   const [status, setStatus] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
@@ -177,9 +182,16 @@ export default function SettingsPage() {
         </p>
       )}
 
-      <div className="mt-6 grid min-h-0 flex-1 grid-cols-[1fr_320px] gap-5 overflow-hidden">
+      {/*
+        Two columns, split by what each thing is about rather than by size:
+        everything to do with the frame pool sits with the pool on the left, and
+        the right rail is the booth itself — camera, event, phone remote. The
+        rail used to carry all five cards and had to scroll to reach any of them.
+      */}
+      <div className="mt-6 grid min-h-0 flex-1 grid-cols-[1fr_330px] gap-5 overflow-hidden">
+        <div className="flex min-h-0 flex-col gap-5 overflow-hidden">
         {/* Frame list */}
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-[var(--border)]">
+        <section className="flex min-h-[210px] flex-1 flex-col overflow-hidden rounded-[18px] border border-[var(--border)]">
           <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-5 py-4">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame pool</p>
             <p className="text-[0.78rem] text-[var(--ink-3)]">
@@ -263,10 +275,12 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Camera, remote, uploads, explainer */}
-        <aside className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1">
-          <CaptureSettingsCard />
-          <RemoteAccessCard />
+        {/* Wide things go left: twelve presets and four sliders are cramped in
+            a 330px rail and comfortable across the full column. */}
+        <LookSettingsCard {...capture} />
+
+        {/* Adding a frame and the resulting odds both belong with the pool. */}
+        <div className="grid shrink-0 grid-cols-2 gap-5">
           <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Add a frame</p>
             <p className="mt-1 text-[0.75rem] leading-[1.5] text-[var(--ink-3)]">
@@ -296,26 +310,11 @@ export default function SettingsPage() {
             </button>
           </section>
 
-          <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
-            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How the odds work</p>
-            <p className="mt-2 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              The number on each frame is its chance of coming up. The enabled
-              frames always add up to 100%, so raising one lowers the others to
-              make room.
-            </p>
-            <p className="mt-2 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              Set a frame to <strong>0</strong>, or switch it off, to keep it out
-              of the draw.
-            </p>
-            <p className="mt-3 rounded-xl bg-[var(--shell-bg)] px-3.5 py-3 text-[0.75rem] leading-[1.6] text-[var(--ink-2)]">
-              The wheel never reveals this. Every segment is drawn the same size, so a
-              rare frame looks exactly as likely as a common one.
-            </p>
-          </section>
-
-          <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
-            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Current odds</p>
-            <div className="mt-3 flex flex-col gap-2">
+          <section className="flex min-h-0 flex-col rounded-[18px] border border-[var(--border)] px-5 py-4">
+            <p className="shrink-0 text-[0.92rem] font-semibold text-[var(--ink)]">Current odds</p>
+            {/* Scrolls on its own: a long frame pool must not push the row
+                taller than the column and squeeze the list above it. */}
+            <div className="mt-3 flex max-h-[190px] flex-col gap-2 overflow-y-auto pr-1">
               {frames.filter(f => (draft[f.id]?.enabled ?? true)).map(f => {
                 const pct = draft[f.id]?.weight ?? 0;
                 return (
@@ -336,6 +335,30 @@ export default function SettingsPage() {
                 </p>
               )}
             </div>
+          </section>
+        </div>
+        </div>
+
+        {/* The booth itself: event details and the phone remote. */}
+        <aside className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1">
+          <EventSettingsCard {...capture} />
+          <RemoteAccessCard />
+
+          <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
+            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How the odds work</p>
+            <p className="mt-2 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
+              The number on each frame is its chance of coming up. The enabled
+              frames always add up to 100%, so raising one lowers the others to
+              make room.
+            </p>
+            <p className="mt-2 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
+              Set a frame to <strong>0</strong>, or switch it off, to keep it out
+              of the draw.
+            </p>
+            <p className="mt-3 rounded-xl bg-[var(--shell-bg)] px-3.5 py-3 text-[0.75rem] leading-[1.6] text-[var(--ink-2)]">
+              The wheel never reveals this. Every segment is drawn the same size, so a
+              rare frame looks exactly as likely as a common one.
+            </p>
           </section>
         </aside>
       </div>

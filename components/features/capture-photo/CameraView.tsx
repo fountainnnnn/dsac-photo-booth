@@ -20,7 +20,7 @@ import { rememberCapture } from '@/components/features/gallery/galleryStore';
 import type { FrameConfig, EventDetails } from '@/types/frame';
 import {
   FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
-  STAMP_FONT_STACK, drawDateStamp, stampFontPx, stampText, formatEventDate, resolveEventDate,
+  STAMP_FONT_STACK, drawDateStamp, fitFontPx, stampFontPx, stampText, formatEventDate, resolveEventDate,
 } from '@/types/frame';
 import { filtersToCSS } from '@/types/editor';
 
@@ -77,6 +77,10 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   const isPreviewing = preview !== undefined && (preview?.id ?? null) !== (wonFrame?.id ?? null);
   const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [stageSize, setStageSize]     = useState({ w: 0, h: 0 });
+  // The camera's own shape. Cameras rarely deliver the 16:10 we ask for — most
+  // hand back 16:9 — and with no frame on there is nothing to justify squashing
+  // the picture into the artboard's shape, so the stage follows the camera.
+  const [cameraAspect, setCameraAspect] = useState(FRAME_ASPECT);
 
   // Timer and adjustments are configured in Settings, not here.
   const { settings: captureSettings, reload: reloadSettings } = useCaptureSettings();
@@ -107,8 +111,11 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        // 16:10 to match the frame artboards (1921x1201).
-        video: { facingMode, aspectRatio: FRAME_ASPECT, width: { ideal: 1920 }, height: { ideal: 1200 } },
+        // No aspectRatio constraint. Asking for the artboard's 16:10 only ever
+        // cost us: webcams are 16:9, so a browser that honours it crops away
+        // field of view, and one that ignores it hands back 16:9 anyway. Take
+        // the camera's native shape and let the stage adapt to it.
+        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       });
       streamRef.current = stream;
@@ -159,17 +166,23 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
 
   // Size the stage in JS rather than with aspect-ratio + max-height. Those two
   // fight: whichever axis is binding wins and the other is left over-long, so
-  // the frame artwork gets stretched. Fitting the artboard into the available
-  // box keeps it exact on both axes.
+  // the frame artwork gets stretched. Fitting the target shape into the
+  // available box keeps it exact on both axes.
+  //
+  // Which shape depends on whether a frame is on. With one, the stage is the
+  // artboard and the picture is stretched into its cut-out, because the frame
+  // has to line up exactly. With no frame there is nothing to line up with, so
+  // the stage takes the camera's shape and the picture stays undistorted.
+  const stageAspect = displayFrame ? FRAME_ASPECT : cameraAspect;
+
   useLayoutEffect(() => {
     const box = stageBoxRef.current;
     if (!box) return;
 
     const fit = (width: number, height: number) => {
       if (width <= 0 || height <= 0) return;
-      const scale = Math.min(width / FRAME_W_PX, height / FRAME_H_PX);
-      const w = Math.max(1, Math.floor(FRAME_W_PX * scale));
-      const h = Math.max(1, Math.floor(FRAME_H_PX * scale));
+      const w = Math.max(1, Math.floor(Math.min(width, height * stageAspect)));
+      const h = Math.max(1, Math.floor(w / stageAspect));
       setStageSize({ w, h });
       if (canvasRef.current) {
         canvasRef.current.width = w;
@@ -198,7 +211,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     });
     ro.observe(box);
     return () => ro.disconnect();
-  }, [canvasRef]);
+  }, [canvasRef, stageAspect]);
 
   // ── Capture ──────────────────────────────────────────────────────────────────
 
@@ -361,7 +374,12 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   return (
     <StudioShell active="capture" onNavigate={navigate}>
       <video ref={videoRef} data-testid="capture-video-element" autoPlay playsInline muted
-        onCanPlay={() => setIsStreaming(true)} className="hidden" />
+        onCanPlay={() => setIsStreaming(true)}
+        onLoadedMetadata={e => {
+          const { videoWidth: w, videoHeight: h } = e.currentTarget;
+          if (w > 0 && h > 0) setCameraAspect(w / h);
+        }}
+        className="hidden" />
 
       {/* Header. Timer and adjustments live in Settings now, so the booth
           screen stays a camera and a wheel. */}
@@ -601,6 +619,23 @@ function Slider({ icon, label, value, min, max, unit = '', hue = false, onChange
 }
 
 /**
+ * How much to shrink the event name so it fits its width budget — the same
+ * calculation `drawDateStamp` does, against the same artboard dimensions, so
+ * the DOM preview and the captured photo cannot disagree.
+ *
+ * Measured on a throwaway canvas rather than in the DOM because that is what
+ * the canvas will do at capture time, down to the font stack.
+ */
+function nameFitScale(name: string | undefined, sizeFrac: number, maxWidthFrac: number): number {
+  if (!name) return 1;
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (!ctx) return 1;
+  const nominal = Math.round(sizeFrac * FRAME_H_PX);
+  if (nominal <= 0) return 1;
+  return fitFontPx(ctx, name, nominal, maxWidthFrac * FRAME_W_PX) / nominal;
+}
+
+/**
  * The event date over the live feed, so the preview matches the photo.
  * Sized in cqh against the stage — the same fraction-of-height the canvas stamp
  * uses — so the two cannot drift.
@@ -633,6 +668,16 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
       color: slot.colour,
       lineHeight: 1,
     };
+
+    // A name that overruns its budget is shrunk to fit, exactly as the canvas
+    // does. Clipping it with overflow:hidden was wrong twice over: the preview
+    // showed a truncated name, and the photo it was previewing showed a
+    // complete but smaller one.
+    const nameSizeFrac = above?.sizeFrac ?? slot.sizeFrac;
+    const nameScale = nameFitScale(
+      name, nameSizeFrac, (above?.maxWidthFrac ?? slot.maxNameWidthFrac),
+    );
+
     return (
       <>
         {name && (
@@ -642,17 +687,14 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
             style={above ? {
               ...common,
               top: `${above.baselineFrac * 100}%`,
-              fontSize: `${above.sizeFrac * 100}cqh`,
+              fontSize: `${nameSizeFrac * nameScale * 100}cqh`,
               left: `${above.centreFrac * 100}%`,
               transform: 'translate(-50%, -100%)',
-              maxWidth: `${above.maxWidthFrac * 100}%`,
-              overflow: 'hidden',
             } : {
               ...common,
+              fontSize: `${nameSizeFrac * nameScale * 100}cqh`,
               right: `${(1 - slot.onLeftFrac + slot.gapFrac) * 100}%`,
               transform: 'translateY(-100%)',
-              maxWidth: `${slot.maxNameWidthFrac * 100}%`,
-              overflow: 'hidden',
             }}
           >
             {name}

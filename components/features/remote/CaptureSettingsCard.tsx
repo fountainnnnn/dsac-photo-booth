@@ -7,13 +7,29 @@ import type { ImageFilters } from '@/types/editor';
 const TIMER_OPTIONS = [0, 3, 5, 10] as const;
 
 /**
- * Timer and image adjustments, moved off the booth screen so the guest only
- * ever sees a camera and a wheel.
+ * Timer, event details, and image adjustments, moved off the booth screen so
+ * the guest only ever sees a camera and a wheel.
  *
  * Saving is debounced rather than manual: an operator dragging a slider expects
  * the kiosk to follow, not to hunt for a Save button afterwards.
+ *
+ * This is split into two cards so the settings page can put them in different
+ * columns — together they were tall enough to make the right rail scroll before
+ * you could reach anything. They deliberately share one `useCaptureSettings`,
+ * owned by the caller: two independent copies would each PUT their own stale
+ * snapshot, so editing the event name and then a slider would silently undo the
+ * name.
  */
-export default function CaptureSettingsCard() {
+
+export interface CaptureSettingsControl {
+  settings: CaptureSettings;
+  push: (next: CaptureSettings) => void;
+  saved: boolean;
+  loading: boolean;
+}
+
+/** Load the settings once and expose a debounced writer. Call in the page. */
+export function useCaptureSettingsControl(): CaptureSettingsControl {
   const { settings, setSettings, save, loading } = useCaptureSettings();
   const [saved, setSaved] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -31,15 +47,15 @@ export default function CaptureSettingsCard() {
 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
-  const setFilters = (fn: (f: ImageFilters) => ImageFilters) =>
-    push({ ...settings, filters: fn(settings.filters) });
+  return { settings, push, saved, loading };
+}
 
-  const f = settings.filters;
-
+/** What is printed on the photo, and how long the countdown runs. */
+export function EventSettingsCard({ settings, push, saved, loading }: CaptureSettingsControl) {
   return (
     <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
       <div className="flex items-center gap-2">
-        <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Camera</p>
+        <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Event</p>
         <span className={`ml-auto text-[0.72rem] font-semibold transition-opacity duration-200 ${
           saved ? 'text-[#127a4a] opacity-100' : 'opacity-0'
         }`}>
@@ -50,7 +66,6 @@ export default function CaptureSettingsCard() {
         Applies to the booth immediately. Guests never see these controls.
       </p>
 
-      {/* Event details */}
       <div className="mt-4 flex flex-col gap-2.5">
         <label className="text-[0.78rem] font-semibold text-[var(--ink-2)]">
           Event name
@@ -72,14 +87,8 @@ export default function CaptureSettingsCard() {
             {settings.eventDate ? 'Stamped on every photo.' : "Empty — today's date is used."}
           </span>
         </label>
-        <p className="rounded-lg bg-[var(--shell-bg)] px-3 py-2 text-[0.7rem] leading-[1.5] text-[var(--ink-2)]">
-          The two built-in frames have their caption printed into the artwork, so
-          only the date changes on those. The event name appears on uploaded
-          frames, and on any artboard supplied without a caption.
-        </p>
       </div>
 
-      {/* Timer */}
       <div className="mt-5">
         <p className="mb-2 flex items-center gap-1.5 text-[0.78rem] font-semibold text-[var(--ink-2)]">
           <TimerIcon size={15} /> Countdown
@@ -100,42 +109,49 @@ export default function CaptureSettingsCard() {
           ))}
         </div>
       </div>
+    </section>
+  );
+}
 
-      {/* Presets */}
-      <div className="mt-5">
-        <p className="mb-2 text-[0.78rem] font-semibold text-[var(--ink-2)]">Look</p>
-        <div className="grid grid-cols-4 gap-1.5">
-          {FILTER_PRESETS.map(p => {
-            const on = f.brightness === p.filters.brightness && f.contrast === p.filters.contrast
-              && f.saturation === p.filters.saturation && f.hue === p.filters.hue;
-            return (
-              <button
-                key={p.label} type="button"
-                onClick={() => push({ ...settings, filters: p.filters })}
-                className={`flex flex-col items-center gap-1 rounded-lg py-1.5 text-[0.68rem] font-semibold transition ${
-                  on ? 'bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent)]'
-                     : 'text-[var(--ink-2)] hover:bg-[var(--shell-bg)]'
-                }`}
-              >
-                <span className="h-6 w-full rounded"
-                  style={{ background: '#b9bcc4', filter: filtersToCSS(p.filters) }} />
-                {p.label}
-              </button>
-            );
-          })}
-        </div>
+/** How the picture looks: a preset, then fine adjustment. */
+export function LookSettingsCard({ settings, push }: CaptureSettingsControl) {
+  const f = settings.filters;
+  const setFilters = (fn: (x: ImageFilters) => ImageFilters) =>
+    push({ ...settings, filters: fn(settings.filters) });
+
+  return (
+    <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
+      <div className="flex items-center">
+        <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Look</p>
+        <button type="button"
+          onClick={() => push({ ...settings, filters: DEFAULT_FILTERS })}
+          className="ml-auto inline-flex items-center gap-1 text-[0.72rem] font-semibold text-[var(--ink-3)] transition hover:text-[var(--accent)]">
+          <ArrowCounterClockwise size={13} /> Reset
+        </button>
       </div>
 
-      {/* Fine adjustments */}
-      <div className="mt-5 flex flex-col gap-2.5">
-        <div className="flex items-center">
-          <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">Adjustments</p>
-          <button type="button"
-            onClick={() => push({ ...settings, filters: DEFAULT_FILTERS })}
-            className="ml-auto inline-flex items-center gap-1 text-[0.72rem] font-semibold text-[var(--ink-3)] transition hover:text-[var(--accent)]">
-            <ArrowCounterClockwise size={13} /> Reset
-          </button>
-        </div>
+      <div className="mt-3 grid grid-cols-6 gap-1.5">
+        {FILTER_PRESETS.map(p => {
+          const on = f.brightness === p.filters.brightness && f.contrast === p.filters.contrast
+            && f.saturation === p.filters.saturation && f.hue === p.filters.hue;
+          return (
+            <button
+              key={p.label} type="button"
+              onClick={() => push({ ...settings, filters: p.filters })}
+              className={`flex flex-col items-center gap-1 rounded-lg py-1.5 text-[0.68rem] font-semibold transition ${
+                on ? 'bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent)]'
+                   : 'text-[var(--ink-2)] hover:bg-[var(--shell-bg)]'
+              }`}
+            >
+              <span className="h-6 w-full rounded"
+                style={{ background: '#b9bcc4', filter: filtersToCSS(p.filters) }} />
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2.5">
         <Row icon={<Sun size={15} />} label="Brightness" value={f.brightness} min={50} max={150}
           onChange={v => setFilters(x => ({ ...x, brightness: v }))} />
         <Row icon={<CircleHalf size={15} weight="fill" />} label="Contrast" value={f.contrast} min={50} max={150}
