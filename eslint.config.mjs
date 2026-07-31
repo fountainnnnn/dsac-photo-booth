@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'public/models/**'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'public/models/**', 'release/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -26,10 +26,19 @@ export default tseslint.config(
     },
   },
   {
-    files: ['server/**/*.mjs'],
+    // The server and the Electron main process both run in Node, not a browser.
+    files: ['server/**/*.mjs', 'electron/**/*.cjs'],
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.node,
     },
+  },
+  {
+    files: ['electron/**/*.cjs'],
+    languageOptions: { sourceType: 'commonjs' },
+    // The Electron entrypoint has to be CommonJS: Electron will load an ESM
+    // main, but `app.whenReady()` never resolves under one and the app hangs
+    // before it opens a window. require() here is deliberate, not legacy.
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
   }
 );

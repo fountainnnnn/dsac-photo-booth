@@ -1,0 +1,61 @@
+# Packaging for the booth laptop.
+#
+# The target machine has nothing installed — no Node, no npm, no terminal — so
+# everything ships inside the artefact: Electron's own Node 24 (which is where
+# node:sqlite comes from), the built frontend, the Express server, and
+# cloudflared for the public URL.
+#
+#   npm run package   ->  release/
+#
+# Two artefacts come out, because "send someone an exe" can mean either thing:
+#   DSAC Photo Booth <version>.exe          installer, adds a desktop shortcut
+#   DSAC Photo Booth <version> portable.exe single file, runs from anywhere
+
+appId: sg.edu.sp.dsac.photobooth
+productName: DSAC Photo Booth
+copyright: Singapore Polytechnic Data Science & Analytics Centre
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**            # the built frontend, served by Express
+  - server/**
+  - electron/**
+  - package.json
+  # Frontend libraries are production dependencies because Vite needs them at
+  # build time, but their output is already inside dist/. Nothing at runtime
+  # resolves them, and together they are 54 MB of dead weight in the download.
+  - "!node_modules/@phosphor-icons/**"
+  - "!node_modules/react/**"
+  - "!node_modules/react-dom/**"
+
+# cloudflared is a real executable and has to be spawned, which means it must
+# live on the actual filesystem rather than inside the asar archive.
+asarUnpack:
+  - node_modules/cloudflared/bin/**
+
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
+nsis:
+  # A booth is set up by whoever is running the event, not by IT. One click,
+  # no install location prompt, shortcuts where they expect them.
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  artifactName: ${productName} ${version} Setup.${ext}
+
+portable:
+  artifactName: ${productName} ${version} portable.${ext}
+  # Photos and settings live in the user's AppData either way, so a portable
+  # run keeps its database across launches instead of starting empty.
+  requestExecutionLevel: user

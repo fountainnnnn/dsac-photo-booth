@@ -18,8 +18,14 @@
 /dist/
 /out/
 
+# packaged desktop app (.exe artefacts — 112 MB each, rebuilt by `npm run package`)
+/release*/
+
 # production
-/build
+# `build/` is electron-builder's buildResources directory now, and the icon in
+# it is a source file the packaging step needs.
+/build/*
+!/build/icon.png
 
 # local event data
 /photos/
