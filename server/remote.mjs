@@ -32,6 +32,12 @@ const IDLE_STATE = {
   streaming: false,     // is the kiosk camera live
   photoToken: null,     // set once a photo is saved
   downloadUrl: null,
+  // Mirrors the wheel so the phone can drive it: the organiser is holding the
+  // remote, not standing at the laptop, so opening the wheel is no use unless
+  // they can spin it too.
+  wheelOpen: false,
+  wheelSpinning: false,
+  wheelResult: null,    // frame label once it lands
   updatedAt: null,
 };
 

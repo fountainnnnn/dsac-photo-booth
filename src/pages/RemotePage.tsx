@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowCounterClockwise, ArrowSquareOut, Camera, CheckCircle, DiceFive, WifiHigh, WifiSlash, X,
+  ArrowCounterClockwise, ArrowSquareOut, Camera, CheckCircle, DiceFive, Timer as TimerIcon, WifiHigh, WifiSlash, X,
 } from '@phosphor-icons/react';
 import { useRemote } from '@/components/features/remote/useRemote';
+import { useCaptureSettings } from '@/components/features/remote/useCaptureSettings';
 
 /**
  * The organiser's phone. They stand with the guests, well away from the
@@ -12,8 +13,11 @@ import { useRemote } from '@/components/features/remote/useRemote';
  * scrolling, and the primary action always in the same place. Once a photo
  * lands, the only choice offered is whether to retake it.
  */
+const TIMER_OPTIONS = [0, 3, 5, 10] as const;
+
 export default function RemotePage() {
   const { state, connected, send } = useRemote();
+  const { settings, save } = useCaptureSettings();
   const [busy, setBusy] = useState(false);
 
   // Keep the screen awake — a locked phone mid-event is useless.
@@ -33,9 +37,15 @@ export default function RemotePage() {
     setTimeout(() => setBusy(false), 400);
   }, [send]);
 
-  const { phase, countdown, frameLabel, streaming } = state;
+  const { phase, countdown, frameLabel, streaming, wheelOpen, wheelSpinning, wheelResult } = state;
   const counting = phase === 'counting';
   const captured = phase === 'captured';
+
+  // The kiosk's timer lives in settings; changing it here saves and the booth
+  // picks it up, so the organiser never has to walk back to the laptop.
+  const setTimer = useCallback((seconds: number) => {
+    void save({ ...settings, timerSecs: seconds }).catch(() => {});
+  }, [save, settings]);
 
   return (
     <main
@@ -97,7 +107,30 @@ export default function RemotePage() {
 
       {/* Controls */}
       <section className="mt-auto flex shrink-0 flex-col gap-3 pt-8">
-        {captured ? (
+        {/* The wheel is open on the booth — mirror its controls. */}
+        {wheelOpen ? (
+          <>
+            <button
+              type="button"
+              onClick={() => act('spin-now')}
+              disabled={busy || wheelSpinning}
+              className="flex min-h-[110px] w-full items-center justify-center gap-3 rounded-[24px] bg-[var(--accent)] text-[1.35rem] font-semibold text-white shadow-[0_14px_40px_-10px_rgba(225,38,47,0.65)] transition active:scale-[0.98] disabled:opacity-50"
+            >
+              <DiceFive size={32} weight="fill" />
+              {wheelSpinning ? 'Spinning…' : wheelResult ? 'Spin again' : 'Spin'}
+            </button>
+            {wheelResult && !wheelSpinning && (
+              <button
+                type="button"
+                onClick={() => act('close-wheel')}
+                disabled={busy}
+                className="flex min-h-[76px] w-full items-center justify-center gap-2.5 rounded-[20px] border-2 border-white/25 text-[1.1rem] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+              >
+                Continue with {wheelResult}
+              </button>
+            )}
+          </>
+        ) : captured ? (
           <>
             <button
               type="button"
@@ -150,6 +183,27 @@ export default function RemotePage() {
               <DiceFive size={24} />
               Spin for a frame
             </button>
+
+            {/* Countdown length, so it can be tuned without walking back. */}
+            <div className="mt-1">
+              <p className="mb-2 flex items-center gap-1.5 text-[0.8rem] font-semibold text-white/45">
+                <TimerIcon size={15} /> Countdown
+              </p>
+              <div className="flex gap-2">
+                {TIMER_OPTIONS.map(s => (
+                  <button
+                    key={s} type="button" onClick={() => setTimer(s)}
+                    className={`min-h-[56px] flex-1 rounded-[16px] text-[1rem] font-semibold transition active:scale-[0.97] ${
+                      settings.timerSecs === s
+                        ? 'bg-white text-[var(--stage)]'
+                        : 'border-2 border-white/20 text-white/80'
+                    }`}
+                  >
+                    {s === 0 ? 'Off' : `${s}s`}
+                  </button>
+                ))}
+              </div>
+            </div>
           </>
         )}
       </section>

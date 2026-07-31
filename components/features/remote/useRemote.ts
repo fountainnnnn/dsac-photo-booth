@@ -23,10 +23,17 @@ export interface RemoteState {
   streaming: boolean;
   photoToken: string | null;
   downloadUrl: string | null;
+  /** Mirrors the kiosk's wheel so the phone can drive it. */
+  wheelOpen: boolean;
+  wheelSpinning: boolean;
+  wheelResult: string | null;
   updatedAt: string | null;
 }
 
-export type RemoteAction = 'capture' | 'cancel' | 'retake' | 'spin' | 'settings-changed';
+export type RemoteAction =
+  | 'capture' | 'cancel' | 'retake'
+  | 'spin' | 'spin-now' | 'close-wheel'
+  | 'settings-changed';
 
 export interface RemoteCommand {
   version: number;
@@ -43,6 +50,9 @@ const EMPTY_STATE: RemoteState = {
   streaming: false,
   photoToken: null,
   downloadUrl: null,
+  wheelOpen: false,
+  wheelSpinning: false,
+  wheelResult: null,
   updatedAt: null,
 };
 

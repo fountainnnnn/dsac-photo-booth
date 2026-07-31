@@ -29,11 +29,10 @@ const SEGMENT_FILLS = [
   { fill: '#c6cbf5', ink: '#333a94' }, // periwinkle
 ];
 
-const SPIN_MS = 30000;
-// Scaled up with the duration: a 30s spin at the old 5 turns would barely
-// move and read as broken. More rotations keep it whipping round before the
-// ease-out settles it on the winner.
-const FULL_TURNS = 26;
+const SPIN_MS = 4200;
+// Enough rotations to read as a real spin at this duration without blurring
+// into a smear.
+const FULL_TURNS = 7;
 /** Keep the pointer at least this far from a segment edge, in degrees. */
 const BOUNDARY_GUARD_DEG = 4;
 
@@ -56,6 +55,13 @@ export interface FrameWheelModalProps {
   /** Fired the moment the wheel stops, so the live preview updates behind it. */
   onPicked: (frame: FrameConfig) => void;
   onClose: () => void;
+  /**
+   * Bumped by the phone remote to start a spin. A counter rather than a
+   * boolean so repeated spins each register.
+   */
+  spinSignal?: number;
+  /** Reports spinning/result so the phone can mirror the wheel. */
+  onStatus?: (status: { spinning: boolean; result: string | null }) => void;
 }
 
 export default function FrameWheelModal({
@@ -63,6 +69,8 @@ export default function FrameWheelModal({
   frames,
   onPicked,
   onClose,
+  spinSignal = 0,
+  onStatus,
 }: FrameWheelModalProps) {
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
@@ -114,6 +122,21 @@ export default function FrameWheelModal({
       onPicked(frames[winner]);
     }, SPIN_MS);
   }, [spinning, frames, rotation, onPicked]);
+
+  // Let the phone start a spin. Held in a ref so re-rendering never re-fires it.
+  const spinRef = useRef(spin);
+  spinRef.current = spin;
+  const lastSignal = useRef(spinSignal);
+  useEffect(() => {
+    if (spinSignal === lastSignal.current) return;
+    lastSignal.current = spinSignal;
+    if (open) spinRef.current();
+  }, [spinSignal, open]);
+
+  // Keep the phone's view of the wheel in step with this one.
+  useEffect(() => {
+    onStatus?.({ spinning, result: result?.label ?? null });
+  }, [spinning, result, onStatus]);
 
   if (!open) return null;
 

@@ -44,16 +44,24 @@ export interface DateStamp {
  * wording cannot be changed from here; they use `dateStamp` to append the date
  * after the baked "on" instead.
  */
+/**
+ * The artboards print only the word "on", with the space either side left
+ * blank. The event name is written to its left and the date to its right, both
+ * sharing that word's baseline, so the finished line reads as one sentence.
+ */
 export interface CaptionSlot {
-  /** Centre of the caption, as a fraction of frame width. */
-  centreXFrac: number;
-  /** Text baseline, as a fraction of frame height. */
+  /** Left and right edges of the printed "on", as fractions of frame width. */
+  onLeftFrac: number;
+  onRightFrac: number;
+  /** Shared baseline, as a fraction of frame height. */
   baselineFrac: number;
-  /** Font size as a fraction of frame height. */
+  /** Font size as a fraction of frame height, matched to the printed word. */
   sizeFrac: number;
   colour: string;
-  /** Width budget, so a long event name shrinks rather than overflowing. */
-  maxWidthFrac: number;
+  /** Space between "on" and the words either side, as a fraction of width. */
+  gapFrac: number;
+  /** Budget for the event name; a longer one shrinks rather than colliding. */
+  maxNameWidthFrac: number;
 }
 
 /** Event details an operator can change without touching the artwork. */
@@ -132,36 +140,36 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     src: '/frames/frame-tech.png',
     // Cut-out at 163,192 sized 1610x781 on the 1921x1201 artboard.
     window: { x: 0.08485, y: 0.15987, w: 0.83811, h: 0.65029 },
-    // The artboard already sets "Transformation Made Possible" / "on" across
-    // two lines; we only append the date. Measured off the artwork: the baked
-    // "on" ends at x=852 on a baseline of y=1136, with a 24px x-height.
-    dateStamp: {
-      xFrac: 0.4508, // just past the "on", plus a word space
-      yFrac: 0.9459, // shares the baked baseline
-      align: 'left',
-      sizeFrac: 0.0425, // matches the 24px x-height of the baked "on"
-      colour: '#abdddd', // sampled from the caption ink
-      prefix: '',
+    // Printed "on" occupies x 817..850 on a baseline of y=1134, 21px x-height
+    // (~45px type). The name is written to its left, the date to its right.
+    captionSlot: {
+      onLeftFrac: 0.4253,
+      onRightFrac: 0.4425,
+      baselineFrac: 0.9442,
+      sizeFrac: 0.0375,
+      colour: '#b1dfe0',   // sampled from the printed word
+      gapFrac: 0.008,
+      maxNameWidthFrac: 0.38,
     },
   },
   {
     id: 'doodle',
     label: 'Doodle',
     src: '/frames/frame-doodle.png',
-    // Cut-out at 137,160 sized 1644x923. The brush edge is irregular, so this
+    // Cut-out at 146,167 sized 1628x896. The brush edge is irregular, so this
     // is its bounding box — the artwork covers the corners the photo overshoots.
-    window: { x: 0.07132, y: 0.13322, w: 0.8558, h: 0.76853 },
-    // One line here: "Transformation Made Possible on" ends at x=1204 on a
-    // baseline of y=1154, 32px x-height. Capped so a long date can never run
-    // into the magnifier doodle that starts around x=1650.
-    dateStamp: {
-      xFrac: 0.6361,
-      yFrac: 0.9609,
-      align: 'left',
-      sizeFrac: 0.0566,
-      colour: '#218684',
-      prefix: '',
-      maxWidthFrac: 0.21,
+    window: { x: 0.076, y: 0.13905, w: 0.84748, h: 0.74604 },
+    // Printed "on" occupies x 1159..1204 on a baseline of y=1153, 30px x-height
+    // (~64px type). The name budget keeps it clear of the red squiggle on the
+    // left, and the date lands before the magnifier doodle at x~1568.
+    captionSlot: {
+      onLeftFrac: 0.6033,
+      onRightFrac: 0.6268,
+      baselineFrac: 0.96,
+      sizeFrac: 0.0533,
+      colour: '#12817b',
+      gapFrac: 0.009,
+      maxNameWidthFrac: 0.40,
     },
   },
 ];
@@ -255,26 +263,36 @@ export function drawDateStamp(
   const slot = frame.captionSlot;
   if (slot) {
     const name = (event?.eventName ?? DEFAULT_EVENT_DETAILS.eventName).trim();
-    const text = name ? `${name} on ${formatEventDate(date)}` : formatEventDate(date);
+    const dateText = formatEventDate(date);
+    const baseline = slot.baselineFrac * h;
+    const gap = slot.gapFrac * w;
 
-    let size = Math.round(slot.sizeFrac * h);
-    if (typeof ctx.measureText === 'function') {
+    // Match the printed "on"; shrink only if the name would run into it.
+    let nameSize = Math.round(slot.sizeFrac * h);
+    if (name && typeof ctx.measureText === 'function') {
       ctx.save();
-      ctx.font = `${size}px ${STAMP_FONT_STACK}`;
-      const width = ctx.measureText(text).width;
+      ctx.font = `${nameSize}px ${STAMP_FONT_STACK}`;
+      const width = ctx.measureText(name).width;
       ctx.restore();
-      const budget = slot.maxWidthFrac * w;
+      const budget = slot.maxNameWidthFrac * w;
       if (Number.isFinite(width) && width > budget && width > 0) {
-        size = Math.max(8, Math.floor(size * (budget / width)));
+        nameSize = Math.max(8, Math.floor(nameSize * (budget / width)));
       }
     }
 
     ctx.save();
-    ctx.font = `${size}px ${STAMP_FONT_STACK}`;
     ctx.fillStyle = slot.colour;
-    ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText(text, slot.centreXFrac * w, slot.baselineFrac * h);
+
+    if (name) {
+      ctx.font = `${nameSize}px ${STAMP_FONT_STACK}`;
+      ctx.textAlign = 'right';
+      ctx.fillText(name, slot.onLeftFrac * w - gap, baseline);
+    }
+
+    ctx.font = `${Math.round(slot.sizeFrac * h)}px ${STAMP_FONT_STACK}`;
+    ctx.textAlign = 'left';
+    ctx.fillText(dateText, slot.onRightFrac * w + gap, baseline);
     ctx.restore();
     return;
   }

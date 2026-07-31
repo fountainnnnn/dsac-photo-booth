@@ -58,31 +58,20 @@ export function useLivePreview(
       ctx.fillRect(0, 0, w, h);
     }
 
-    // Fit the whole frame inside the cut-out rather than cropping to fill it.
-    // Nobody loses the top of their head to a window whose shape happens to
-    // differ from the camera's; the shot is scaled down and centred instead.
+    // Stretch the frame to fill the cut-out exactly. Fitting it left white
+    // letterbox bars whenever the camera's shape differed from the window's,
+    // and cropping would cut people off at the edges; filling keeps every
+    // window fully covered with the whole shot inside it.
     const vw = video.videoWidth  || dw;
     const vh = video.videoHeight || dh;
-    const scale = Math.min(dw / vw, dh / vh);
-    const fw = Math.round(vw * scale);
-    const fh = Math.round(vh * scale);
-    const fx = dx + Math.round((dw - fw) / 2);
-    const fy = dy + Math.round((dh - fh) / 2);
-
-    // Letterbox bars would otherwise be left transparent, and a JPEG has no
-    // alpha — they would come out black.
-    if (!contentRect) {
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, w, h);
-    }
 
     ctx.save();
     ctx.filter = filtersToCSS(filters);
     // Mirror about the drawn image's own centre, so the flip stays correct
     // wherever it has been placed.
-    ctx.translate(fx + fw, fy);
+    ctx.translate(dx + dw, dy);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, vw, vh, 0, 0, fw, fh);
+    ctx.drawImage(video, 0, 0, vw, vh, 0, 0, dw, dh);
     ctx.restore();
 
     rafRef.current = requestAnimationFrame(drawFrame);

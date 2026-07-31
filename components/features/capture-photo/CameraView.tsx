@@ -69,6 +69,9 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   const [wonFrame, setWonFrame] = useState<FrameConfig | null>(null);
   const [preview, setPreview]   = useState<FrameConfig | null | undefined>(undefined);
   const [wheelOpen, setWheelOpen] = useState(false);
+  // Bumped when the phone asks for a spin; the modal watches this.
+  const [spinSignal, setSpinSignal] = useState(0);
+  const [wheelStatus, setWheelStatus] = useState({ spinning: false, result: null as string | null });
 
   const displayFrame = preview !== undefined ? preview : wonFrame;
   const isPreviewing = preview !== undefined && (preview?.id ?? null) !== (wonFrame?.id ?? null);
@@ -255,20 +258,15 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
       ctx.fillRect(0, 0, outW, outH);
     }
 
-    // Fit, never crop — the whole shot is scaled to sit inside the cut-out.
+    // Stretch to fill the cut-out exactly — matches the live preview.
     const vw = video.videoWidth  || dw;
     const vh = video.videoHeight || dh;
-    const scale = Math.min(dw / vw, dh / vh);
-    const fw = Math.round(vw * scale);
-    const fh = Math.round(vh * scale);
-    const fx = dx + Math.round((dw - fw) / 2);
-    const fy = dy + Math.round((dh - fh) / 2);
 
     ctx.save();
     ctx.filter = filtersToCSS(filters);
-    ctx.translate(fx + fw, fy);
+    ctx.translate(dx + dw, dy);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, vw, vh, 0, 0, fw, fh);
+    ctx.drawImage(video, 0, 0, vw, vh, 0, 0, dw, dh);
     ctx.restore();
 
     if (wonFrame) {
@@ -324,6 +322,8 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
       switch (cmd.action) {
         case 'capture': a.handleCapturePress(); break;
         case 'spin':    setWheelOpen(true); break;
+        case 'spin-now': setSpinSignal(n => n + 1); break;
+        case 'close-wheel': setWheelOpen(false); break;
         case 'retake':  onRetake?.(); break;
         case 'cancel':
           if (countdownRef.current) clearInterval(countdownRef.current);
@@ -343,8 +343,11 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
       frameLabel: wonFrame?.label ?? null,
       timer: timerSecs,
       streaming: isStreaming,
+      wheelOpen,
+      wheelSpinning: wheelStatus.spinning,
+      wheelResult: wheelStatus.result,
     });
-  }, [countdown, wonFrame, timerSecs, isStreaming, publishRemote]);
+  }, [countdown, wonFrame, timerSecs, isStreaming, wheelOpen, wheelStatus, publishRemote]);
 
   // ── Navigation ───────────────────────────────────────────────────────────────
 
@@ -527,6 +530,8 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
         frames={enabledFrames}
         onPicked={(f) => { setWonFrame(f); setPreview(undefined); }}
         onClose={() => setWheelOpen(false)}
+        spinSignal={spinSignal}
+        onStatus={setWheelStatus}
       />
     </StudioShell>
   );
@@ -615,25 +620,46 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
     setShrink(full > 0 ? fitted / full : 1);
   }, [frame, stamp, date]);
 
-  // Artwork without its own caption gets the full line, event name included.
+  // The artwork prints only "on"; the name goes to its left, the date to its
+  // right, both on that word's baseline.
   if (slot) {
     const name = event.eventName?.trim();
+    const common: React.CSSProperties = {
+      top: `${slot.baselineFrac * 100}%`,
+      fontFamily: STAMP_FONT_STACK,
+      fontSize: `${slot.sizeFrac * 100}cqh`,
+      color: slot.colour,
+      lineHeight: 1,
+    };
     return (
-      <span
-        aria-hidden
-        className="pointer-events-none absolute z-20 whitespace-nowrap"
-        style={{
-          left: `${slot.centreXFrac * 100}%`,
-          top: `${slot.baselineFrac * 100}%`,
-          transform: 'translate(-50%, -100%)',
-          fontFamily: STAMP_FONT_STACK,
-          fontSize: `${slot.sizeFrac * 100}cqh`,
-          color: slot.colour,
-          lineHeight: 1,
-        }}
-      >
-        {name ? `${name} on ${formatEventDate(date)}` : formatEventDate(date)}
-      </span>
+      <>
+        {name && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute z-20 whitespace-nowrap"
+            style={{
+              ...common,
+              right: `${(1 - slot.onLeftFrac + slot.gapFrac) * 100}%`,
+              transform: 'translateY(-100%)',
+              maxWidth: `${slot.maxNameWidthFrac * 100}%`,
+              overflow: 'hidden',
+            }}
+          >
+            {name}
+          </span>
+        )}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute z-20 whitespace-nowrap"
+          style={{
+            ...common,
+            left: `${(slot.onRightFrac + slot.gapFrac) * 100}%`,
+            transform: 'translateY(-100%)',
+          }}
+        >
+          {formatEventDate(date)}
+        </span>
+      </>
     );
   }
 

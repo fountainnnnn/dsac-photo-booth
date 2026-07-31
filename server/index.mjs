@@ -271,7 +271,12 @@ app.post('/api/remote/state', (req, res) => {
   return res.json({ state: remote.setState(req.body) });
 });
 
-const REMOTE_ACTIONS = new Set(['capture', 'cancel', 'retake', 'spin', 'reset']);
+const REMOTE_ACTIONS = new Set([
+  'capture', 'cancel', 'retake', 'reset',
+  'spin',        // open the wheel on the kiosk
+  'spin-now',    // actually spin it
+  'close-wheel', // accept the result and close
+]);
 
 app.post('/api/remote/command', (req, res) => {
   const action = req.body?.action;
