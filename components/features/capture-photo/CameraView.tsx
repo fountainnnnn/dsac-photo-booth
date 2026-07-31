@@ -620,10 +620,12 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
     setShrink(full > 0 ? fitted / full : 1);
   }, [frame, stamp, date]);
 
-  // The artwork prints only "on"; the name goes to its left, the date to its
-  // right, both on that word's baseline.
+  // The artwork prints only "on"; the date always goes to its right. The name
+  // goes either on its own centred line above or inline to the left, whichever
+  // the artwork was designed for.
   if (slot) {
     const name = event.eventName?.trim();
+    const above = slot.nameAbove;
     const common: React.CSSProperties = {
       top: `${slot.baselineFrac * 100}%`,
       fontFamily: STAMP_FONT_STACK,
@@ -637,7 +639,15 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
           <span
             aria-hidden
             className="pointer-events-none absolute z-20 whitespace-nowrap"
-            style={{
+            style={above ? {
+              ...common,
+              top: `${above.baselineFrac * 100}%`,
+              fontSize: `${above.sizeFrac * 100}cqh`,
+              left: `${above.centreFrac * 100}%`,
+              transform: 'translate(-50%, -100%)',
+              maxWidth: `${above.maxWidthFrac * 100}%`,
+              overflow: 'hidden',
+            } : {
               ...common,
               right: `${(1 - slot.onLeftFrac + slot.gapFrac) * 100}%`,
               transform: 'translateY(-100%)',

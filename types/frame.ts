@@ -46,22 +46,59 @@ export interface DateStamp {
  */
 /**
  * The artboards print only the word "on", with the space either side left
- * blank. The event name is written to its left and the date to its right, both
- * sharing that word's baseline, so the finished line reads as one sentence.
+ * blank. The date is always written to its right, on that word's baseline.
+ *
+ * Where the event name goes depends on the artwork, and the design PDF sets
+ * both: doodle runs the whole caption as one line, so the name sits to the left
+ * of "on"; tech stacks it, so the name gets its own larger centred line above.
  */
 export interface CaptionSlot {
   /** Left and right edges of the printed "on", as fractions of frame width. */
   onLeftFrac: number;
   onRightFrac: number;
-  /** Shared baseline, as a fraction of frame height. */
+  /** Baseline of the "on ..." line, as a fraction of frame height. */
   baselineFrac: number;
   /** Font size as a fraction of frame height, matched to the printed word. */
   sizeFrac: number;
   colour: string;
   /** Space between "on" and the words either side, as a fraction of width. */
   gapFrac: number;
-  /** Budget for the event name; a longer one shrinks rather than colliding. */
+  /** Budget for an inline event name; a longer one shrinks rather than colliding. */
   maxNameWidthFrac: number;
+  /** Set to stack the name on its own line above instead of running it inline. */
+  nameAbove?: NameLine;
+}
+
+/** A centred line of its own for the event name, above the "on ..." line. */
+export interface NameLine {
+  /** Centre x and baseline y, as fractions of the frame. */
+  centreFrac: number;
+  baselineFrac: number;
+  /** Font size as a fraction of frame height. Larger than the line below it. */
+  sizeFrac: number;
+  /** Width budget; a longer name shrinks rather than running into the artwork. */
+  maxWidthFrac: number;
+}
+
+/**
+ * `size`, shrunk just enough that `text` fits `budget` px wide.
+ *
+ * jsdom and other non-rendering contexts have no text metrics, so an
+ * unmeasurable string keeps its nominal size rather than throwing.
+ */
+export function fitFontPx(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  size: number,
+  budget: number,
+): number {
+  if (!text || typeof ctx?.measureText !== 'function' || budget <= 0) return size;
+  ctx.save();
+  ctx.font = `${size}px ${STAMP_FONT_STACK}`;
+  const width = ctx.measureText(text).width;
+  ctx.restore();
+  if (!Number.isFinite(width) || width <= budget) return size;
+  return Math.max(8, Math.floor(size * (budget / width)));
 }
 
 /** Event details an operator can change without touching the artwork. */
@@ -140,16 +177,24 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     src: '/frames/frame-tech.png',
     // Cut-out at 163,192 sized 1610x781 on the 1921x1201 artboard.
     window: { x: 0.08485, y: 0.15987, w: 0.83811, h: 0.65029 },
-    // Printed "on" occupies x 817..850 on a baseline of y=1134, 21px x-height
-    // (~45px type). The name is written to its left, the date to its right.
+    // Printed "on" occupies x 816..852 on a baseline of y=1136, 24px x-height
+    // (~45px type). The design PDF stacks this caption: the name sits centred
+    // on its own larger line above, with "on <date>" centred beneath it.
     captionSlot: {
-      onLeftFrac: 0.4253,
-      onRightFrac: 0.4425,
-      baselineFrac: 0.9442,
+      onLeftFrac: 0.42478,
+      onRightFrac: 0.44404,
+      baselineFrac: 0.94671,
       sizeFrac: 0.0375,
       colour: '#b1dfe0',   // sampled from the printed word
       gapFrac: 0.008,
       maxNameWidthFrac: 0.38,
+      nameAbove: {
+        centreFrac: 0.5,
+        baselineFrac: 0.877,
+        sizeFrac: 0.051,
+        // The band is clear from ~0.18 to the diamond cluster at ~0.80.
+        maxWidthFrac: 0.60,
+      },
     },
   },
   {
@@ -266,26 +311,22 @@ export function drawDateStamp(
     const dateText = formatEventDate(date);
     const baseline = slot.baselineFrac * h;
     const gap = slot.gapFrac * w;
-
-    // Match the printed "on"; shrink only if the name would run into it.
-    let nameSize = Math.round(slot.sizeFrac * h);
-    if (name && typeof ctx.measureText === 'function') {
-      ctx.save();
-      ctx.font = `${nameSize}px ${STAMP_FONT_STACK}`;
-      const width = ctx.measureText(name).width;
-      ctx.restore();
-      const budget = slot.maxNameWidthFrac * w;
-      if (Number.isFinite(width) && width > budget && width > 0) {
-        nameSize = Math.max(8, Math.floor(nameSize * (budget / width)));
-      }
-    }
+    const above = slot.nameAbove;
 
     ctx.save();
     ctx.fillStyle = slot.colour;
     ctx.textBaseline = 'alphabetic';
 
-    if (name) {
-      ctx.font = `${nameSize}px ${STAMP_FONT_STACK}`;
+    if (name && above) {
+      // Its own centred line, set larger than the "on <date>" line below it.
+      const size = fitFontPx(ctx, name, Math.round(above.sizeFrac * h), above.maxWidthFrac * w);
+      ctx.font = `${size}px ${STAMP_FONT_STACK}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(name, above.centreFrac * w, above.baselineFrac * h);
+    } else if (name) {
+      // Inline: matched to the printed "on", shrunk only if it would collide.
+      const size = fitFontPx(ctx, name, Math.round(slot.sizeFrac * h), slot.maxNameWidthFrac * w);
+      ctx.font = `${size}px ${STAMP_FONT_STACK}`;
       ctx.textAlign = 'right';
       ctx.fillText(name, slot.onLeftFrac * w - gap, baseline);
     }
