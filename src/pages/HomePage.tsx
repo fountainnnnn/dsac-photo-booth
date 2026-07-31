@@ -6,6 +6,7 @@ import CursorArrow from '@/components/ui/CursorArrow';
 
 /** The real event frame, shown in the "Add the frame" card. */
 const EVENT_FRAME = '/frames/frame-tech.png';
+const DEMO_GROUP_PHOTO = '/photos/learning-journey-group.png';
 
 export default function HomePage() {
   return (
@@ -37,6 +38,13 @@ export default function HomePage() {
           <MeshOverlay />
           <div className="absolute inset-x-6 top-6 bottom-[76px]">
             <div className="relative h-full w-full overflow-hidden rounded-xl bg-[var(--stage)] shadow-[0_8px_24px_-8px_rgba(11,10,12,0.45)]">
+              <img
+                src={DEMO_GROUP_PHOTO}
+                alt="A group of friends posing at the photo booth"
+                className="absolute inset-0 h-full w-full object-cover"
+                draggable={false}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-black/10" />
               <Brackets />
               <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5 rounded-md border border-white/15 bg-black/35 px-2 py-1 backdrop-blur-md">
                 <span
@@ -63,8 +71,15 @@ export default function HomePage() {
               style={{ aspectRatio: '16 / 9' }}
             >
               <img
+                src={DEMO_GROUP_PHOTO}
+                alt="The group photo with the DSAC event frame"
+                className="absolute inset-0 h-full w-full object-cover"
+                draggable={false}
+              />
+              <img
                 src={EVENT_FRAME}
-                alt="The DSAC event frame"
+                alt=""
+                aria-hidden="true"
                 className="absolute inset-0 h-full w-full"
                 draggable={false}
               />
