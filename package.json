@@ -8,14 +8,15 @@
   "scripts": {
     "dev": "concurrently -k -n backend,frontend -c red,blue \"npm:server\" \"npm:client\"",
     "client": "vite --host 0.0.0.0",
-    "server": "node server/index.mjs",
+    "server": "node --disable-warning=ExperimentalWarning server/index.mjs",
     "build": "tsc -b && vite build",
-    "start": "node server/index.mjs",
+    "start": "node --disable-warning=ExperimentalWarning server/index.mjs",
     "preview": "concurrently -k -n backend,frontend -c red,blue \"npm:server\" \"vite preview --host 0.0.0.0\"",
     "lint": "eslint .",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "booth": "npm run build && node --disable-warning=ExperimentalWarning server/index.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

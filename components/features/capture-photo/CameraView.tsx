@@ -3,31 +3,26 @@ import {
   ArrowClockwise,
   Camera,
   CameraSlash,
-  CaretRight,
-  CircleHalf,
   DiceFive,
-  Drop,
   Eye,
   Image as ImageIcon,
-  Palette,
-  Sun,
   Timer as TimerIcon,
+  WifiHigh,
+  WifiSlash,
 } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import FrameWheelModal from '@/components/ui/FrameWheelModal';
 import { useLivePreview } from './useLivePreview';
 import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
+import { useCaptureSettings } from '@/components/features/remote/useCaptureSettings';
+import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
 import { rememberCapture } from '@/components/features/gallery/galleryStore';
-import type { FrameConfig } from '@/types/frame';
+import type { FrameConfig, EventDetails } from '@/types/frame';
 import {
   FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
-  STAMP_FONT_STACK, drawDateStamp, stampFontPx, stampText,
+  STAMP_FONT_STACK, drawDateStamp, stampFontPx, stampText, formatEventDate, resolveEventDate,
 } from '@/types/frame';
-import type { ImageFilters } from '@/types/editor';
-import { DEFAULT_FILTERS, FILTER_PRESETS, filtersToCSS } from '@/types/editor';
-
-const TIMER_OPTIONS = [0, 3, 5, 10] as const;
-type TimerOption = typeof TIMER_OPTIONS[number];
+import { filtersToCSS } from '@/types/editor';
 
 type PermissionStatus = 'prompt' | 'granted' | 'denied' | 'unsupported';
 
@@ -35,6 +30,8 @@ export interface CameraViewProps {
   facingMode?: 'user' | 'environment';
   onCapture: (blob: Blob, dataUrl: string) => void;
   onError?: (error: Error) => void;
+  /** Fired when the phone remote asks to retake, so the flow can reset. */
+  onRetake?: () => void;
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 0.92): Promise<Blob> {
@@ -51,15 +48,12 @@ function isDrawable(img: HTMLImageElement | undefined): img is HTMLImageElement 
   return !!img && img.complete && img.naturalWidth > 0;
 }
 
-export default function CameraView({ facingMode = 'user', onCapture, onError }: CameraViewProps) {
+export default function CameraView({ facingMode = 'user', onCapture, onError, onRetake }: CameraViewProps) {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const stageBoxRef   = useRef<HTMLDivElement>(null);
   const countdownRef  = useRef<ReturnType<typeof setInterval> | null>(null);
-  const framesCardRef = useRef<HTMLDivElement>(null);
-  const filtersCardRef = useRef<HTMLDivElement>(null);
-  const adjustCardRef = useRef<HTMLDivElement>(null);
 
   const [permission, setPermission]     = useState<PermissionStatus>('prompt');
   const [isStreaming, setIsStreaming]   = useState(false);
@@ -78,12 +72,14 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
 
   const displayFrame = preview !== undefined ? preview : wonFrame;
   const isPreviewing = preview !== undefined && (preview?.id ?? null) !== (wonFrame?.id ?? null);
-  const [filters, setFilters]         = useState<ImageFilters>(DEFAULT_FILTERS);
-  const [filterThumb, setFilterThumb] = useState<string | null>(null);
   const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [stageSize, setStageSize]     = useState({ w: 0, h: 0 });
 
-  const [timerSecs, setTimerSecs]     = useState<TimerOption>(0);
+  // Timer and adjustments are configured in Settings, not here.
+  const { settings: captureSettings, reload: reloadSettings } = useCaptureSettings();
+  const filters = captureSettings.filters;
+  const timerSecs = captureSettings.timerSecs;
+
   const [countdown, setCountdown]     = useState<number | null>(null);
 
   // Drop references to frames an operator deleted while the kiosk was open.
@@ -201,24 +197,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
     return () => ro.disconnect();
   }, [canvasRef]);
 
-  // Small unfiltered snapshot so each preset chip can preview itself.
-  useEffect(() => {
-    if (!isStreaming) return;
-    const grab = () => {
-      const video = videoRef.current;
-      if (!video?.videoWidth) return;
-      const c = document.createElement('canvas');
-      c.width = 96; c.height = 60;
-      const ctx = c.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(video, 0, 0, c.width, c.height);
-      setFilterThumb(c.toDataURL('image/jpeg', 0.6));
-    };
-    grab();
-    const id = setInterval(grab, 2500);
-    return () => clearInterval(id);
-  }, [isStreaming]);
-
   // ── Capture ──────────────────────────────────────────────────────────────────
 
   const doCapture = useCallback(async () => {
@@ -241,7 +219,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
         const cached = frameCache.current.get(wonFrame.src);
         if (isDrawable(cached)) {
           ctx.drawImage(cached, 0, 0, output.width, output.height);
-          drawDateStamp(ctx, wonFrame, output.width, output.height);
+          drawDateStamp(ctx, wonFrame, output.width, output.height, captureSettings);
         } else {
           console.warn('[DSAC] Frame not ready; capturing without it:', wonFrame.src);
         }
@@ -277,29 +255,27 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
       ctx.fillRect(0, 0, outW, outH);
     }
 
+    // Fit, never crop — the whole shot is scaled to sit inside the cut-out.
     const vw = video.videoWidth  || dw;
     const vh = video.videoHeight || dh;
-    const sourceAspect = vw / vh;
-    const destAspect = dw / dh;
-    let sx = 0, sy = 0, sw = vw, sh = vh;
-    if (sourceAspect > destAspect) {
-      sw = Math.round(vh * destAspect); sx = Math.round((vw - sw) / 2);
-    } else {
-      sh = Math.round(vw / destAspect); sy = Math.round((vh - sh) / 2);
-    }
+    const scale = Math.min(dw / vw, dh / vh);
+    const fw = Math.round(vw * scale);
+    const fh = Math.round(vh * scale);
+    const fx = dx + Math.round((dw - fw) / 2);
+    const fy = dy + Math.round((dh - fh) / 2);
 
     ctx.save();
     ctx.filter = filtersToCSS(filters);
-    ctx.translate(dx + dw, dy);
+    ctx.translate(fx + fw, fy);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
+    ctx.drawImage(video, 0, 0, vw, vh, 0, 0, fw, fh);
     ctx.restore();
 
     if (wonFrame) {
       const cachedFrame = frameCache.current.get(wonFrame.src);
       if (isDrawable(cachedFrame)) {
         ctx.drawImage(cachedFrame, 0, 0, outW, outH);
-        drawDateStamp(ctx, wonFrame, outW, outH);
+        drawDateStamp(ctx, wonFrame, outW, outH, captureSettings);
       }
     }
 
@@ -335,20 +311,46 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
 
   useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current); }, []);
 
+  // ── Phone remote ─────────────────────────────────────────────────────────────
+  // The organiser stands with the guests, so the phone drives the shutter.
+  // Handlers are held in a ref: the SSE subscription must not be torn down and
+  // rebuilt every time a dependency of doCapture changes.
+  const actionsRef = useRef({ doCapture, handleCapturePress, reloadSettings });
+  actionsRef.current = { doCapture, handleCapturePress, reloadSettings };
+
+  const { connected: remoteConnected, publish: publishRemote } = useRemote({
+    onCommand: useCallback((cmd: RemoteCommand) => {
+      const a = actionsRef.current;
+      switch (cmd.action) {
+        case 'capture': a.handleCapturePress(); break;
+        case 'spin':    setWheelOpen(true); break;
+        case 'retake':  onRetake?.(); break;
+        case 'cancel':
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          countdownRef.current = null;
+          setCountdown(null);
+          break;
+        case 'settings-changed': void a.reloadSettings(); break;
+      }
+    }, [onRetake]),
+  });
+
+  // Mirror what the booth is doing so the phone can render it.
+  useEffect(() => {
+    void publishRemote({
+      phase: countdown !== null ? 'counting' : 'idle',
+      countdown,
+      frameLabel: wonFrame?.label ?? null,
+      timer: timerSecs,
+      streaming: isStreaming,
+    });
+  }, [countdown, wonFrame, timerSecs, isStreaming, publishRemote]);
+
   // ── Navigation ───────────────────────────────────────────────────────────────
 
   const navigate = useCallback((section: StudioSection) => {
     if (section === 'settings') { window.location.href = '/settings'; return; }
     if (section === 'gallery')  { window.location.href = '/gallery'; return; }
-    if (section === 'frames')   { window.location.href = '/frames'; return; }
-    const target = section === 'filters' ? filtersCardRef
-      : section === 'adjust' ? adjustCardRef
-      : null;
-    target?.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    target?.current?.animate?.(
-      [{ boxShadow: '0 0 0 0 rgba(225,38,47,0.5)' }, { boxShadow: '0 0 0 6px rgba(225,38,47,0)' }],
-      { duration: 700, easing: 'ease-out' },
-    );
   }, []);
 
   const enabledFrames = useMemo(() => frames.filter((f) => f.enabled !== false), [frames]);
@@ -358,39 +360,32 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
       <video ref={videoRef} data-testid="capture-video-element" autoPlay playsInline muted
         onCanPlay={() => setIsStreaming(true)} className="hidden" />
 
-      {/* Header */}
-      <header className="flex shrink-0 items-center gap-6">
+      {/* Header. Timer and adjustments live in Settings now, so the booth
+          screen stays a camera and a wheel. */}
+      <header className="flex shrink-0 items-center gap-4">
         <h1 className="text-[1.6rem] font-semibold tracking-[-0.02em] text-[var(--ink)]">
-          Make it yours<span className="text-[var(--accent)]">.</span>
+          Say cheese<span className="text-[var(--accent)]">.</span>
         </h1>
 
-        <div className="ml-auto flex items-center gap-1 rounded-full border border-[var(--border)] p-1.5 pl-4">
-          <TimerIcon size={19} className="mr-1.5 text-[var(--ink-2)]" />
-          <span className="mr-1.5 text-[0.85rem] font-semibold text-[var(--ink-2)]">Timer</span>
-          {TIMER_OPTIONS.map(s => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setTimerSecs(s)}
-              className={`min-w-[62px] rounded-full px-4 py-2 text-[0.85rem] font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-                timerSecs === s
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'text-[var(--ink-2)] hover:bg-[var(--shell-bg)]'
-              }`}
-            >
-              {s === 0 ? 'Off' : `${s}s`}
-            </button>
-          ))}
+        <div className="ml-auto flex items-center gap-2.5">
+          {timerSecs > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-2 text-[0.8rem] font-semibold text-[var(--ink-2)]">
+              <TimerIcon size={16} />
+              {timerSecs}s
+            </span>
+          )}
+          <span
+            title={remoteConnected ? 'A phone remote is connected' : 'No phone remote connected'}
+            className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[0.8rem] font-semibold ${
+              remoteConnected
+                ? 'border-[color-mix(in_srgb,var(--accent)_35%,transparent)] text-[var(--accent)]'
+                : 'border-[var(--border)] text-[var(--ink-3)]'
+            }`}
+          >
+            {remoteConnected ? <WifiHigh size={16} weight="fill" /> : <WifiSlash size={16} />}
+            Remote
+          </span>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setFilters(DEFAULT_FILTERS)}
-          aria-label="Reset adjustments"
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--ink-2)] transition hover:border-[var(--ink-3)] hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-        >
-          <Sun size={19} />
-        </button>
       </header>
 
       {/* Stage + capture rail */}
@@ -422,7 +417,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
               <>
                 <img src={displayFrame.src} alt="" draggable={false}
                   className="pointer-events-none absolute inset-0 z-10 h-full w-full" />
-                <LiveDateStamp frame={displayFrame} />
+                <LiveDateStamp frame={displayFrame} event={captureSettings} />
               </>
             )}
 
@@ -527,67 +522,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError }: 
         </aside>
       </div>
 
-      {/* Bottom cards */}
-      <div className="mt-5 grid shrink-0 grid-cols-3 gap-5">
-        <Card ref={framesCardRef} title="Frames" actionLabel="View all"
-          onAction={() => { window.location.href = '/frames'; }}>
-          <div className="flex items-end gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            <Swatch active={!displayFrame} label="None" onClick={() => setPreview(null)}>
-              <span className="absolute inset-0 flex items-center justify-center">
-                <span className="h-8 w-px rotate-45 bg-[var(--ink-3)]" />
-              </span>
-            </Swatch>
-            {enabledFrames.map((f) => (
-              <Swatch key={f.id} active={displayFrame?.id === f.id} label={f.label} onClick={() => setPreview(f)}>
-                <img src={f.src} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
-              </Swatch>
-            ))}
-            <button
-              type="button"
-              onClick={() => setWheelOpen(true)}
-              aria-label="Open the frame wheel"
-              className="mb-5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-white text-[var(--ink-2)] shadow-sm transition hover:border-[var(--ink-3)] hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            >
-              <CaretRight size={15} weight="bold" />
-            </button>
-          </div>
-        </Card>
-
-        <Card ref={filtersCardRef} title="Filters" actionLabel="View all"
-          onAction={() => setFilters(DEFAULT_FILTERS)}>
-          <div className="flex items-end gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {FILTER_PRESETS.slice(0, 6).map(p => {
-              const on = filters.brightness === p.filters.brightness
-                && filters.contrast === p.filters.contrast
-                && filters.saturation === p.filters.saturation
-                && filters.hue === p.filters.hue;
-              return (
-                <Swatch key={p.label} active={on} label={p.label} onClick={() => setFilters(p.filters)}>
-                  {filterThumb
-                    ? <img src={filterThumb} alt="" className="absolute inset-0 h-full w-full object-cover"
-                        style={{ filter: filtersToCSS(p.filters) }} draggable={false} />
-                    : <span className="absolute inset-0" style={{ background: '#dcdce0', filter: filtersToCSS(p.filters) }} />}
-                </Swatch>
-              );
-            })}
-          </div>
-        </Card>
-
-        <Card ref={adjustCardRef} title="Adjustments" actionLabel="Reset"
-          onAction={() => setFilters(DEFAULT_FILTERS)}>
-          <div className="flex flex-col gap-2">
-            <Slider icon={<Sun size={16} />} label="Brightness" value={filters.brightness} min={50} max={150}
-              onChange={v => setFilters(f => ({ ...f, brightness: v }))} />
-            <Slider icon={<CircleHalf size={16} weight="fill" />} label="Contrast" value={filters.contrast} min={50} max={150}
-              onChange={v => setFilters(f => ({ ...f, contrast: v }))} />
-            <Slider icon={<Drop size={16} />} label="Saturation" value={filters.saturation} min={0} max={200}
-              onChange={v => setFilters(f => ({ ...f, saturation: v }))} />
-            <Slider icon={<Palette size={16} />} label="Hue" value={filters.hue} min={-180} max={180} unit="°" hue
-              onChange={v => setFilters(f => ({ ...f, hue: v }))} />
-          </div>
-        </Card>
-      </div>
-
       <FrameWheelModal
         open={wheelOpen}
         frames={enabledFrames}
@@ -666,18 +600,42 @@ function Slider({ icon, label, value, min, max, unit = '', hue = false, onChange
  * Sized in cqh against the stage — the same fraction-of-height the canvas stamp
  * uses — so the two cannot drift.
  */
-function LiveDateStamp({ frame }: { frame: FrameConfig }) {
+function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetails }) {
   const stamp = frame.dateStamp;
+  const slot = frame.captionSlot;
   const [shrink, setShrink] = useState(1);
+  const date = resolveEventDate(event);
 
   useEffect(() => {
     if (!stamp?.maxWidthFrac) { setShrink(1); return; }
     const ctx = document.createElement('canvas').getContext('2d');
     if (!ctx) return;
     const full = Math.round(stamp.sizeFrac * FRAME_H_PX);
-    const fitted = stampFontPx(ctx, frame, FRAME_W_PX, FRAME_H_PX);
+    const fitted = stampFontPx(ctx, frame, FRAME_W_PX, FRAME_H_PX, date);
     setShrink(full > 0 ? fitted / full : 1);
-  }, [frame, stamp]);
+  }, [frame, stamp, date]);
+
+  // Artwork without its own caption gets the full line, event name included.
+  if (slot) {
+    const name = event.eventName?.trim();
+    return (
+      <span
+        aria-hidden
+        className="pointer-events-none absolute z-20 whitespace-nowrap"
+        style={{
+          left: `${slot.centreXFrac * 100}%`,
+          top: `${slot.baselineFrac * 100}%`,
+          transform: 'translate(-50%, -100%)',
+          fontFamily: STAMP_FONT_STACK,
+          fontSize: `${slot.sizeFrac * 100}cqh`,
+          color: slot.colour,
+          lineHeight: 1,
+        }}
+      >
+        {name ? `${name} on ${formatEventDate(date)}` : formatEventDate(date)}
+      </span>
+    );
+  }
 
   if (!stamp) return null;
 
@@ -695,7 +653,7 @@ function LiveDateStamp({ frame }: { frame: FrameConfig }) {
         lineHeight: 1,
       }}
     >
-      {stampText(frame)}
+      {stampText(frame, date)}
     </span>
   );
 }

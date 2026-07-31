@@ -35,6 +35,54 @@ export interface DateStamp {
   maxWidthFrac?: number;
 }
 
+/**
+ * A caption drawn entirely by us: "<event name> on <date>".
+ *
+ * Only for artwork that does not already carry its own caption — an uploaded
+ * frame, or a future artboard with the text left off. The two built-in
+ * artboards bake "Transformation Made Possible on" into the pixels, so their
+ * wording cannot be changed from here; they use `dateStamp` to append the date
+ * after the baked "on" instead.
+ */
+export interface CaptionSlot {
+  /** Centre of the caption, as a fraction of frame width. */
+  centreXFrac: number;
+  /** Text baseline, as a fraction of frame height. */
+  baselineFrac: number;
+  /** Font size as a fraction of frame height. */
+  sizeFrac: number;
+  colour: string;
+  /** Width budget, so a long event name shrinks rather than overflowing. */
+  maxWidthFrac: number;
+}
+
+/** Event details an operator can change without touching the artwork. */
+export interface EventDetails {
+  eventName: string;
+  /** ISO yyyy-mm-dd. Empty means "use today", so an unattended booth stays right. */
+  eventDate: string;
+}
+
+export const DEFAULT_EVENT_DETAILS: EventDetails = {
+  eventName: 'Transformation Made Possible',
+  eventDate: '',
+};
+
+/** The date to stamp: the configured one, else today. */
+export function resolveEventDate(details?: Partial<EventDetails> | null): Date {
+  const raw = details?.eventDate?.trim();
+  if (raw) {
+    // Parse as local midnight; `new Date('2026-05-19')` is UTC and can land on
+    // the previous day for anyone east of Greenwich, Singapore included.
+    const [y, m, d] = raw.split('-').map(Number);
+    if (y && m && d) {
+      const parsed = new Date(y, m - 1, d);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+  }
+  return new Date();
+}
+
 /** The transparent cut-out a photo sits inside, as fractions of the frame. */
 export interface FrameWindow {
   x: number;
@@ -53,8 +101,13 @@ export interface FrameConfig {
    * from each artboard's alpha channel. Omit to fill the whole frame.
    */
   window?: FrameWindow;
-  /** Omit for a frame that already carries its own date. */
+  /** Appends the date after a caption already baked into the artwork. */
   dateStamp?: DateStamp | null;
+  /**
+   * Draws the whole caption ourselves. Only for artwork without its own —
+   * uploads, or an artboard with the text left off. Wins over dateStamp.
+   */
+  captionSlot?: CaptionSlot | null;
   /** Relative spin weight. Never shown to the person spinning. */
   weight?: number;
   /** Excluded from the wheel entirely when false. */
@@ -192,8 +245,40 @@ export function drawDateStamp(
   frame: FrameConfig,
   w: number,
   h: number,
-  date: Date = new Date(),
+  event?: Partial<EventDetails> | null,
 ) {
+  const date = resolveEventDate(event);
+
+  // Artwork with no caption of its own gets the whole line drawn here, so the
+  // event name is ours to set. Artwork that bakes its caption into the pixels
+  // can only have the date appended after it.
+  const slot = frame.captionSlot;
+  if (slot) {
+    const name = (event?.eventName ?? DEFAULT_EVENT_DETAILS.eventName).trim();
+    const text = name ? `${name} on ${formatEventDate(date)}` : formatEventDate(date);
+
+    let size = Math.round(slot.sizeFrac * h);
+    if (typeof ctx.measureText === 'function') {
+      ctx.save();
+      ctx.font = `${size}px ${STAMP_FONT_STACK}`;
+      const width = ctx.measureText(text).width;
+      ctx.restore();
+      const budget = slot.maxWidthFrac * w;
+      if (Number.isFinite(width) && width > budget && width > 0) {
+        size = Math.max(8, Math.floor(size * (budget / width)));
+      }
+    }
+
+    ctx.save();
+    ctx.font = `${size}px ${STAMP_FONT_STACK}`;
+    ctx.fillStyle = slot.colour;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(text, slot.centreXFrac * w, slot.baselineFrac * h);
+    ctx.restore();
+    return;
+  }
+
   const stamp = frame.dateStamp;
   if (!stamp) return;
 

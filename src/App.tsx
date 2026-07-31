@@ -3,6 +3,7 @@ import DownloadPage from './pages/DownloadPage';
 import FramesPage from './pages/FramesPage';
 import GalleryPage from './pages/GalleryPage';
 import HomePage from './pages/HomePage';
+import RemotePage from './pages/RemotePage';
 import SettingsPage from './pages/SettingsPage';
 
 function getDownloadToken(pathname: string): string | null {
@@ -21,6 +22,7 @@ export default function App() {
   if (pathname === '/settings') return <SettingsPage />;
   if (pathname === '/gallery') return <GalleryPage />;
   if (pathname === '/frames') return <FramesPage />;
+  if (pathname === '/remote') return <RemotePage />;
   if (downloadToken) return <DownloadPage token={downloadToken} />;
 
   return <HomePage />;

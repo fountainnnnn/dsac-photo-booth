@@ -22,6 +22,37 @@ function mockGetUserMedia(impl: () => Promise<FakeStream>) {
 // HTMLVideoElement.play is not implemented in jsdom — stub it
 window.HTMLVideoElement.prototype.play = vi.fn().mockResolvedValue(undefined);
 
+/**
+ * The countdown and image adjustments come from the settings API now, so the
+ * tests have to say which they want. Left to a failed fetch the hook falls back
+ * to a 3s countdown, and a test pressing the shutter would be timing a
+ * three-second wait rather than testing capture.
+ */
+function mockSettings(timerSecs: number) {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes('/api/settings/capture')) {
+      return new Response(JSON.stringify({
+        settings: {
+          timerSecs,
+          filters: { brightness: 100, contrast: 100, saturation: 100, hue: 0 },
+        },
+      }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    if (url.includes('/api/frames')) {
+      return new Response(JSON.stringify({ settings: {}, custom: [] }),
+        { headers: { 'Content-Type': 'application/json' } });
+    }
+    if (url.includes('/api/remote/poll')) {
+      // The real endpoint holds the request open. Never resolve, so the poll
+      // loop stays parked instead of spinning through the test.
+      return new Promise<Response>(() => {});
+    }
+    // Remote state publishing and anything else — accepted and ignored.
+    return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -29,6 +60,8 @@ window.HTMLVideoElement.prototype.play = vi.fn().mockResolvedValue(undefined);
 describe('CameraView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
+    mockSettings(0); // no countdown unless a test asks for one
   });
 
   it('renders the video element and capture controls', async () => {
@@ -180,5 +213,44 @@ describe('CameraView', () => {
 
     toDataURLSpy.mockRestore();
     toBlobSpy.mockRestore();
+  });
+
+  // The booth ships with a countdown so guests get a moment to pose, and the
+  // organiser fires it from across the room. Pressing the shutter must start
+  // that countdown rather than capturing on the spot.
+  it('counts down before capturing when a timer is configured', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockSettings(3);
+    mockGetUserMedia(() => Promise.resolve(makeFakeStream()));
+
+    const fakeBlob = new Blob(['fake'], { type: 'image/jpeg' });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      { drawImage: vi.fn(), scale: vi.fn(), translate: vi.fn() } as unknown as CanvasRenderingContext2D,
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,fake');
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (
+      this: HTMLCanvasElement, cb: BlobCallback | null,
+    ) { cb?.(fakeBlob); });
+
+    const onCapture = vi.fn();
+    render(<CameraView onCapture={onCapture} />);
+
+    const video = screen.getByTestId('capture-video-element');
+    await act(async () => { fireEvent.canPlay(video); });
+    await waitFor(() =>
+      expect((screen.getByTestId('capture-button') as HTMLButtonElement).disabled).toBe(false),
+    );
+
+    fireEvent.click(screen.getByTestId('capture-button'));
+
+    // Still counting — nothing captured yet.
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(onCapture).not.toHaveBeenCalled();
+
+    // Countdown elapses, then the shutter fires.
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+    await waitFor(() => expect(onCapture).toHaveBeenCalledTimes(1));
+
+    vi.useRealTimers();
   });
 });

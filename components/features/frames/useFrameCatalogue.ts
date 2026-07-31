@@ -67,6 +67,15 @@ export function useFrameCatalogue(): UseFrameCatalogue {
         label: f.label,
         src: f.src,
         dateStamp: f.dateStamp ?? undefined,
+        // An uploaded frame carries no caption of its own, so the event name
+        // and date are drawn for it, centred along the bottom.
+        captionSlot: f.dateStamp ? undefined : {
+          centreXFrac: 0.5,
+          baselineFrac: 0.955,
+          sizeFrac: 0.045,
+          colour: '#17161a',
+          maxWidthFrac: 0.8,
+        },
         builtIn: false,
       }));
 

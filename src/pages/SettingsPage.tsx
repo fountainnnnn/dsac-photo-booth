@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle, LockSimple, Trash, UploadSimple, Warning } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useFrameCatalogue, type FrameSetting } from '@/components/features/frames/useFrameCatalogue';
+import CaptureSettingsCard from '@/components/features/remote/CaptureSettingsCard';
+import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -261,8 +263,10 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Upload + explainer */}
-        <aside className="flex min-h-0 flex-col gap-5 overflow-y-auto">
+        {/* Camera, remote, uploads, explainer */}
+        <aside className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1">
+          <CaptureSettingsCard />
+          <RemoteAccessCard />
           <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Add a frame</p>
             <p className="mt-1 text-[0.75rem] leading-[1.5] text-[var(--ink-3)]">

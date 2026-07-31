@@ -49,3 +49,6 @@ yarn-error.log*
 
 # local storage index
 /records.json
+
+# local sqlite database + wal files
+/data/

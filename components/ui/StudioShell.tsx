@@ -1,12 +1,4 @@
-import {
-  CaretDown,
-  Camera,
-  CirclesThree,
-  FadersHorizontal,
-  FrameCorners,
-  Gear,
-  Images,
-} from '@phosphor-icons/react';
+import { CaretDown, Camera, Gear, Images } from '@phosphor-icons/react';
 
 /**
  * StudioShell — the persistent left rail and page frame.
@@ -17,12 +9,11 @@ import {
 
 export type StudioSection = 'capture' | 'gallery' | 'frames' | 'filters' | 'adjust' | 'settings';
 
+// Frames, filters and adjustments are configured in Settings now, so the rail
+// only carries the two places an operator actually stands in.
 const NAV: { id: StudioSection; label: string; Icon: React.ComponentType<{ size?: number; weight?: 'regular' | 'fill' | 'bold' }> }[] = [
   { id: 'capture', label: 'Capture', Icon: Camera },
   { id: 'gallery', label: 'Gallery', Icon: Images },
-  { id: 'frames', label: 'Frames', Icon: FrameCorners },
-  { id: 'filters', label: 'Filters', Icon: CirclesThree },
-  { id: 'adjust', label: 'Adjust', Icon: FadersHorizontal },
 ];
 
 export interface StudioShellProps {

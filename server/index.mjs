@@ -7,8 +7,9 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import multer from 'multer';
 import QRCode from 'qrcode';
-import { createStorage } from './storage/index.mjs';
-import { createFrameCatalogue } from './frames.mjs';
+import { openDatabase } from './db.mjs';
+import { createRemoteHub } from './remote.mjs';
+import { startTunnel } from './tunnel.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.join(__dirname, '..');
@@ -50,8 +51,15 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const PHOTO_TTL_DAYS = Number.parseFloat(process.env.PHOTO_TTL_DAYS ?? '7');
 const TTL_MS = PHOTO_TTL_DAYS * 24 * 60 * 60 * 1000;
 
-const storage = createStorage();
-const frames = createFrameCatalogue(storage);
+// One SQLite file holds photos, uploaded frames, and every setting.
+const DATA_DIR = process.env.STORAGE_DIR
+  ? path.resolve(process.env.STORAGE_DIR)
+  : path.join(ROOT_DIR, 'data');
+const store = openDatabase(DATA_DIR);
+const remote = createRemoteHub();
+
+// Discovered at boot when the tunnel comes up; QR codes read it live.
+let tunnelOrigin = null;
 
 // When a production build exists we serve it from this same process, so the
 // kiosk and the phone download page share one origin (and one Railway service).
@@ -60,36 +68,6 @@ const SERVES_FRONTEND = fs.existsSync(path.join(DIST_DIR, 'index.html'));
 
 function extForMime(mimeType) {
   return mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
-}
-
-function isExpired(record) {
-  return Date.now() > new Date(record.expiresAt).getTime();
-}
-
-// Delete a record and its blobs from storage.
-function purge(record) {
-  if (record.photoKey) storage.blobs.delete(record.photoKey);
-  if (record.qrKey) storage.blobs.delete(record.qrKey);
-  storage.records.delete(record.token);
-}
-
-// Fetch a live record, transparently dropping (and 404-ing) expired ones.
-function getLiveRecord(token) {
-  const record = storage.records.get(token);
-  if (!record) return null;
-  if (isExpired(record)) {
-    purge(record);
-    return null;
-  }
-  return record;
-}
-
-// Sweep expired photos so storage does not grow without bound. On a serverless
-// host this is replaced by an R2/bucket lifecycle rule.
-function sweepExpired() {
-  for (const record of storage.records.list()) {
-    if (isExpired(record)) purge(record);
-  }
 }
 
 function getLocalNetworkIP() {
@@ -104,18 +82,17 @@ function getLocalNetworkIP() {
 }
 
 /**
- * The origin baked into QR codes and share links. It must be reachable from a
- * phone on the venue's network, so it can never be "localhost".
+ * The origin baked into QR codes and the remote-control link. Guests and the
+ * organiser scan on mobile data, not the venue Wi-Fi, so this can never be
+ * localhost and a LAN address is only a last resort.
  *
- * 1. PUBLIC_URL           — explicit override, wins everywhere.
- * 2. RAILWAY_PUBLIC_DOMAIN — injected by Railway; always https.
- * 3. LAN IP               — dev fallback. In production the API also serves the
- *                           frontend, so the port is the server's own; in dev
- *                           the browser is on Vite's port instead.
+ * 1. PUBLIC_URL      — explicit override, wins everywhere.
+ * 2. Cloudflare tunnel — the normal case for the local app.
+ * 3. LAN IP          — same-network fallback when no tunnel came up.
  */
 function getPublicOrigin() {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '');
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  if (tunnelOrigin) return tunnelOrigin;
   return `http://${getLocalNetworkIP()}:${SERVES_FRONTEND ? port : frontendPort}`;
 }
 
@@ -184,9 +161,6 @@ app.post('/api/photos', upload.single('file'), validateImage, (_req, res) => {
 app.post('/api/photos/composed', upload.single('file'), validateImage, async (req, res, next) => {
   try {
     const token = crypto.randomUUID();
-    const ext = extForMime(req.file.mimetype);
-    const photoKey = `photos/${token}.${ext}`;
-    const qrKey = `qrs/${token}.png`;
     const photoDownloadUrl = downloadUrl(token);
 
     const qrBuffer = await QRCode.toBuffer(photoDownloadUrl, {
@@ -195,18 +169,23 @@ app.post('/api/photos/composed', upload.single('file'), validateImage, async (re
       color: { dark: '#18181b', light: '#FFFFFF' },
     });
 
-    storage.blobs.put(photoKey, req.file.buffer);
-    storage.blobs.put(qrKey, qrBuffer);
-
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + TTL_MS);
-    storage.records.put(token, {
+    store.photos.put({
       token,
-      photoKey,
-      qrKey,
-      mimeType: req.file.mimetype,
+      mime: req.file.mimetype,
+      bytes: req.file.buffer,
+      qr: qrBuffer,
       createdAt: createdAt.toISOString(),
       expiresAt: expiresAt.toISOString(),
+    });
+
+    // Tell the organiser's phone the shot has landed, so it can offer a retake.
+    remote.setState({
+      phase: 'captured',
+      countdown: null,
+      photoToken: token,
+      downloadUrl: photoDownloadUrl,
     });
 
     res.status(201).json({
@@ -222,53 +201,124 @@ app.post('/api/photos/composed', upload.single('file'), validateImage, async (re
 });
 
 app.get('/api/download/:token', (req, res) => {
-  const photo = getLiveRecord(req.params.token);
+  const photo = store.photos.get(req.params.token);
   if (!photo) return res.status(404).json({ error: 'Photo not found or link has expired' });
 
-  const buffer = storage.blobs.get(photo.photoKey);
-  if (!buffer) return res.status(404).json({ error: 'Photo file missing' });
-
-  const ext = `.${extForMime(photo.mimeType)}`;
-  res.setHeader('Content-Type', photo.mimeType);
+  const ext = `.${extForMime(photo.mime)}`;
+  res.setHeader('Content-Type', photo.mime);
   res.setHeader('Content-Disposition', `attachment; filename="dsac-photo${ext}"`);
   res.setHeader('Cache-Control', 'private, max-age=86400');
-  return res.send(buffer);
+  return res.send(photo.bytes);
 });
 
 app.get('/api/preview/:token', (req, res) => {
-  const photo = getLiveRecord(req.params.token);
+  const photo = store.photos.get(req.params.token);
   if (!photo) return res.status(404).json({ error: 'Photo not found or link has expired' });
 
-  const buffer = storage.blobs.get(photo.photoKey);
-  if (!buffer) return res.status(404).json({ error: 'Photo file missing' });
-
-  res.setHeader('Content-Type', photo.mimeType);
+  res.setHeader('Content-Type', photo.mime);
   res.setHeader('Cache-Control', 'public, max-age=86400');
-  return res.send(buffer);
+  return res.send(photo.bytes);
 });
 
 app.get('/api/qr/:token', (req, res) => {
-  const photo = getLiveRecord(req.params.token);
-  if (!photo?.qrKey) return res.status(404).json({ error: 'QR code not found' });
-
-  const buffer = storage.blobs.get(photo.qrKey);
-  if (!buffer) return res.status(404).json({ error: 'QR file missing' });
+  const photo = store.photos.get(req.params.token);
+  if (!photo?.qr) return res.status(404).json({ error: 'QR code not found' });
 
   res.setHeader('Content-Type', 'image/png');
   res.setHeader('Cache-Control', 'public, max-age=86400');
-  return res.send(buffer);
+  return res.send(photo.qr);
+});
+
+app.get('/api/photos/recent', (_req, res) => {
+  res.json({
+    photos: store.photos.recent(60).map(p => ({
+      token: p.token,
+      createdAt: p.createdAt,
+      src: `/api/preview/${encodeURIComponent(p.token)}`,
+    })),
+  });
+});
+
+// ── Remote control ───────────────────────────────────────────────────────────
+// The organiser drives the shutter from their phone while standing away from
+// the kiosk. See server/remote.mjs for why this is SSE rather than WebSockets.
+
+app.get('/api/remote/poll', async (req, res) => {
+  const since = Number.parseInt(String(req.query.since ?? '0'), 10);
+  const clientId = String(req.query.client ?? '');
+  try {
+    const payload = await remote.poll(since, clientId);
+    // A held response must not be cached anywhere along the way.
+    res.setHeader('Cache-Control', 'no-store, no-transform');
+    res.json(payload);
+  } catch {
+    res.status(500).json({ error: 'Poll failed' });
+  }
+});
+
+app.get('/api/remote/state', (_req, res) => {
+  res.json({
+    state: remote.getState(),
+    version: remote.currentVersion(),
+    listeners: remote.clientCount(),
+  });
+});
+
+app.post('/api/remote/state', (req, res) => {
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({ error: 'Expected a state object' });
+  }
+  return res.json({ state: remote.setState(req.body) });
+});
+
+const REMOTE_ACTIONS = new Set(['capture', 'cancel', 'retake', 'spin', 'reset']);
+
+app.post('/api/remote/command', (req, res) => {
+  const action = req.body?.action;
+  if (!REMOTE_ACTIONS.has(action)) {
+    return res.status(400).json({
+      error: `Unknown action. Expected one of: ${[...REMOTE_ACTIONS].join(', ')}`,
+    });
+  }
+  if (action === 'reset') return res.json({ state: remote.reset() });
+  return res.json({ command: remote.command(action, req.body?.payload ?? {}) });
+});
+
+// ── Capture settings ─────────────────────────────────────────────────────────
+// Timer and image adjustments live in Settings now, so the kiosk reads them
+// from here rather than owning them.
+
+const DEFAULT_CAPTURE_SETTINGS = {
+  timerSecs: 3,
+  filters: { brightness: 100, contrast: 100, saturation: 100, hue: 0 },
+  eventName: 'Transformation Made Possible',
+  eventDate: '', // empty means "use today", so an unattended booth stays right
+};
+
+app.get('/api/settings/capture', (_req, res) => {
+  res.json({ settings: store.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS) });
+});
+
+app.put('/api/settings/capture', (req, res) => {
+  const incoming = req.body?.settings ?? req.body;
+  if (!incoming || typeof incoming !== 'object') {
+    return res.status(400).json({ error: 'Expected a settings object' });
+  }
+  const merged = { ...DEFAULT_CAPTURE_SETTINGS, ...incoming };
+  store.kv.set('captureSettings', merged);
+  // Nudge the kiosk so a settings change takes effect without a reload.
+  remote.command('settings-changed', { settings: merged });
+  return res.json({ settings: merged });
 });
 
 // ── Frame catalogue ──────────────────────────────────────────────────────────
 
 app.get('/api/frames', (_req, res) => {
-  const { settings, custom } = frames.get();
   res.json({
-    settings,
-    // Never leak the storage key to the client.
-    custom: custom.map(({ id, label, mimeType, dateStamp, createdAt }) => ({
-      id, label, mimeType, dateStamp, createdAt,
-      src: `/api/frames/${encodeURIComponent(id)}/image`,
+    settings: store.frames.getSettings(),
+    custom: store.frames.listCustom().map(f => ({
+      ...f,
+      src: `/api/frames/${encodeURIComponent(f.id)}/image`,
     })),
   });
 });
@@ -277,8 +327,8 @@ app.put('/api/frames/settings', (req, res) => {
   if (!req.body || typeof req.body !== 'object') {
     return res.status(400).json({ error: 'Expected a settings object' });
   }
-  const config = frames.saveSettings(req.body.settings ?? req.body);
-  return res.json({ settings: config.settings });
+  const settings = store.frames.setSettings(req.body.settings ?? req.body);
+  return res.json({ settings });
 });
 
 app.post('/api/frames', upload.single('file'), validateImage, (req, res, next) => {
@@ -287,18 +337,14 @@ app.post('/api/frames', upload.single('file'), validateImage, (req, res, next) =
     if (req.body?.dateStamp) {
       try { dateStamp = JSON.parse(req.body.dateStamp); } catch { dateStamp = null; }
     }
-    const frame = frames.addCustom({
-      buffer: req.file.buffer,
+    const frame = store.frames.addCustom({
+      bytes: req.file.buffer,
       mimeType: req.file.mimetype,
       label: req.body?.label,
       dateStamp,
     });
     return res.status(201).json({
-      id: frame.id,
-      label: frame.label,
-      mimeType: frame.mimeType,
-      dateStamp: frame.dateStamp,
-      createdAt: frame.createdAt,
+      ...frame,
       src: `/api/frames/${encodeURIComponent(frame.id)}/image`,
     });
   } catch (err) {
@@ -307,20 +353,20 @@ app.post('/api/frames', upload.single('file'), validateImage, (req, res, next) =
 });
 
 app.patch('/api/frames/:id', (req, res) => {
-  const frame = frames.updateCustom(req.params.id, req.body ?? {});
+  const frame = store.frames.updateCustom(req.params.id, req.body ?? {});
   if (!frame) return res.status(404).json({ error: 'Frame not found' });
-  return res.json({ id: frame.id, label: frame.label, dateStamp: frame.dateStamp });
+  return res.json(frame);
 });
 
 app.delete('/api/frames/:id', (req, res) => {
-  if (!frames.removeCustom(req.params.id)) {
+  if (!store.frames.removeCustom(req.params.id)) {
     return res.status(404).json({ error: 'Frame not found (built-in frames cannot be deleted)' });
   }
   return res.status(204).end();
 });
 
 app.get('/api/frames/:id/image', (req, res) => {
-  const image = frames.imageFor(req.params.id);
+  const image = store.frames.image(req.params.id);
   if (!image) return res.status(404).json({ error: 'Frame image not found' });
 
   res.setHeader('Content-Type', image.mimeType);
@@ -329,7 +375,7 @@ app.get('/api/frames/:id/image', (req, res) => {
 });
 
 app.get('/api/share/:token', (req, res) => {
-  const photo = getLiveRecord(req.params.token);
+  const photo = store.photos.get(req.params.token);
   if (!photo) return res.status(404).send('Photo not found');
 
   const safeTitle = 'My AI Learning Journey at SP DSAC';
@@ -386,18 +432,46 @@ app.use((err, _req, res, next) => {
 });
 
 // Drop anything already past its TTL on boot, then keep sweeping periodically.
-sweepExpired();
-setInterval(sweepExpired, 6 * 60 * 60 * 1000).unref();
+store.photos.sweepExpired();
+setInterval(() => store.photos.sweepExpired(), 6 * 60 * 60 * 1000).unref();
 
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`DSAC Photo Booth API  ->  http://localhost:${port}`);
-  console.log(`Public origin         ->  ${getPublicOrigin()}`);
-  console.log(`Frontend              ->  ${SERVES_FRONTEND ? 'served from ./dist' : 'not built (run `npm run build`) — dev uses Vite'}`);
-  console.log(`Storage dir           ->  ${storage.baseDir}`);
-  console.log(`Photo retention       ->  ${PHOTO_TTL_DAYS} day(s), then auto-deleted`);
+const banner = (label, value) => console.log(`  ${label.padEnd(20)} ${value}`);
+
+const server = app.listen(port, '0.0.0.0', async () => {
+  console.log('\n  DSAC Photo Booth\n');
+  banner('Local', `http://localhost:${SERVES_FRONTEND ? port : frontendPort}`);
+  banner('Database', store.file);
+  banner('Photos stored', `${store.photos.count()}`);
+  banner('Retention', `${PHOTO_TTL_DAYS} day(s)`);
+  banner('Frontend', SERVES_FRONTEND ? 'served from ./dist' : 'dev server (Vite)');
+
+  // A public URL is what makes QR codes and the phone remote work off-network.
+  if (process.env.PUBLIC_URL) {
+    banner('Public URL', `${getPublicOrigin()}  (PUBLIC_URL)`);
+  } else if (process.env.NO_TUNNEL === '1') {
+    banner('Public URL', `${getPublicOrigin()}  (tunnel disabled)`);
+  } else {
+    console.log('\n  Opening a public tunnel…');
+    const { url, error } = await startTunnel(SERVES_FRONTEND ? port : frontendPort);
+    if (url) {
+      tunnelOrigin = url;
+      console.log('');
+      banner('Public URL', url);
+      banner('Remote control', `${url}/remote`);
+    } else {
+      console.log('');
+      console.warn(`  Tunnel unavailable (${error}).`);
+      console.warn(`  Falling back to ${getPublicOrigin()} — same network only.`);
+    }
+  }
+  console.log('');
 });
 
 server.on('error', (err) => {
-  console.error(err);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n  Port ${port} is already in use — is the booth already running?\n`);
+  } else {
+    console.error(err);
+  }
   process.exitCode = 1;
 });

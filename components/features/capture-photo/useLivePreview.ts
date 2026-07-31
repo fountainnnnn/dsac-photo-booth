@@ -58,27 +58,31 @@ export function useLivePreview(
       ctx.fillRect(0, 0, w, h);
     }
 
-    // Cover-crop the video into the destination so it fills without distorting.
+    // Fit the whole frame inside the cut-out rather than cropping to fill it.
+    // Nobody loses the top of their head to a window whose shape happens to
+    // differ from the camera's; the shot is scaled down and centred instead.
     const vw = video.videoWidth  || dw;
     const vh = video.videoHeight || dh;
-    const videoAspect = vw / vh;
-    const destAspect  = dw / dh;
-    let sx = 0, sy = 0, sw = vw, sh = vh;
-    if (videoAspect > destAspect) {
-      sw = Math.round(vh * destAspect);
-      sx = Math.round((vw - sw) / 2);
-    } else {
-      sh = Math.round(vw / destAspect);
-      sy = Math.round((vh - sh) / 2);
+    const scale = Math.min(dw / vw, dh / vh);
+    const fw = Math.round(vw * scale);
+    const fh = Math.round(vh * scale);
+    const fx = dx + Math.round((dw - fw) / 2);
+    const fy = dy + Math.round((dh - fh) / 2);
+
+    // Letterbox bars would otherwise be left transparent, and a JPEG has no
+    // alpha — they would come out black.
+    if (!contentRect) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
     }
 
     ctx.save();
     ctx.filter = filtersToCSS(filters);
-    // Mirror about the destination's own centre, so the flip stays correct
-    // when the photo is inset rather than full-bleed.
-    ctx.translate(dx + dw, dy);
+    // Mirror about the drawn image's own centre, so the flip stays correct
+    // wherever it has been placed.
+    ctx.translate(fx + fw, fy);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
+    ctx.drawImage(video, 0, 0, vw, vh, 0, 0, fw, fh);
     ctx.restore();
 
     rafRef.current = requestAnimationFrame(drawFrame);
