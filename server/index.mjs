@@ -413,9 +413,21 @@ app.get('/api/share/:token', (req, res) => {
 // Express 5 uses path-to-regexp v8, where a bare '*' route is a syntax error.
 // Plain middleware sidesteps route parsing entirely and is version-proof.
 if (SERVES_FRONTEND) {
-  // Hashed assets are immutable; index.html must never be cached or the kiosk
-  // will keep booting a stale build after a deploy.
-  app.use(express.static(DIST_DIR, { index: false, maxAge: '1y', etag: true }));
+  // Vite content-hashes everything under /assets, so those names change
+  // whenever their contents do and they can be cached forever.
+  app.use('/assets', express.static(path.join(DIST_DIR, 'assets'), {
+    index: false, maxAge: '1y', immutable: true,
+  }));
+
+  // Everything else in dist/ was copied from public/ and keeps its name when
+  // its contents change — the frame artwork above all. Caching those for a
+  // year meant replacing a frame did nothing for any browser that had already
+  // loaded the old one: it kept compositing yesterday's caption for a year
+  // without ever asking the server. Revalidate instead; an ETag match is a
+  // 304 with no body, so it stays cheap on the booth's own machine.
+  app.use(express.static(DIST_DIR, { index: false, maxAge: 0, etag: true }));
+
+  // index.html must never be cached or the kiosk keeps booting a stale build.
 
   app.use((req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
