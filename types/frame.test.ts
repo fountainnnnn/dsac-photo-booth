@@ -4,8 +4,8 @@ import { BUILT_IN_FRAMES, FRAME_H, FRAME_W, drawDateStamp } from './frame';
 /**
  * The caption layout is measured off the artwork and differs per frame, so a
  * wrong constant produces a photo that looks fine in code review and wrong on
- * the print. These tests pin the layout the design PDF specifies: tech stacks
- * both frames keep the event name and date on one line with a centre gap.
+ * the print. Both built-ins use a centred two-line block in the quiet middle
+ * of the footer.
  */
 
 interface Drawn { text: string; x: number; y: number; align: string; font: string }
@@ -39,37 +39,18 @@ function draw(id: string) {
 }
 
 describe('drawDateStamp', () => {
-  it('spaces the event name and date apart on the tech frame', () => {
-    const [name, date] = draw('tech');
-    const slot = frame('tech').captionSlot!;
-
-    expect(name.text).toBe('AI Learning Journey');
-    expect(name.align).toBe('right');
-    expect(name.x).toBeLessThan(slot.nameRightFrac * FRAME_W);
-    expect(date.text).toBe('19/5/2026');
-    expect(date.align).toBe('left');
-    expect(date.x).toBeGreaterThan(slot.dateLeftFrac * FRAME_W);
-    expect(name.y).toBe(date.y);
-  });
-
-  it('runs the whole caption inline on the doodle frame', () => {
-    const [name, date] = draw('doodle');
-    const slot = frame('doodle').captionSlot!;
-
-    expect(name.text).toBe('AI Learning Journey');
-    expect(name.y).toBe(date.y);                       // one line
-    expect(name.align).toBe('right');
-    expect(name.x).toBeLessThan(slot.nameRightFrac * FRAME_W);
-    expect(date.x).toBeGreaterThan(slot.dateLeftFrac * FRAME_W);
-  });
-
-  it('lands the date to the right of the centre gap on both frames', () => {
+  it('centres the event name above the date on both frames', () => {
     for (const id of ['tech', 'doodle']) {
       const slot = frame(id).captionSlot!;
-      const date = draw(id).find((d) => d.text === '19/5/2026');
-      expect(date?.align).toBe('left');
-      expect(date?.x).toBeGreaterThan(slot.dateLeftFrac * FRAME_W);
-      expect(date?.y).toBeCloseTo(slot.baselineFrac * FRAME_H, 0);
+      const [name, date] = draw(id);
+      expect(name.text).toBe('AI Learning Journey');
+      expect(name.align).toBe('center');
+      expect(name.x).toBeCloseTo(FRAME_W / 2, 0);
+      expect(name.y).toBeLessThan(date.y);
+      expect(date.text).toBe('19/5/2026');
+      expect(date.align).toBe('center');
+      expect(date.x).toBeCloseTo(FRAME_W / 2, 0);
+      expect(date.y).toBeCloseTo(slot.baselineFrac * FRAME_H, 0);
     }
   });
 
@@ -79,11 +60,11 @@ describe('drawDateStamp', () => {
     drawDateStamp(ctx, frame('tech'), FRAME_W, FRAME_H, { ...EVENT, eventName: long });
 
     const slot = frame('tech').captionSlot!;
-    const nominal = slot.sizeFrac * FRAME_H;
+    const nominal = slot.nameAbove!.sizeFrac * FRAME_H;
     const size = parseInt(drawn[0].font, 10);
     expect(size).toBeLessThan(nominal);
     expect(long.length * 0.5 * size).toBeLessThanOrEqual(
-      slot.maxNameWidthFrac * FRAME_W + 1,
+      slot.nameAbove!.maxWidthFrac * FRAME_W + 1,
     );
   });
 

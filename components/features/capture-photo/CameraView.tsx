@@ -682,9 +682,8 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
     setShrink(full > 0 ? fitted / full : 1);
   }, [frame, stamp, date]);
 
-  // The artwork prints only "on"; the date always goes to its right. The name
-  // goes either on its own centred line above or inline to the left, whichever
-  // the artwork was designed for.
+  // Built-ins use a centred two-line caption; uploaded frames can still use
+  // the compact inline layout.
   if (slot) {
     const name = event.eventName?.trim();
     const above = slot.nameAbove;
@@ -733,7 +732,7 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
           style={{
             ...common,
             left: `${(slot.dateLeftFrac + slot.gapFrac) * 100}%`,
-            transform: 'translateY(-100%)',
+            transform: slot.dateAlign === 'center' ? 'translate(-50%, -100%)' : 'translateY(-100%)',
           }}
         >
           {formatEventDate(date)}

@@ -45,6 +45,8 @@ export interface CaptionSlot {
   /** Font size as a fraction of frame height. */
   sizeFrac: number;
   colour: string;
+  /** Date alignment; built-in frames centre it beneath the event name. */
+  dateAlign?: 'left' | 'center';
   /** Extra breathing room on both sides of the centre gap. */
   gapFrac: number;
   /** Budget for an inline event name; a longer one shrinks rather than colliding. */
@@ -161,15 +163,22 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     src: '/frames/frame-tech.png',
     // Cut-out at 163,192 sized 1610x781 on the 1921x1201 artboard.
     window: { x: 0.08485, y: 0.15987, w: 0.83811, h: 0.65029 },
-    // Name and date sit on one line with a clear gap in the centre.
+    // A centred two-line block keeps the caption away from edge artwork.
     captionSlot: {
-      nameRightFrac: 0.42478,
-      dateLeftFrac: 0.57522,
-      baselineFrac: 0.94671,
-      sizeFrac: 0.0375,
+      nameRightFrac: 0.5,
+      dateLeftFrac: 0.5,
+      baselineFrac: 0.968,
+      sizeFrac: 0.031,
       colour: '#b1dfe0',
-      gapFrac: 0.008,
-      maxNameWidthFrac: 0.38,
+      dateAlign: 'center',
+      gapFrac: 0,
+      maxNameWidthFrac: 0.46,
+      nameAbove: {
+        centreFrac: 0.5,
+        baselineFrac: 0.91,
+        sizeFrac: 0.038,
+        maxWidthFrac: 0.5,
+      },
     },
   },
   {
@@ -179,15 +188,22 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     // Cut-out at 146,167 sized 1628x896. The brush edge is irregular, so this
     // is its bounding box — the artwork covers the corners the photo overshoots.
     window: { x: 0.076, y: 0.13905, w: 0.84748, h: 0.74604 },
-    // Name and date sit on one line, clear of the surrounding doodles.
+    // A centred two-line block fits between the footer's edge doodles.
     captionSlot: {
-      nameRightFrac: 0.475,
-      dateLeftFrac: 0.525,
-      baselineFrac: 0.96,
-      sizeFrac: 0.0533,
+      nameRightFrac: 0.5,
+      dateLeftFrac: 0.5,
+      baselineFrac: 0.978,
+      sizeFrac: 0.032,
       colour: '#12817b',
-      gapFrac: 0.009,
-      maxNameWidthFrac: 0.40,
+      dateAlign: 'center',
+      gapFrac: 0,
+      maxNameWidthFrac: 0.44,
+      nameAbove: {
+        centreFrac: 0.5,
+        baselineFrac: 0.935,
+        sizeFrac: 0.034,
+        maxWidthFrac: 0.48,
+      },
     },
   },
 ];
@@ -305,7 +321,7 @@ export function drawDateStamp(
     }
 
     ctx.font = `${Math.round(slot.sizeFrac * h)}px ${STAMP_FONT_STACK}`;
-    ctx.textAlign = 'left';
+    ctx.textAlign = slot.dateAlign === 'center' ? 'center' : 'left';
     ctx.fillText(dateText, slot.dateLeftFrac * w + gap, baseline);
     ctx.restore();
     return;
