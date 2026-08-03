@@ -2,7 +2,6 @@ import CapturePage from './pages/CapturePage';
 import DownloadPage from './pages/DownloadPage';
 import FramesPage from './pages/FramesPage';
 import GalleryPage from './pages/GalleryPage';
-import HomePage from './pages/HomePage';
 import RemotePage from './pages/RemotePage';
 import SettingsPage from './pages/SettingsPage';
 
@@ -25,5 +24,5 @@ export default function App() {
   if (pathname === '/remote') return <RemotePage />;
   if (downloadToken) return <DownloadPage token={downloadToken} />;
 
-  return <HomePage />;
+  return <CapturePage />;
 }

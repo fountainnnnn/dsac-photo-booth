@@ -82,18 +82,35 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   // the picture into the artboard's shape, so the stage follows the camera.
   const [cameraAspect, setCameraAspect] = useState(FRAME_ASPECT);
 
-  // Timer and adjustments are configured in Settings, not here.
-  const { settings: captureSettings, reload: reloadSettings } = useCaptureSettings();
+  const {
+    settings: captureSettings,
+    save: saveCaptureSettings,
+    reload: reloadSettings,
+  } = useCaptureSettings();
   const filters = captureSettings.filters;
   const timerSecs = captureSettings.timerSecs;
+  const frameMode = captureSettings.frameMode;
 
   const [countdown, setCountdown]     = useState<number | null>(null);
+
+  const updateCaptureSettings = useCallback((patch: Partial<typeof captureSettings>) => {
+    void saveCaptureSettings({ ...captureSettings, ...patch }).catch(() => {});
+  }, [captureSettings, saveCaptureSettings]);
 
   // Drop references to frames an operator deleted while the kiosk was open.
   useEffect(() => {
     if (wonFrame && !frames.some(f => f.id === wonFrame.id)) setWonFrame(null);
     if (preview && !frames.some(f => f.id === preview.id)) setPreview(undefined);
   }, [frames, wonFrame, preview]);
+
+  // A fixed frame is an operator choice, not a per-guest wheel result. Resolve
+  // it from persisted settings every time the booth launches or returns here.
+  useEffect(() => {
+    if (frameMode !== 'fixed') return;
+    const selected = frames.find(f => f.id === captureSettings.selectedFrameId && f.enabled !== false) ?? null;
+    setWonFrame(selected);
+    setPreview(undefined);
+  }, [frameMode, captureSettings.selectedFrameId, frames]);
 
   // ── Camera ───────────────────────────────────────────────────────────────────
 
@@ -381,20 +398,28 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
         }}
         className="hidden" />
 
-      {/* Header. Timer and adjustments live in Settings now, so the booth
-          screen stays a camera and a wheel. */}
+      {/* Header */}
       <header className="flex shrink-0 items-center gap-4">
         <h1 className="text-[1.6rem] font-semibold tracking-[-0.02em] text-[var(--ink)]">
           Say cheese<span className="text-[var(--accent)]">.</span>
         </h1>
 
         <div className="ml-auto flex items-center gap-2.5">
-          {timerSecs > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-2 text-[0.8rem] font-semibold text-[var(--ink-2)]">
-              <TimerIcon size={16} />
-              {timerSecs}s
-            </span>
-          )}
+          <label className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-[0.8rem] font-semibold text-[var(--ink-2)]">
+            <TimerIcon size={16} />
+            <span className="sr-only">Countdown timer</span>
+            <select
+              aria-label="Countdown timer"
+              value={timerSecs}
+              onChange={e => updateCaptureSettings({ timerSecs: Number(e.target.value) })}
+              className="bg-transparent pr-1 font-semibold text-[var(--ink)] outline-none"
+            >
+              <option value={0}>Off</option>
+              <option value={3}>3s</option>
+              <option value={5}>5s</option>
+              <option value={10}>10s</option>
+            </select>
+          </label>
           <span
             title={remoteConnected ? 'A phone remote is connected' : 'No phone remote connected'}
             className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[0.8rem] font-semibold ${
@@ -498,15 +523,17 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
             </button>
           </div>
 
-          <button
-            data-testid="open-frame-wheel"
-            type="button"
-            onClick={() => setWheelOpen(true)}
-            className="mt-7 inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-[var(--border)] px-4 text-[0.9rem] font-semibold text-[var(--ink)] transition hover:border-[var(--ink-3)] hover:bg-[var(--shell-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-          >
-            <DiceFive size={19} />
-            {wonFrame ? 'Spin again' : 'Spin for a frame'}
-          </button>
+          {frameMode === 'wheel' && (
+            <button
+              data-testid="open-frame-wheel"
+              type="button"
+              onClick={() => setWheelOpen(true)}
+              className="mt-7 inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-[var(--border)] px-4 text-[0.9rem] font-semibold text-[var(--ink)] transition hover:border-[var(--ink-3)] hover:bg-[var(--shell-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            >
+              <DiceFive size={19} />
+              {wonFrame ? 'Spin again' : 'Spin for a frame'}
+            </button>
+          )}
 
           <a
             href="/gallery"
@@ -693,7 +720,7 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
             } : {
               ...common,
               fontSize: `${nameSizeFrac * nameScale * 100}cqh`,
-              right: `${(1 - slot.onLeftFrac + slot.gapFrac) * 100}%`,
+              right: `${(1 - slot.nameRightFrac + slot.gapFrac) * 100}%`,
               transform: 'translateY(-100%)',
             }}
           >
@@ -705,7 +732,7 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
           className="pointer-events-none absolute z-20 whitespace-nowrap"
           style={{
             ...common,
-            left: `${(slot.onRightFrac + slot.gapFrac) * 100}%`,
+            left: `${(slot.dateLeftFrac + slot.gapFrac) * 100}%`,
             transform: 'translateY(-100%)',
           }}
         >

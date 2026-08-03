@@ -35,37 +35,21 @@ export interface DateStamp {
   maxWidthFrac?: number;
 }
 
-/**
- * A caption drawn entirely by us: "<event name> on <date>".
- *
- * Only for artwork that does not already carry its own caption — an uploaded
- * frame, or a future artboard with the text left off. The two built-in
- * artboards bake "Transformation Made Possible on" into the pixels, so their
- * wording cannot be changed from here; they use `dateStamp` to append the date
- * after the baked "on" instead.
- */
-/**
- * The artboards print only the word "on", with the space either side left
- * blank. The date is always written to its right, on that word's baseline.
- *
- * Where the event name goes depends on the artwork, and the design PDF sets
- * both: doodle runs the whole caption as one line, so the name sits to the left
- * of "on"; tech stacks it, so the name gets its own larger centred line above.
- */
+/** A caption drawn entirely by us: event name on the left, date on the right. */
 export interface CaptionSlot {
-  /** Left and right edges of the printed "on", as fractions of frame width. */
-  onLeftFrac: number;
-  onRightFrac: number;
-  /** Baseline of the "on ..." line, as a fraction of frame height. */
+  /** The name ends here and the date starts here, leaving a clean centre gap. */
+  nameRightFrac: number;
+  dateLeftFrac: number;
+  /** Shared baseline, as a fraction of frame height. */
   baselineFrac: number;
-  /** Font size as a fraction of frame height, matched to the printed word. */
+  /** Font size as a fraction of frame height. */
   sizeFrac: number;
   colour: string;
-  /** Space between "on" and the words either side, as a fraction of width. */
+  /** Extra breathing room on both sides of the centre gap. */
   gapFrac: number;
   /** Budget for an inline event name; a longer one shrinks rather than colliding. */
   maxNameWidthFrac: number;
-  /** Set to stack the name on its own line above instead of running it inline. */
+  /** Optional legacy layout for uploaded artwork that needs a stacked name. */
   nameAbove?: NameLine;
 }
 
@@ -177,24 +161,15 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     src: '/frames/frame-tech.png',
     // Cut-out at 163,192 sized 1610x781 on the 1921x1201 artboard.
     window: { x: 0.08485, y: 0.15987, w: 0.83811, h: 0.65029 },
-    // Printed "on" occupies x 816..852 on a baseline of y=1136, 24px x-height
-    // (~45px type). The design PDF stacks this caption: the name sits centred
-    // on its own larger line above, with "on <date>" centred beneath it.
+    // Name and date sit on one line with a clear gap in the centre.
     captionSlot: {
-      onLeftFrac: 0.42478,
-      onRightFrac: 0.44404,
+      nameRightFrac: 0.42478,
+      dateLeftFrac: 0.57522,
       baselineFrac: 0.94671,
       sizeFrac: 0.0375,
-      colour: '#b1dfe0',   // sampled from the printed word
+      colour: '#b1dfe0',
       gapFrac: 0.008,
       maxNameWidthFrac: 0.38,
-      nameAbove: {
-        centreFrac: 0.5,
-        baselineFrac: 0.877,
-        sizeFrac: 0.051,
-        // The band is clear from ~0.18 to the diamond cluster at ~0.80.
-        maxWidthFrac: 0.60,
-      },
     },
   },
   {
@@ -204,12 +179,10 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     // Cut-out at 146,167 sized 1628x896. The brush edge is irregular, so this
     // is its bounding box — the artwork covers the corners the photo overshoots.
     window: { x: 0.076, y: 0.13905, w: 0.84748, h: 0.74604 },
-    // Printed "on" occupies x 1159..1204 on a baseline of y=1153, 30px x-height
-    // (~64px type). The name budget keeps it clear of the red squiggle on the
-    // left, and the date lands before the magnifier doodle at x~1568.
+    // Name and date sit on one line, clear of the surrounding doodles.
     captionSlot: {
-      onLeftFrac: 0.6033,
-      onRightFrac: 0.6268,
+      nameRightFrac: 0.475,
+      dateLeftFrac: 0.525,
       baselineFrac: 0.96,
       sizeFrac: 0.0533,
       colour: '#12817b',
@@ -324,16 +297,16 @@ export function drawDateStamp(
       ctx.textAlign = 'center';
       ctx.fillText(name, above.centreFrac * w, above.baselineFrac * h);
     } else if (name) {
-      // Inline: matched to the printed "on", shrunk only if it would collide.
+      // Inline, shrunk only if it would collide with the surrounding artwork.
       const size = fitFontPx(ctx, name, Math.round(slot.sizeFrac * h), slot.maxNameWidthFrac * w);
       ctx.font = `${size}px ${STAMP_FONT_STACK}`;
       ctx.textAlign = 'right';
-      ctx.fillText(name, slot.onLeftFrac * w - gap, baseline);
+      ctx.fillText(name, slot.nameRightFrac * w - gap, baseline);
     }
 
     ctx.font = `${Math.round(slot.sizeFrac * h)}px ${STAMP_FONT_STACK}`;
     ctx.textAlign = 'left';
-    ctx.fillText(dateText, slot.onRightFrac * w + gap, baseline);
+    ctx.fillText(dateText, slot.dateLeftFrac * w + gap, baseline);
     ctx.restore();
     return;
   }

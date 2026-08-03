@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowCounterClockwise, ArrowSquareOut, Camera, CheckCircle, DiceFive, Timer as TimerIcon, WifiHigh, WifiSlash, X,
+  ArrowCounterClockwise, ArrowLeft, ArrowSquareOut, Camera, CheckCircle, DiceFive, Timer as TimerIcon, WifiHigh, WifiSlash, X,
 } from '@phosphor-icons/react';
 import { useRemote } from '@/components/features/remote/useRemote';
 import { useCaptureSettings } from '@/components/features/remote/useCaptureSettings';
@@ -129,6 +129,17 @@ export default function RemotePage() {
                 Continue with {wheelResult}
               </button>
             )}
+            {!wheelSpinning && (
+              <button
+                type="button"
+                onClick={() => act('close-wheel')}
+                disabled={busy}
+                className="flex min-h-[62px] w-full items-center justify-center gap-2.5 rounded-[20px] border-2 border-white/20 text-[1rem] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+              >
+                <ArrowLeft size={22} weight="bold" />
+                Back to camera
+              </button>
+            )}
           </>
         ) : captured ? (
           <>
@@ -174,15 +185,17 @@ export default function RemotePage() {
               <Camera size={36} weight="fill" />
               Take photo
             </button>
-            <button
-              type="button"
-              onClick={() => act('spin')}
-              disabled={busy}
-              className="flex min-h-[68px] w-full items-center justify-center gap-2.5 rounded-[20px] border-2 border-white/20 text-[1.05rem] font-semibold text-white transition active:scale-[0.98] disabled:opacity-40"
-            >
-              <DiceFive size={24} />
-              Spin for a frame
-            </button>
+            {settings.frameMode === 'wheel' && (
+              <button
+                type="button"
+                onClick={() => act('spin')}
+                disabled={busy}
+                className="flex min-h-[68px] w-full items-center justify-center gap-2.5 rounded-[20px] border-2 border-white/20 text-[1.05rem] font-semibold text-white transition active:scale-[0.98] disabled:opacity-40"
+              >
+                <DiceFive size={24} />
+                Spin for a frame
+              </button>
+            )}
 
             {/* Countdown length, so it can be tuned without walking back. */}
             <div className="mt-1">

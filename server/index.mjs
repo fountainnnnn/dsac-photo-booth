@@ -295,6 +295,8 @@ app.post('/api/remote/command', (req, res) => {
 
 const DEFAULT_CAPTURE_SETTINGS = {
   timerSecs: 3,
+  frameMode: 'wheel',
+  selectedFrameId: '',
   filters: { brightness: 100, contrast: 100, saturation: 100, hue: 0 },
   eventName: 'Transformation Made Possible',
   eventDate: '', // empty means "use today", so an unattended booth stays right

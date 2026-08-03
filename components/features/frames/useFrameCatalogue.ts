@@ -70,8 +70,8 @@ export function useFrameCatalogue(): UseFrameCatalogue {
         // An uploaded frame has no printed "on" to sit beside, so the caption
         // is written as one line low on the artwork with a nominal gap.
         captionSlot: f.dateStamp ? undefined : {
-          onLeftFrac: 0.5,
-          onRightFrac: 0.5,
+          nameRightFrac: 0.475,
+          dateLeftFrac: 0.525,
           baselineFrac: 0.955,
           sizeFrac: 0.045,
           colour: '#17161a',

@@ -5,8 +5,7 @@ import { BUILT_IN_FRAMES, FRAME_H, FRAME_W, drawDateStamp } from './frame';
  * The caption layout is measured off the artwork and differs per frame, so a
  * wrong constant produces a photo that looks fine in code review and wrong on
  * the print. These tests pin the layout the design PDF specifies: tech stacks
- * the event name on its own centred line above "on <date>", doodle runs the
- * whole caption inline.
+ * both frames keep the event name and date on one line with a centre gap.
  */
 
 interface Drawn { text: string; x: number; y: number; align: string; font: string }
@@ -40,17 +39,17 @@ function draw(id: string) {
 }
 
 describe('drawDateStamp', () => {
-  it('stacks the event name above the date on the tech frame', () => {
+  it('spaces the event name and date apart on the tech frame', () => {
     const [name, date] = draw('tech');
+    const slot = frame('tech').captionSlot!;
 
     expect(name.text).toBe('AI Learning Journey');
-    expect(name.align).toBe('center');
-    expect(name.x).toBeCloseTo(FRAME_W / 2, 0);
+    expect(name.align).toBe('right');
+    expect(name.x).toBeLessThan(slot.nameRightFrac * FRAME_W);
     expect(date.text).toBe('19/5/2026');
-
-    // Its own line, clear of the one below and larger than it.
-    expect(name.y).toBeLessThan(date.y - 40);
-    expect(parseInt(name.font, 10)).toBeGreaterThan(parseInt(date.font, 10));
+    expect(date.align).toBe('left');
+    expect(date.x).toBeGreaterThan(slot.dateLeftFrac * FRAME_W);
+    expect(name.y).toBe(date.y);
   });
 
   it('runs the whole caption inline on the doodle frame', () => {
@@ -59,17 +58,17 @@ describe('drawDateStamp', () => {
 
     expect(name.text).toBe('AI Learning Journey');
     expect(name.y).toBe(date.y);                       // one line
-    expect(name.align).toBe('right');                  // ends before the "on"
-    expect(name.x).toBeLessThan(slot.onLeftFrac * FRAME_W);
-    expect(date.x).toBeGreaterThan(slot.onRightFrac * FRAME_W);
+    expect(name.align).toBe('right');
+    expect(name.x).toBeLessThan(slot.nameRightFrac * FRAME_W);
+    expect(date.x).toBeGreaterThan(slot.dateLeftFrac * FRAME_W);
   });
 
-  it('lands the date after the printed "on" on both frames', () => {
+  it('lands the date to the right of the centre gap on both frames', () => {
     for (const id of ['tech', 'doodle']) {
       const slot = frame(id).captionSlot!;
       const date = draw(id).find((d) => d.text === '19/5/2026');
       expect(date?.align).toBe('left');
-      expect(date?.x).toBeGreaterThan(slot.onRightFrac * FRAME_W);
+      expect(date?.x).toBeGreaterThan(slot.dateLeftFrac * FRAME_W);
       expect(date?.y).toBeCloseTo(slot.baselineFrac * FRAME_H, 0);
     }
   });
@@ -79,11 +78,12 @@ describe('drawDateStamp', () => {
     const long = 'An Extraordinarily Long Event Name That Will Never Fit';
     drawDateStamp(ctx, frame('tech'), FRAME_W, FRAME_H, { ...EVENT, eventName: long });
 
-    const nominal = frame('tech').captionSlot!.nameAbove!.sizeFrac * FRAME_H;
+    const slot = frame('tech').captionSlot!;
+    const nominal = slot.sizeFrac * FRAME_H;
     const size = parseInt(drawn[0].font, 10);
     expect(size).toBeLessThan(nominal);
     expect(long.length * 0.5 * size).toBeLessThanOrEqual(
-      frame('tech').captionSlot!.nameAbove!.maxWidthFrac * FRAME_W + 1,
+      slot.maxNameWidthFrac * FRAME_W + 1,
     );
   });
 

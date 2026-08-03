@@ -341,6 +341,55 @@ export default function SettingsPage() {
 
         {/* The booth itself: event details and the phone remote. */}
         <aside className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1">
+          <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
+            <div className="flex items-center gap-2">
+              <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame selection</p>
+              <span className={`ml-auto text-[0.72rem] font-semibold transition-opacity duration-200 ${
+                capture.saved ? 'text-[#127a4a] opacity-100' : 'opacity-0'
+              }`}>Saved</span>
+            </div>
+            <p className="mt-1 text-[0.75rem] leading-[1.5] text-[var(--ink-3)]">
+              Choose whether guests spin for a random frame or always use one selected frame.
+            </p>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" disabled={capture.loading}
+                onClick={() => capture.push({ ...capture.settings, frameMode: 'wheel' })}
+                className={`min-h-10 rounded-xl text-[0.8rem] font-semibold transition ${
+                  capture.settings.frameMode === 'wheel'
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'border border-[var(--border)] text-[var(--ink-2)]'
+                }`}>
+                Spin wheel
+              </button>
+              <button type="button" disabled={capture.loading}
+                onClick={() => capture.push({ ...capture.settings, frameMode: 'fixed' })}
+                className={`min-h-10 rounded-xl text-[0.8rem] font-semibold transition ${
+                  capture.settings.frameMode === 'fixed'
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'border border-[var(--border)] text-[var(--ink-2)]'
+                }`}>
+                Pre-select
+              </button>
+            </div>
+
+            {capture.settings.frameMode === 'fixed' && (
+              <label className="mt-3 block text-[0.78rem] font-semibold text-[var(--ink-2)]">
+                Frame
+                <select
+                  aria-label="Pre-selected frame"
+                  value={capture.settings.selectedFrameId}
+                  onChange={e => capture.push({ ...capture.settings, selectedFrameId: e.target.value })}
+                  className="mt-1.5 min-h-11 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
+                >
+                  <option value="">No frame</option>
+                  {frames.filter(f => f.enabled !== false).map(f => (
+                    <option key={f.id} value={f.id}>{f.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </section>
           <EventSettingsCard {...capture} />
           <RemoteAccessCard />
 

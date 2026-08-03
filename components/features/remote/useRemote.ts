@@ -79,6 +79,7 @@ export function useRemote({ onCommand, enabled = true }: UseRemoteOptions = {}) 
 
     let alive = true;
     let since = 0;
+    let initialised = false;
     const controller = new AbortController();
 
     const loop = async () => {
@@ -105,7 +106,13 @@ export function useRemote({ onCommand, enabled = true }: UseRemoteOptions = {}) 
 
           setConnected(true);
           if (data.state) setState(data.state);
-          for (const command of data.commands ?? []) handlerRef.current?.(command);
+          // The first response is a state handshake. Commands in it pre-date
+          // this component instance and must not be replayed after returning
+          // from the QR/gallery/settings screen (especially an old capture).
+          if (initialised) {
+            for (const command of data.commands ?? []) handlerRef.current?.(command);
+          }
+          initialised = true;
           since = data.version;
         } catch (err) {
           if (!alive || (err as Error)?.name === 'AbortError') return;
