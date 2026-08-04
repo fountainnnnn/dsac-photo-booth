@@ -2,9 +2,15 @@
  * Event frames.
  *
  * Each frame is a full-bleed PNG with a transparent photo window, drawn over
- * the captured photo. The artboards are 1921x1201 (16:10), so the camera stage
- * uses that aspect too — stretching a 16:10 frame onto a 16:9 photo would
- * distort the SP logos and the caption.
+ * the captured photo. The artboards are 1921x1201 (16:10), and the stage uses
+ * that aspect whenever a frame is on — stretching a 16:10 frame onto a 16:9
+ * photo would distort the SP logos and the caption.
+ *
+ * Every `window` is 16:9, matching the camera, so the photo is drawn into it
+ * one-to-one with no fitting, cropping or letterboxing at draw time. Where a
+ * cut-out is not 16:9 the window is the 16:9 rect that *covers* it: the photo
+ * fills the hole completely and the artwork hides the overhang. Keeping that
+ * invariant in the geometry is what lets the drawing code stay dumb.
  *
  * Neither artboard has the event date baked in, so we stamp it at capture
  * time. All stamp geometry is expressed as a fraction of the frame, measured
@@ -170,8 +176,10 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     id: 'tech',
     label: 'Tech',
     src: '/frames/frame-tech.png',
-    // Cut-out at 163,192 sized 1610x781 on the 1921x1201 artboard.
-    window: { x: 0.08485, y: 0.15987, w: 0.83811, h: 0.65029 },
+    // Cut-out measured at 161,190 sized 1614x786 — a wide 2.05 slot. The window
+    // is the 16:9 rect that covers it, so 61px above and 62px below sit behind
+    // the artwork. That loss is the price of not distorting anyone.
+    window: { x: 0.08381, y: 0.10746, w: 0.84019, h: 0.75593 },
     // A centred two-line block keeps the caption away from edge artwork.
     captionSlot: {
       nameRightFrac: 0.5,
@@ -194,9 +202,10 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     id: 'doodle',
     label: 'Doodle',
     src: '/frames/frame-doodle.png',
-    // Cut-out at 146,167 sized 1628x896. The brush edge is irregular, so this
-    // is its bounding box — the artwork covers the corners the photo overshoots.
-    window: { x: 0.076, y: 0.13905, w: 0.84748, h: 0.74604 },
+    // Cut-out measured at 137,160 sized 1644x923, which is already 1.781 — all
+    // but 16:9. Widened by a pixel or two to match exactly. The brush edge is
+    // irregular, so this is its bounding box; the artwork covers the corners.
+    window: { x: 0.07132, y: 0.13249, w: 0.85580, h: 0.76998 },
     // A centred two-line block fits between the footer's edge doodles.
     captionSlot: {
       nameRightFrac: 0.5,
