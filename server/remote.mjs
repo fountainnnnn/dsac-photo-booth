@@ -27,17 +27,11 @@ const COMMAND_HISTORY = 50;
 const IDLE_STATE = {
   phase: 'idle',        // idle | counting | captured
   countdown: null,      // seconds remaining while counting
-  frameLabel: null,     // the frame won on the wheel, if any
+  frameLabel: null,     // the frame the operator selected, if any
   timer: 0,             // configured delay in seconds
   streaming: false,     // is the kiosk camera live
   photoToken: null,     // set once a photo is saved
   downloadUrl: null,
-  // Mirrors the wheel so the phone can drive it: the organiser is holding the
-  // remote, not standing at the laptop, so opening the wheel is no use unless
-  // they can spin it too.
-  wheelOpen: false,
-  wheelSpinning: false,
-  wheelResult: null,    // frame label once it lands
   updatedAt: null,
 };
 

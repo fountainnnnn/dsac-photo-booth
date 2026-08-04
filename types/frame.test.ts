@@ -10,13 +10,16 @@ import { BUILT_IN_FRAMES, FRAME_H, FRAME_W, drawDateStamp } from './frame';
 
 interface Drawn { text: string; x: number; y: number; align: string; font: string }
 
+/** Pixel size out of a CSS font string, which may lead with a weight. */
+const fontPx = (font: string) => Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 0);
+
 /** Records what was drawn. Text metrics are stubbed proportional to length. */
 function recorder() {
   const drawn: Drawn[] = [];
   const ctx = {
     font: '', fillStyle: '', textAlign: 'left', textBaseline: 'alphabetic',
     save() {}, restore() {},
-    measureText: (t: string) => ({ width: t.length * 0.5 * parseInt(ctx.font, 10) }),
+    measureText: (t: string) => ({ width: t.length * 0.5 * fontPx(ctx.font) }),
     fillText(text: string, x: number, y: number) {
       drawn.push({ text, x, y, align: ctx.textAlign, font: ctx.font });
     },
@@ -47,7 +50,7 @@ describe('drawDateStamp', () => {
       expect(name.align).toBe('center');
       expect(name.x).toBeCloseTo(FRAME_W / 2, 0);
       expect(name.y).toBeLessThan(date.y);
-      expect(date.text).toBe('19/5/2026');
+      expect(date.text).toBe('19 May 2026');
       expect(date.align).toBe('center');
       expect(date.x).toBeCloseTo(FRAME_W / 2, 0);
       expect(date.y).toBeCloseTo(slot.baselineFrac * FRAME_H, 0);
@@ -61,7 +64,7 @@ describe('drawDateStamp', () => {
 
     const slot = frame('tech').captionSlot!;
     const nominal = slot.nameAbove!.sizeFrac * FRAME_H;
-    const size = parseInt(drawn[0].font, 10);
+    const size = fontPx(drawn[0].font);
     expect(size).toBeLessThan(nominal);
     expect(long.length * 0.5 * size).toBeLessThanOrEqual(
       slot.nameAbove!.maxWidthFrac * FRAME_W + 1,
@@ -71,6 +74,20 @@ describe('drawDateStamp', () => {
   it('draws only the date when the event name is blank', () => {
     const { ctx, drawn } = recorder();
     drawDateStamp(ctx, frame('tech'), FRAME_W, FRAME_H, { ...EVENT, eventName: '  ' });
-    expect(drawn.map((d) => d.text)).toEqual(['19/5/2026']);
+    expect(drawn.map((d) => d.text)).toEqual(['19 May 2026']);
+  });
+
+  it('sets the event name bold and the date regular', () => {
+    const [name, date] = draw('tech');
+    expect(name.font).toMatch(/^bold /);
+    expect(date.font).not.toMatch(/bold/);
+  });
+
+  it('writes the date as "31 Dec 2026"', () => {
+    const { ctx, drawn } = recorder();
+    drawDateStamp(ctx, frame('tech'), FRAME_W, FRAME_H, {
+      eventName: '', eventDate: '2026-12-31',
+    });
+    expect(drawn[0].text).toBe('31 Dec 2026');
   });
 });

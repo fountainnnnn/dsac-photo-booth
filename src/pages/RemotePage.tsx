@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowCounterClockwise, ArrowLeft, ArrowSquareOut, Camera, CheckCircle, DiceFive, Timer as TimerIcon, WifiHigh, WifiSlash, X,
+  ArrowCounterClockwise, ArrowSquareOut, Camera, CheckCircle, Timer as TimerIcon, WifiHigh, WifiSlash, X,
 } from '@phosphor-icons/react';
 import { useRemote } from '@/components/features/remote/useRemote';
 import { useCaptureSettings } from '@/components/features/remote/useCaptureSettings';
@@ -37,7 +37,7 @@ export default function RemotePage() {
     setTimeout(() => setBusy(false), 400);
   }, [send]);
 
-  const { phase, countdown, frameLabel, streaming, wheelOpen, wheelSpinning, wheelResult } = state;
+  const { phase, countdown, frameLabel, streaming } = state;
   const counting = phase === 'counting';
   const captured = phase === 'captured';
 
@@ -107,41 +107,8 @@ export default function RemotePage() {
 
       {/* Controls */}
       <section className="mt-auto flex shrink-0 flex-col gap-3 pt-8">
-        {/* The wheel is open on the booth — mirror its controls. */}
-        {wheelOpen ? (
-          <>
-            <button
-              type="button"
-              onClick={() => act('spin-now')}
-              disabled={busy || wheelSpinning}
-              className="flex min-h-[110px] w-full items-center justify-center gap-3 rounded-[24px] bg-[var(--accent)] text-[1.35rem] font-semibold text-white shadow-[0_14px_40px_-10px_rgba(225,38,47,0.65)] transition active:scale-[0.98] disabled:opacity-50"
-            >
-              <DiceFive size={32} weight="fill" />
-              {wheelSpinning ? 'Spinning…' : wheelResult ? 'Spin again' : 'Spin'}
-            </button>
-            {wheelResult && !wheelSpinning && (
-              <button
-                type="button"
-                onClick={() => act('close-wheel')}
-                disabled={busy}
-                className="flex min-h-[76px] w-full items-center justify-center gap-2.5 rounded-[20px] border-2 border-white/25 text-[1.1rem] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
-              >
-                Continue with {wheelResult}
-              </button>
-            )}
-            {!wheelSpinning && (
-              <button
-                type="button"
-                onClick={() => act('close-wheel')}
-                disabled={busy}
-                className="flex min-h-[62px] w-full items-center justify-center gap-2.5 rounded-[20px] border-2 border-white/20 text-[1rem] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
-              >
-                <ArrowLeft size={22} weight="bold" />
-                Back to camera
-              </button>
-            )}
-          </>
-        ) : captured ? (
+        {captured ? (
+
           <>
             <button
               type="button"
@@ -185,17 +152,6 @@ export default function RemotePage() {
               <Camera size={36} weight="fill" />
               Take photo
             </button>
-            {settings.frameMode === 'wheel' && (
-              <button
-                type="button"
-                onClick={() => act('spin')}
-                disabled={busy}
-                className="flex min-h-[68px] w-full items-center justify-center gap-2.5 rounded-[20px] border-2 border-white/20 text-[1.05rem] font-semibold text-white transition active:scale-[0.98] disabled:opacity-40"
-              >
-                <DiceFive size={24} />
-                Spin for a frame
-              </button>
-            )}
 
             {/* Countdown length, so it can be tuned without walking back. */}
             <div className="mt-1">

@@ -273,9 +273,6 @@ app.post('/api/remote/state', (req, res) => {
 
 const REMOTE_ACTIONS = new Set([
   'capture', 'cancel', 'retake', 'reset',
-  'spin',        // open the wheel on the kiosk
-  'spin-now',    // actually spin it
-  'close-wheel', // accept the result and close
 ]);
 
 app.post('/api/remote/command', (req, res) => {
@@ -295,7 +292,6 @@ app.post('/api/remote/command', (req, res) => {
 
 const DEFAULT_CAPTURE_SETTINGS = {
   timerSecs: 3,
-  frameMode: 'wheel',
   selectedFrameId: '',
   filters: { brightness: 100, contrast: 100, saturation: 100, hue: 0 },
   eventName: 'Transformation Made Possible',

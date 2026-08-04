@@ -7,38 +7,11 @@ import {
 } from '@/components/features/remote/CaptureSettingsCard';
 import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 
-const round1 = (n: number) => Math.round(n * 10) / 10;
-
 /**
- * Rescale the enabled frames so their percentages sum to exactly 100, keeping
- * their ratios. Disabled frames are left untouched (and excluded).
- */
-function normalise(
-  draft: Record<string, FrameSetting>,
-  ids: string[],
-): Record<string, FrameSetting> {
-  const enabled = ids.filter(id => draft[id]?.enabled !== false);
-  if (enabled.length === 0) return draft;
-
-  const sum = enabled.reduce((s, id) => s + (draft[id]?.weight ?? 0), 0);
-  const next = { ...draft };
-  for (const id of enabled) {
-    const cur = draft[id]?.weight ?? 0;
-    next[id] = {
-      weight: round1(sum > 0 ? (cur / sum) * 100 : 100 / enabled.length),
-      enabled: true,
-    };
-  }
-  return next;
-}
-
-/**
- * Settings — upload frames and set how often each one comes up.
+ * Settings — which frames the operator can pick from, plus the event details.
  *
- * The number on each frame IS its percentage chance. The enabled frames always
- * add up to 100, so raising one lowers the others to make room. None of this
- * shows on the wheel — every segment there is the same size, so a rare frame
- * looks exactly as likely as a common one.
+ * There are no odds any more: the operator chooses the frame on the capture
+ * screen, so a frame is either in the picker or it is not.
  */
 export default function SettingsPage() {
   const { frames, loading, error, saveSettings, uploadFrame, deleteFrame } = useFrameCatalogue();
@@ -52,59 +25,33 @@ export default function SettingsPage() {
   const [label, setLabel] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Seed the draft from the server, but never clobber edits in progress. Stored
-  // weights may be raw (e.g. 1/1) so normalise them to real percentages first.
+  // Seed the draft from the server, but never clobber edits in progress.
   useEffect(() => {
     setDraft((prev) => {
       const next = { ...prev };
-      const isFirstSeed = Object.keys(prev).length === 0;
       for (const f of frames) {
-        if (!(f.id in next)) next[f.id] = { weight: f.weight ?? 1, enabled: f.enabled !== false };
+        if (!(f.id in next)) next[f.id] = { enabled: f.enabled !== false };
       }
       for (const id of Object.keys(next)) {
         if (!frames.some((f) => f.id === id)) delete next[id];
       }
-      return isFirstSeed ? normalise(next, frames.map(f => f.id)) : next;
+      return next;
     });
   }, [frames]);
 
-  const totalWeight = useMemo(
-    () => frames.reduce((sum, f) => {
-      const d = draft[f.id];
-      return d?.enabled === false ? sum : sum + (d?.weight ?? 0);
-    }, 0),
+  const enabledCount = useMemo(
+    () => frames.filter(f => draft[f.id]?.enabled !== false).length,
     [frames, draft],
   );
 
-  // The number typed is the percentage. Keep the edited frame exact and share
-  // the remaining 100 - value across the other enabled frames by their ratios,
-  // so the set always totals 100 and only the others move.
-  const setWeight = (id: string, weight: number) =>
-    setDraft(d => {
-      const val = Math.max(0, Math.min(100, Number.isFinite(weight) ? weight : 0));
-      const next = { ...d, [id]: { weight: val, enabled: d[id]?.enabled !== false } };
-
-      const others = frames.filter(f => f.id !== id && (next[f.id]?.enabled !== false));
-      const remaining = 100 - val;
-      const otherSum = others.reduce((s, f) => s + (next[f.id]?.weight ?? 0), 0);
-      for (const f of others) {
-        const cur = next[f.id]?.weight ?? 0;
-        next[f.id] = {
-          weight: round1(otherSum > 0 ? (cur / otherSum) * remaining : remaining / others.length),
-          enabled: true,
-        };
-      }
-      return next;
-    });
-
   const setEnabled = (id: string, enabled: boolean) =>
-    setDraft(d => normalise({ ...d, [id]: { weight: d[id]?.weight ?? 0, enabled } }, frames.map(f => f.id)));
+    setDraft(d => ({ ...d, [id]: { enabled } }));
 
   const save = useCallback(async () => {
     setBusy(true); setStatus(null);
     try {
       await saveSettings(draft);
-      setStatus({ kind: 'ok', text: 'Saved. The wheel will use these odds.' });
+      setStatus({ kind: 'ok', text: 'Saved.' });
     } catch (err) {
       setStatus({ kind: 'err', text: err instanceof Error ? err.message : 'Could not save' });
     } finally {
@@ -152,7 +99,7 @@ export default function SettingsPage() {
             Settings<span className="text-[var(--accent)]">.</span>
           </h1>
           <p className="mt-1 text-[0.85rem] text-[var(--ink-2)]">
-            Manage the frames in the pool and how often each one is drawn.
+            Choose which frames the operator can pick from, and set the event details.
           </p>
         </div>
 
@@ -204,18 +151,14 @@ export default function SettingsPage() {
           <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-6 py-5">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame pool</p>
             <p className="text-[0.78rem] text-[var(--ink-3)]">
-              {frames.filter(f => draft[f.id]?.enabled !== false).length} of {frames.length} in the wheel
+              {enabledCount} of {frames.length} available to pick
             </p>
-
-            <span className="ml-auto text-[0.78rem] tabular-nums text-[var(--ink-3)]">
-              Totals {totalWeight.toFixed(0)}%
-            </span>
           </div>
 
           <div className="px-6 py-5">
             <div className="flex flex-col gap-4">
               {frames.map((frame) => {
-                const d = draft[frame.id] ?? { weight: frame.weight ?? 1, enabled: true };
+                const d = draft[frame.id] ?? { enabled: true };
                 return (
                   <div
                     key={frame.id}
@@ -234,28 +177,9 @@ export default function SettingsPage() {
                         )}
                       </p>
                       <p className="mt-0.5 text-[0.75rem] text-[var(--ink-3)]">
-                        {d.enabled ? `${d.weight}% chance` : 'Not in the wheel'}
+                        {d.enabled ? 'In the picker' : 'Hidden from the picker'}
                         {frame.dateStamp ? ' · stamps the date' : ''}
                       </p>
-                    </div>
-
-                    <div className="flex w-[250px] shrink-0 items-center gap-3">
-                      <input
-                        type="range" min={0} max={100} step={0.5} value={d.weight}
-                        disabled={!d.enabled}
-                        onChange={e => setWeight(frame.id, Number(e.target.value))}
-                        className="dsac-range" aria-label={`${frame.label} probability`}
-                      />
-                      <label className="relative shrink-0">
-                        <input
-                          type="number" min={0} max={100} step={0.1} value={d.weight}
-                          disabled={!d.enabled}
-                          onChange={e => setWeight(frame.id, Number(e.target.value))}
-                          aria-label={`${frame.label} probability, percent`}
-                          className="w-[76px] rounded-lg border border-[var(--border)] py-1.5 pl-2.5 pr-6 text-right text-[0.82rem] font-semibold tabular-nums text-[var(--ink)] outline-none transition focus:border-[var(--accent)] disabled:opacity-40"
-                        />
-                        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[0.75rem] text-[var(--ink-3)]">%</span>
-                      </label>
                     </div>
 
                     <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[0.78rem] font-medium text-[var(--ink-2)]">
@@ -288,132 +212,50 @@ export default function SettingsPage() {
             a 330px rail and comfortable across the full column. */}
         <LookSettingsCard {...capture} />
 
-        {/* Adding a frame and the resulting odds both belong with the pool. */}
-        <div className="grid grid-cols-2 items-start gap-8">
-          <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
-            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Add a frame</p>
-            <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
-              A 1921&times;1201 PNG with a transparent centre. Uploads join the wheel
-              at weight 1.
-            </p>
+        {/* Uploading belongs with the pool it adds to. */}
+        <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
+          <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Add a frame</p>
+          <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
+            A 1921&times;1201 PNG with a transparent centre. Uploads appear in
+            the picker straight away.
+          </p>
 
-            <label className="mt-5 block text-[0.78rem] font-semibold text-[var(--ink-2)]">
-              Name
-              <input
-                type="text" value={label} onChange={e => setLabel(e.target.value)}
-                placeholder="e.g. Confetti" maxLength={40}
-                className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
-              />
-            </label>
-
+          <label className="mt-5 block text-[0.78rem] font-semibold text-[var(--ink-2)]">
+            Name
             <input
-              ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) void onUpload(f); e.target.value = ''; }}
+              type="text" value={label} onChange={e => setLabel(e.target.value)}
+              placeholder="e.g. Confetti" maxLength={40}
+              className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
             />
-            <button
-              type="button" onClick={() => fileRef.current?.click()} disabled={busy}
-              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--ink-3)] text-[0.88rem] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            >
-              <UploadSimple size={18} />
-              Choose image
-            </button>
-          </section>
+          </label>
 
-          <section className="flex flex-col rounded-[18px] border border-[var(--border)] px-6 py-5">
-            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Current odds</p>
-            <div className="mt-4 flex flex-col gap-3.5">
-              {frames.filter(f => (draft[f.id]?.enabled ?? true)).map(f => {
-                const pct = draft[f.id]?.weight ?? 0;
-                return (
-                  <div key={f.id}>
-                    <div className="flex justify-between text-[0.75rem]">
-                      <span className="truncate text-[var(--ink-2)]">{f.label}</span>
-                      <span className="ml-2 shrink-0 font-semibold tabular-nums text-[var(--ink)]">{pct.toFixed(0)}%</span>
-                    </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--shell-bg)]">
-                      <span className="block h-full rounded-full bg-[var(--accent)]" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-              {totalWeight === 0 && (
-                <p className="text-[0.75rem] text-[var(--accent-ink)]">
-                  Every frame is off or at zero — the wheel would have nothing to draw.
-                </p>
-              )}
-            </div>
-          </section>
-        </div>
+          <input
+            ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) void onUpload(f); e.target.value = ''; }}
+          />
+          <button
+            type="button" onClick={() => fileRef.current?.click()} disabled={busy}
+            className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--ink-3)] text-[0.88rem] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          >
+            <UploadSimple size={18} />
+            Choose image
+          </button>
+        </section>
         </div>
 
         {/* The booth itself: event details and the phone remote. */}
         <aside className="flex flex-col gap-8">
-          <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
-            <div className="flex items-center gap-2">
-              <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame selection</p>
-              <span className={`ml-auto text-[0.72rem] font-semibold transition-opacity duration-200 ${
-                capture.saved ? 'text-[#127a4a] opacity-100' : 'opacity-0'
-              }`}>Saved</span>
-            </div>
-            <p className="mt-1 text-[0.75rem] leading-[1.5] text-[var(--ink-3)]">
-              Choose whether guests spin for a random frame or always use one selected frame.
-            </p>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button type="button" disabled={capture.loading}
-                onClick={() => capture.push({ ...capture.settings, frameMode: 'wheel' })}
-                className={`min-h-10 rounded-xl text-[0.8rem] font-semibold transition ${
-                  capture.settings.frameMode === 'wheel'
-                    ? 'bg-[var(--accent)] text-white'
-                    : 'border border-[var(--border)] text-[var(--ink-2)]'
-                }`}>
-                Spin wheel
-              </button>
-              <button type="button" disabled={capture.loading}
-                onClick={() => capture.push({ ...capture.settings, frameMode: 'fixed' })}
-                className={`min-h-10 rounded-xl text-[0.8rem] font-semibold transition ${
-                  capture.settings.frameMode === 'fixed'
-                    ? 'bg-[var(--accent)] text-white'
-                    : 'border border-[var(--border)] text-[var(--ink-2)]'
-                }`}>
-                Pre-select
-              </button>
-            </div>
-
-            {capture.settings.frameMode === 'fixed' && (
-              <label className="mt-3 block text-[0.78rem] font-semibold text-[var(--ink-2)]">
-                Frame
-                <select
-                  aria-label="Pre-selected frame"
-                  value={capture.settings.selectedFrameId}
-                  onChange={e => capture.push({ ...capture.settings, selectedFrameId: e.target.value })}
-                  className="mt-1.5 min-h-11 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
-                >
-                  <option value="">No frame</option>
-                  {frames.filter(f => f.enabled !== false).map(f => (
-                    <option key={f.id} value={f.id}>{f.label}</option>
-                  ))}
-                </select>
-              </label>
-            )}
-          </section>
           <EventSettingsCard {...capture} />
           <RemoteAccessCard />
 
-          <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
-            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How the odds work</p>
-            <p className="mt-2 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              The number on each frame is its chance of coming up. The enabled
-              frames always add up to 100%, so raising one lowers the others to
-              make room.
+          <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
+            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How frames are chosen</p>
+            <p className="mt-2.5 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
+              The operator picks the frame on the capture screen, and the picker
+              offers whatever is switched on here.
             </p>
-            <p className="mt-2 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              Set a frame to <strong>0</strong>, or switch it off, to keep it out
-              of the draw.
-            </p>
-            <p className="mt-3 rounded-xl bg-[var(--shell-bg)] px-3.5 py-3 text-[0.75rem] leading-[1.6] text-[var(--ink-2)]">
-              The wheel never reveals this. Every segment is drawn the same size, so a
-              rare frame looks exactly as likely as a common one.
+            <p className="mt-2.5 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
+              Switch a frame off to keep it out of the picker without deleting it.
             </p>
           </section>
         </aside>

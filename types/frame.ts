@@ -77,10 +77,13 @@ export function fitFontPx(
   text: string,
   size: number,
   budget: number,
+  weight = '',
 ): number {
   if (!text || typeof ctx?.measureText !== 'function' || budget <= 0) return size;
   ctx.save();
-  ctx.font = `${size}px ${STAMP_FONT_STACK}`;
+  // Measure at the weight it will be drawn at — bold is wider, and measuring
+  // regular would let a bold name overrun the budget it was fitted to.
+  ctx.font = `${weight} ${size}px ${STAMP_FONT_STACK}`.trim();
   const width = ctx.measureText(text).width;
   ctx.restore();
   if (!Number.isFinite(width) || width <= budget) return size;
@@ -139,9 +142,7 @@ export interface FrameConfig {
    * uploads, or an artboard with the text left off. Wins over dateStamp.
    */
   captionSlot?: CaptionSlot | null;
-  /** Relative spin weight. Never shown to the person spinning. */
-  weight?: number;
-  /** Excluded from the wheel entirely when false. */
+  /** Hidden from the operator's frame picker when false. */
   enabled?: boolean;
   /** Built-ins ship with the app and cannot be deleted. */
   builtIn?: boolean;
@@ -153,6 +154,14 @@ export interface FrameConfig {
  */
 export const STAMP_FONT_STACK =
   "'Ink Free','Segoe Script','Bradley Hand','Comic Sans MS',cursive";
+
+/**
+ * The event name is set bold, the date is not, so the name reads as the
+ * heading of the two-line block. Ink Free ships no bold face, so this is a
+ * synthesised bold — heavier and slightly wider, which is why `fitFontPx`
+ * has to measure at the same weight.
+ */
+export const NAME_WEIGHT = 'bold';
 
 /** Ships with the app. Geometry is measured off the artboards, so it lives here
  *  rather than in the database an operator can edit. */
@@ -209,35 +218,20 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
 ];
 
 export const BUILT_IN_FRAMES: FrameConfig[] = BUILT_IN_SOURCE.map((f) => ({
-  ...f, builtIn: true, weight: 1, enabled: true,
+  ...f, builtIn: true, enabled: true,
 }));
 
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
 /**
- * Pick a frame using its weight.
- *
- * Weights are an operator setting and are deliberately invisible on the wheel —
- * every segment is drawn the same size, so a rare frame looks exactly as likely
- * as a common one. The odds live here, not in the geometry.
+ * "31 Dec 2026" — day, short month, year. Spelled out rather than numeric so
+ * the photo reads the same to a guest who writes dates month-first.
  */
-export function pickWeighted(
-  frames: FrameConfig[],
-  random: () => number = Math.random,
-): FrameConfig | null {
-  const pool = frames.filter((f) => f.enabled !== false && (f.weight ?? 1) > 0);
-  if (pool.length === 0) return null;
-
-  const total = pool.reduce((sum, f) => sum + (f.weight ?? 1), 0);
-  let ticket = random() * total;
-  for (const frame of pool) {
-    ticket -= frame.weight ?? 1;
-    if (ticket <= 0) return frame;
-  }
-  return pool[pool.length - 1]; // floating-point guard
-}
-
-/** "19/5/2026" — day/month/year, no leading zeros, matching the mockup. */
 export function formatEventDate(date: Date = new Date()): string {
-  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 /** The full stamp text for a frame, including its prefix. */
@@ -307,15 +301,15 @@ export function drawDateStamp(
     ctx.textBaseline = 'alphabetic';
 
     if (name && above) {
-      // Its own centred line, set larger than the "on <date>" line below it.
-      const size = fitFontPx(ctx, name, Math.round(above.sizeFrac * h), above.maxWidthFrac * w);
-      ctx.font = `${size}px ${STAMP_FONT_STACK}`;
+      // Its own centred line, set larger than the date below it.
+      const size = fitFontPx(ctx, name, Math.round(above.sizeFrac * h), above.maxWidthFrac * w, NAME_WEIGHT);
+      ctx.font = `${NAME_WEIGHT} ${size}px ${STAMP_FONT_STACK}`;
       ctx.textAlign = 'center';
       ctx.fillText(name, above.centreFrac * w, above.baselineFrac * h);
     } else if (name) {
       // Inline, shrunk only if it would collide with the surrounding artwork.
-      const size = fitFontPx(ctx, name, Math.round(slot.sizeFrac * h), slot.maxNameWidthFrac * w);
-      ctx.font = `${size}px ${STAMP_FONT_STACK}`;
+      const size = fitFontPx(ctx, name, Math.round(slot.sizeFrac * h), slot.maxNameWidthFrac * w, NAME_WEIGHT);
+      ctx.font = `${NAME_WEIGHT} ${size}px ${STAMP_FONT_STACK}`;
       ctx.textAlign = 'right';
       ctx.fillText(name, slot.nameRightFrac * w - gap, baseline);
     }

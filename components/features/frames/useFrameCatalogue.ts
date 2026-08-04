@@ -7,13 +7,12 @@ import { BUILT_IN_FRAMES } from '@/types/frame';
  * anything uploaded through settings, each carrying its operator-set weight.
  *
  * Built-in artwork and date-stamp geometry come from the bundle, never the
- * server — only weight and enabled are stored remotely. If the API is
+ * server — only whether each frame is enabled is stored remotely. If the API is
  * unreachable the kiosk still gets its built-ins at default weight, so a
  * settings outage can never leave someone unable to take a photo.
  */
 
 export interface FrameSetting {
-  weight: number;
   enabled: boolean;
 }
 
@@ -40,11 +39,7 @@ function applySettings(
 ): FrameConfig[] {
   return frames.map((frame) => {
     const s = settings[frame.id];
-    return {
-      ...frame,
-      weight: s ? s.weight : (frame.weight ?? 1),
-      enabled: s ? s.enabled : (frame.enabled ?? true),
-    };
+    return { ...frame, enabled: s ? s.enabled : (frame.enabled ?? true) };
   });
 }
 

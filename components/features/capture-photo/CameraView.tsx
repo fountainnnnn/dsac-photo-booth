@@ -3,15 +3,12 @@ import {
   ArrowClockwise,
   Camera,
   CameraSlash,
-  DiceFive,
-  Eye,
   Image as ImageIcon,
   Timer as TimerIcon,
   WifiHigh,
   WifiSlash,
 } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
-import FrameWheelModal from '@/components/ui/FrameWheelModal';
 import { useLivePreview } from './useLivePreview';
 import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
 import { useCaptureSettings } from '@/components/features/remote/useCaptureSettings';
@@ -20,7 +17,7 @@ import { rememberCapture } from '@/components/features/gallery/galleryStore';
 import type { FrameConfig, EventDetails } from '@/types/frame';
 import {
   FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
-  STAMP_FONT_STACK, drawDateStamp, fitFontPx, stampFontPx, stampText, formatEventDate, resolveEventDate,
+  NAME_WEIGHT, STAMP_FONT_STACK, drawDateStamp, fitFontPx, stampFontPx, stampText, formatEventDate, resolveEventDate,
 } from '@/types/frame';
 import { filtersToCSS } from '@/types/editor';
 
@@ -61,20 +58,10 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
 
   const { frames } = useFrameCatalogue();
 
-  // Only the wheel can award a frame. Tapping a swatch in the Frames card is a
-  // preview — it changes what you see, never what gets baked into the photo.
-  //   undefined -> not previewing, show whatever was won
-  //   null      -> previewing "no frame"
-  //   frame     -> previewing that frame
-  const [wonFrame, setWonFrame] = useState<FrameConfig | null>(null);
-  const [preview, setPreview]   = useState<FrameConfig | null | undefined>(undefined);
-  const [wheelOpen, setWheelOpen] = useState(false);
-  // Bumped when the phone asks for a spin; the modal watches this.
-  const [spinSignal, setSpinSignal] = useState(0);
-  const [wheelStatus, setWheelStatus] = useState({ spinning: false, result: null as string | null });
-
-  const displayFrame = preview !== undefined ? preview : wonFrame;
-  const isPreviewing = preview !== undefined && (preview?.id ?? null) !== (wonFrame?.id ?? null);
+  // The operator's choice, and the only frame there is. What you see on the
+  // stage is exactly what gets baked into the photo.
+  const [activeFrame, setActiveFrame] = useState<FrameConfig | null>(null);
+  const displayFrame = activeFrame;
   const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [stageSize, setStageSize]     = useState({ w: 0, h: 0 });
   // The camera's own shape. Cameras rarely deliver the 16:10 we ask for — most
@@ -89,7 +76,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   } = useCaptureSettings();
   const filters = captureSettings.filters;
   const timerSecs = captureSettings.timerSecs;
-  const frameMode = captureSettings.frameMode;
 
   const [countdown, setCountdown]     = useState<number | null>(null);
 
@@ -97,20 +83,20 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     void saveCaptureSettings({ ...captureSettings, ...patch }).catch(() => {});
   }, [captureSettings, saveCaptureSettings]);
 
-  // Drop references to frames an operator deleted while the kiosk was open.
+  // Drop the frame if an operator deleted or disabled it mid-event.
   useEffect(() => {
-    if (wonFrame && !frames.some(f => f.id === wonFrame.id)) setWonFrame(null);
-    if (preview && !frames.some(f => f.id === preview.id)) setPreview(undefined);
-  }, [frames, wonFrame, preview]);
+    if (activeFrame && !frames.some(f => f.id === activeFrame.id && f.enabled !== false)) {
+      setActiveFrame(null);
+    }
+  }, [frames, activeFrame]);
 
-  // A fixed frame is an operator choice, not a per-guest wheel result. Resolve
-  // it from persisted settings every time the booth launches or returns here.
+  // Restore the frame the operator last chose, so returning to capture — or
+  // relaunching the booth — does not silently drop back to no frame.
   useEffect(() => {
-    if (frameMode !== 'fixed') return;
-    const selected = frames.find(f => f.id === captureSettings.selectedFrameId && f.enabled !== false) ?? null;
-    setWonFrame(selected);
-    setPreview(undefined);
-  }, [frameMode, captureSettings.selectedFrameId, frames]);
+    setActiveFrame(prev => prev
+      ?? frames.find(f => f.id === captureSettings.selectedFrameId && f.enabled !== false)
+      ?? null);
+  }, [captureSettings.selectedFrameId, frames]);
 
   // ── Camera ───────────────────────────────────────────────────────────────────
 
@@ -246,15 +232,13 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(liveCanvas, 0, 0);
 
-      // Only a frame that was actually won is baked in. A preview is for
-      // looking at, so it must never reach the photo.
-      if (wonFrame) {
-        const cached = frameCache.current.get(wonFrame.src);
+      if (activeFrame) {
+        const cached = frameCache.current.get(activeFrame.src);
         if (isDrawable(cached)) {
           ctx.drawImage(cached, 0, 0, output.width, output.height);
-          drawDateStamp(ctx, wonFrame, output.width, output.height, captureSettings);
+          drawDateStamp(ctx, activeFrame, output.width, output.height, captureSettings);
         } else {
-          console.warn('[DSAC] Frame not ready; capturing without it:', wonFrame.src);
+          console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
         }
       }
 
@@ -277,7 +261,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     ctx.imageSmoothingQuality = 'high';
 
     // The photo goes inside the frame's cut-out; the frame wraps it.
-    const win = wonFrame?.window;
+    const win = activeFrame?.window;
     const dx = win ? Math.round(win.x * outW) : 0;
     const dy = win ? Math.round(win.y * outH) : 0;
     const dw = win ? Math.round(win.w * outW) : outW;
@@ -299,11 +283,11 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     ctx.drawImage(video, 0, 0, vw, vh, 0, 0, dw, dh);
     ctx.restore();
 
-    if (wonFrame) {
-      const cachedFrame = frameCache.current.get(wonFrame.src);
+    if (activeFrame) {
+      const cachedFrame = frameCache.current.get(activeFrame.src);
       if (isDrawable(cachedFrame)) {
         ctx.drawImage(cachedFrame, 0, 0, outW, outH);
-        drawDateStamp(ctx, wonFrame, outW, outH, captureSettings);
+        drawDateStamp(ctx, activeFrame, outW, outH, captureSettings);
       }
     }
 
@@ -312,7 +296,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     rememberCapture(dataUrl);
     const blob = await canvasToBlob(canvas);
     onCapture(blob, dataUrl);
-  }, [isStreaming, canvasRef, filters, wonFrame, onCapture]);
+  }, [isStreaming, canvasRef, filters, activeFrame, onCapture]);
 
   const handleCapturePress = useCallback(() => {
     if (countdown !== null) {
@@ -351,9 +335,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
       const a = actionsRef.current;
       switch (cmd.action) {
         case 'capture': a.handleCapturePress(); break;
-        case 'spin':    setWheelOpen(true); break;
-        case 'spin-now': setSpinSignal(n => n + 1); break;
-        case 'close-wheel': setWheelOpen(false); break;
         case 'retake':  onRetake?.(); break;
         case 'cancel':
           if (countdownRef.current) clearInterval(countdownRef.current);
@@ -370,14 +351,11 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     void publishRemote({
       phase: countdown !== null ? 'counting' : 'idle',
       countdown,
-      frameLabel: wonFrame?.label ?? null,
+      frameLabel: activeFrame?.label ?? null,
       timer: timerSecs,
       streaming: isStreaming,
-      wheelOpen,
-      wheelSpinning: wheelStatus.spinning,
-      wheelResult: wheelStatus.result,
     });
-  }, [countdown, wonFrame, timerSecs, isStreaming, wheelOpen, wheelStatus, publishRemote]);
+  }, [countdown, activeFrame, timerSecs, isStreaming, publishRemote]);
 
   // ── Navigation ───────────────────────────────────────────────────────────────
 
@@ -467,16 +445,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
               </>
             )}
 
-            {/* Say plainly that a previewed frame is not the one you'll get. */}
-            {isPreviewing && (
-              <div className="pointer-events-none absolute left-1/2 top-4 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/20 bg-black/65 px-4 py-2 backdrop-blur-md">
-                <Eye size={15} className="text-white/80" />
-                <span className="text-[0.75rem] font-semibold text-white">
-                  Preview only — spin to win a frame
-                </span>
-              </div>
-            )}
-
             {countdown !== null && (
               <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
                 <div className="flex h-32 w-32 items-center justify-center rounded-full border border-white/20 bg-black/45 backdrop-blur-md">
@@ -523,17 +491,27 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
             </button>
           </div>
 
-          {frameMode === 'wheel' && (
-            <button
-              data-testid="open-frame-wheel"
-              type="button"
-              onClick={() => setWheelOpen(true)}
-              className="mt-7 inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-[var(--border)] px-4 text-[0.9rem] font-semibold text-[var(--ink)] transition hover:border-[var(--ink-3)] hover:bg-[var(--shell-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            >
-              <DiceFive size={19} />
-              {wonFrame ? 'Spin again' : 'Spin for a frame'}
-            </button>
-          )}
+          {/* The operator picks the frame. Selecting one changes the stage
+              immediately, so what is on screen is always what gets captured. */}
+          <div className="mt-7" data-testid="frame-picker">
+            <p className="text-[0.78rem] font-medium text-[var(--ink-3)]">Frame</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <FrameSwatch
+                label="None"
+                selected={!activeFrame}
+                onSelect={() => { setActiveFrame(null); updateCaptureSettings({ selectedFrameId: '' }); }}
+              />
+              {enabledFrames.map(f => (
+                <FrameSwatch
+                  key={f.id}
+                  label={f.label}
+                  src={f.src}
+                  selected={activeFrame?.id === f.id}
+                  onSelect={() => { setActiveFrame(f); updateCaptureSettings({ selectedFrameId: f.id }); }}
+                />
+              ))}
+            </div>
+          </div>
 
           <a
             href="/gallery"
@@ -561,28 +539,53 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
           </div>
 
           <p className="mt-auto pt-4 text-center text-[0.72rem] text-[var(--ink-3)]">
-            {wonFrame
-              ? <>Frame: <strong className="font-semibold text-[var(--ink)]">{wonFrame.label}</strong></>
-              : isPreviewing
-                ? <>Previewing <strong className="font-semibold text-[var(--ink)]">{displayFrame?.label ?? 'no frame'}</strong> — not yours yet</>
-                : 'No frame yet'}
+            {activeFrame
+              ? <>Frame: <strong className="font-semibold text-[var(--ink)]">{activeFrame.label}</strong></>
+              : 'No frame'}
           </p>
         </aside>
       </div>
 
-      <FrameWheelModal
-        open={wheelOpen}
-        frames={enabledFrames}
-        onPicked={(f) => { setWonFrame(f); setPreview(undefined); }}
-        onClose={() => setWheelOpen(false)}
-        spinSignal={spinSignal}
-        onStatus={setWheelStatus}
-      />
     </StudioShell>
   );
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+/** One choice in the capture rail's frame picker. */
+function FrameSwatch({ label, src, selected, onSelect }: {
+  label: string; src?: string; selected: boolean; onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      title={label}
+      className={`flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+        selected
+          ? 'bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]'
+          : 'hover:bg-[var(--shell-bg)]'
+      }`}
+    >
+      <span
+        className={`flex h-[38px] w-full items-center justify-center overflow-hidden rounded ${
+          selected ? 'ring-2 ring-[var(--accent)]' : 'ring-1 ring-[var(--border)]'
+        }`}
+        style={{ background: src ? '#8a8f8a' : 'var(--shell-bg)' }}
+      >
+        {src
+          ? <img src={src} alt="" draggable={false} className="h-full w-full" />
+          : <span className="text-[0.62rem] font-semibold text-[var(--ink-3)]">None</span>}
+      </span>
+      <span className={`w-full truncate text-[0.62rem] font-semibold ${
+        selected ? 'text-[var(--accent)]' : 'text-[var(--ink-2)]'
+      }`}>
+        {label}
+      </span>
+    </button>
+  );
+}
 
 function Card({ ref, title, actionLabel, onAction, children }: {
   ref?: React.Ref<HTMLDivElement>;
@@ -659,7 +662,7 @@ function nameFitScale(name: string | undefined, sizeFrac: number, maxWidthFrac: 
   if (!ctx) return 1;
   const nominal = Math.round(sizeFrac * FRAME_H_PX);
   if (nominal <= 0) return 1;
-  return fitFontPx(ctx, name, nominal, maxWidthFrac * FRAME_W_PX) / nominal;
+  return fitFontPx(ctx, name, nominal, maxWidthFrac * FRAME_W_PX, NAME_WEIGHT) / nominal;
 }
 
 /**
@@ -714,11 +717,13 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
               ...common,
               top: `${above.baselineFrac * 100}%`,
               fontSize: `${nameSizeFrac * nameScale * 100}cqh`,
+              fontWeight: NAME_WEIGHT,
               left: `${above.centreFrac * 100}%`,
               transform: 'translate(-50%, -100%)',
             } : {
               ...common,
               fontSize: `${nameSizeFrac * nameScale * 100}cqh`,
+              fontWeight: NAME_WEIGHT,
               right: `${(1 - slot.nameRightFrac + slot.gapFrac) * 100}%`,
               transform: 'translateY(-100%)',
             }}

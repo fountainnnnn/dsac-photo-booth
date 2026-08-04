@@ -13,7 +13,6 @@ import { DEFAULT_EVENT_DETAILS } from '@/types/frame';
 
 export interface CaptureSettings {
   timerSecs: number;
-  frameMode: 'wheel' | 'fixed';
   selectedFrameId: string;
   filters: ImageFilters;
   /** Printed on frames that do not bake their own caption. */
@@ -24,7 +23,6 @@ export interface CaptureSettings {
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   timerSecs: 3,
-  frameMode: 'wheel',
   selectedFrameId: '',
   filters: DEFAULT_FILTERS,
   eventName: DEFAULT_EVENT_DETAILS.eventName,

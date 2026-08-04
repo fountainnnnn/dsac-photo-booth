@@ -130,9 +130,9 @@ export function openDatabase(dir) {
         createdAt,
       );
 
-      // New frames join the pool switched on; the operator sets the odds.
+      // New frames join the picker switched on.
       const settings = frames.getSettings();
-      settings[id] = { weight: 0, enabled: true };
+      settings[id] = { enabled: true };
       frames.setSettings(settings);
 
       return { id, label, mimeType, dateStamp: dateStamp ?? null, createdAt };
@@ -173,11 +173,7 @@ export function openDatabase(dir) {
     setSettings(next) {
       const clean = {};
       for (const [id, v] of Object.entries(next ?? {})) {
-        const weight = Number(v?.weight);
-        clean[id] = {
-          weight: Number.isFinite(weight) ? Math.max(0, Math.min(100, weight)) : 0,
-          enabled: v?.enabled !== false,
-        };
+        clean[id] = { enabled: v?.enabled !== false };
       }
       kv.set('frameSettings', clean);
       return clean;
