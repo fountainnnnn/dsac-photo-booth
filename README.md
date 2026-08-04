@@ -58,8 +58,13 @@ npm run test:run
 - Frontend (dev): `http://localhost:5173`
 - Everything (production and desktop): `http://localhost:3001`
 
-Useful environment variables: `PORT`, `PUBLIC_URL` (skip the tunnel and use a
-fixed origin), `NO_TUNNEL=1`, `STORAGE_DIR`, `PHOTO_TTL_DAYS`.
+The tunnel always starts — there is no way to turn it off. The booth runs on a
+laptop with nothing hosting it, so the tunnel is the only route a guest's phone
+has to reach it; a booth without one cannot hand out a single photo. It retries
+a few times before falling back to the LAN address.
+
+Useful environment variables: `PORT`, `PUBLIC_URL` (use a fixed origin you
+already have, instead of a quick tunnel), `STORAGE_DIR`, `PHOTO_TTL_DAYS`.
 
 ## How it fits together
 

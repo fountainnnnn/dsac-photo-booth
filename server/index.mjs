@@ -452,6 +452,29 @@ setInterval(() => store.photos.sweepExpired(), 6 * 60 * 60 * 1000).unref();
 
 const banner = (label, value) => console.log(`  ${label.padEnd(20)} ${value}`);
 
+/**
+ * Start the tunnel, retrying a couple of times before giving up.
+ *
+ * cloudflared's quick tunnels fail transiently often enough to matter now that
+ * the booth has no other way to be reached — a single unlucky attempt at the
+ * start of an event would otherwise leave every QR code pointing at a LAN
+ * address no guest can reach.
+ */
+const TUNNEL_ATTEMPTS = 3;
+
+async function openTunnelWithRetries(targetPort) {
+  let last = null;
+  for (let attempt = 1; attempt <= TUNNEL_ATTEMPTS; attempt++) {
+    last = await startTunnel(targetPort);
+    if (last.url) return last;
+    if (attempt < TUNNEL_ATTEMPTS) {
+      console.warn(`  Attempt ${attempt} failed (${last.error}); retrying…`);
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  return last;
+}
+
 const server = app.listen(port, '0.0.0.0', async () => {
   console.log('\n  DSAC Photo Booth\n');
   banner('Local', `http://localhost:${SERVES_FRONTEND ? port : frontendPort}`);
@@ -460,14 +483,15 @@ const server = app.listen(port, '0.0.0.0', async () => {
   banner('Retention', `${PHOTO_TTL_DAYS} day(s)`);
   banner('Frontend', SERVES_FRONTEND ? 'served from ./dist' : 'dev server (Vite)');
 
-  // A public URL is what makes QR codes and the phone remote work off-network.
+  // The booth runs on a laptop now, with nothing hosting it. The tunnel is
+  // the only way a guest's phone reaches it, so it always starts — there is
+  // no "skip the tunnel" mode, because a booth without one cannot hand out a
+  // single photo.
   if (process.env.PUBLIC_URL) {
     banner('Public URL', `${getPublicOrigin()}  (PUBLIC_URL)`);
-  } else if (process.env.NO_TUNNEL === '1') {
-    banner('Public URL', `${getPublicOrigin()}  (tunnel disabled)`);
   } else {
     console.log('\n  Opening a public tunnel…');
-    const { url, error } = await startTunnel(SERVES_FRONTEND ? port : frontendPort);
+    const { url, error } = await openTunnelWithRetries(SERVES_FRONTEND ? port : frontendPort);
     if (url) {
       tunnelOrigin = url;
       console.log('');
@@ -475,8 +499,9 @@ const server = app.listen(port, '0.0.0.0', async () => {
       banner('Remote control', `${url}/remote`);
     } else {
       console.log('');
-      console.warn(`  Tunnel unavailable (${error}).`);
-      console.warn(`  Falling back to ${getPublicOrigin()} — same network only.`);
+      console.error(`  No public tunnel (${error}).`);
+      console.error('  QR codes will only work for phones on this same network.');
+      console.error(`  Fell back to ${getPublicOrigin()}`);
     }
   }
   console.log('');
