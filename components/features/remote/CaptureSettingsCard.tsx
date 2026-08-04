@@ -7,6 +7,18 @@ import type { ImageFilters } from '@/types/editor';
 const TIMER_OPTIONS = [0, 3, 5, 10] as const;
 
 /**
+ * Today as yyyy-mm-dd in local time, for the date field's default.
+ *
+ * `toISOString()` would be UTC and shows yesterday for most of a Singapore
+ * morning — the same trap `resolveEventDate` sidesteps at the other end.
+ */
+function todayISO(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
  * Timer, event details, and image adjustments, moved off the booth screen so
  * the guest only ever sees a camera and a wheel.
  *
@@ -79,12 +91,14 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
         <label className="text-[0.78rem] font-semibold text-[var(--ink-2)]">
           Event date
           <input
-            type="date" value={settings.eventDate}
+            type="date" value={settings.eventDate || todayISO()}
             onChange={e => push({ ...settings, eventDate: e.target.value })}
             className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
           />
           <span className="mt-1 block text-[0.7rem] font-normal text-[var(--ink-3)]">
-            {settings.eventDate ? 'Stamped on every photo.' : "Empty — today's date is used."}
+            {settings.eventDate
+              ? 'Stamped on every photo.'
+              : "Defaulting to today. Change it to pin a different date."}
           </span>
         </label>
       </div>
