@@ -53,7 +53,7 @@ export function useCaptureSettingsControl(): CaptureSettingsControl {
 /** What is printed on the photo, and how long the countdown runs. */
 export function EventSettingsCard({ settings, push, saved, loading }: CaptureSettingsControl) {
   return (
-    <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
+    <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
       <div className="flex items-center gap-2">
         <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Event</p>
         <span className={`ml-auto text-[0.72rem] font-semibold transition-opacity duration-200 ${
@@ -62,18 +62,18 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
           Saved
         </span>
       </div>
-      <p className="mt-1 text-[0.75rem] leading-[1.5] text-[var(--ink-3)]">
+      <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
         Applies to the booth immediately. Guests never see these controls.
       </p>
 
-      <div className="mt-4 flex flex-col gap-2.5">
+      <div className="mt-5 flex flex-col gap-4">
         <label className="text-[0.78rem] font-semibold text-[var(--ink-2)]">
           Event name
           <input
             type="text" value={settings.eventName} maxLength={60}
             onChange={e => push({ ...settings, eventName: e.target.value })}
             placeholder="Transformation Made Possible"
-            className="mt-1.5 w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
+            className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
           />
         </label>
         <label className="text-[0.78rem] font-semibold text-[var(--ink-2)]">
@@ -81,7 +81,7 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
           <input
             type="date" value={settings.eventDate}
             onChange={e => push({ ...settings, eventDate: e.target.value })}
-            className="mt-1.5 w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
+            className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
           />
           <span className="mt-1 block text-[0.7rem] font-normal text-[var(--ink-3)]">
             {settings.eventDate ? 'Stamped on every photo.' : "Empty — today's date is used."}
@@ -89,8 +89,8 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
         </label>
       </div>
 
-      <div className="mt-5">
-        <p className="mb-2 flex items-center gap-1.5 text-[0.78rem] font-semibold text-[var(--ink-2)]">
+      <div className="mt-6">
+        <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-semibold text-[var(--ink-2)]">
           <TimerIcon size={15} /> Countdown
         </p>
         <div className="flex gap-2">
@@ -120,7 +120,7 @@ export function LookSettingsCard({ settings, push }: CaptureSettingsControl) {
     push({ ...settings, filters: fn(settings.filters) });
 
   return (
-    <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
+    <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
       <div className="flex items-center">
         <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Look</p>
         <button type="button"
@@ -130,7 +130,7 @@ export function LookSettingsCard({ settings, push }: CaptureSettingsControl) {
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-6 gap-1.5">
+      <div className="mt-4 grid grid-cols-6 gap-2.5">
         {FILTER_PRESETS.map(p => {
           const on = f.brightness === p.filters.brightness && f.contrast === p.filters.contrast
             && f.saturation === p.filters.saturation && f.hue === p.filters.hue;
@@ -151,7 +151,7 @@ export function LookSettingsCard({ settings, push }: CaptureSettingsControl) {
         })}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2.5">
+      <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-4">
         <Row icon={<Sun size={15} />} label="Brightness" value={f.brightness} min={50} max={150}
           onChange={v => setFilters(x => ({ ...x, brightness: v }))} />
         <Row icon={<CircleHalf size={15} weight="fill" />} label="Contrast" value={f.contrast} min={50} max={150}

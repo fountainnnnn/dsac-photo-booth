@@ -20,9 +20,11 @@ export interface StudioShellProps {
   active: StudioSection;
   onNavigate: (section: StudioSection) => void;
   children: React.ReactNode;
+  /** Let the page scroll instead of pinning the card to one viewport. */
+  scroll?: boolean;
 }
 
-export default function StudioShell({ active, onNavigate, children }: StudioShellProps) {
+export default function StudioShell({ active, onNavigate, children, scroll = false }: StudioShellProps) {
   return (
     <div className="flex h-dvh w-full overflow-hidden" style={{ background: 'var(--shell-bg)' }}>
       {/* Left rail */}
@@ -82,9 +84,18 @@ export default function StudioShell({ active, onNavigate, children }: StudioShel
       </aside>
 
       {/* Main panel — padded on every side so the card floats clear of the
-          rail instead of butting up against it. */}
-      <main className="min-w-0 flex-1 p-4">
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[26px] bg-white px-8 py-7 shadow-[0_1px_3px_rgba(11,10,12,0.06),0_12px_32px_-16px_rgba(11,10,12,0.14)]">
+          rail instead of butting up against it.
+
+          Capture is a kiosk screen and must never scroll: the camera has to
+          fill exactly one viewport. Settings is a long form, so it scrolls the
+          page instead — nesting its own scrollbars inside a fixed-height card
+          meant hunting for content in three separate little windows. */}
+      <main className={`min-w-0 flex-1 p-4 ${scroll ? 'overflow-y-auto' : ''}`}>
+        <div
+          className={`flex flex-col rounded-[26px] bg-white px-8 py-7 shadow-[0_1px_3px_rgba(11,10,12,0.06),0_12px_32px_-16px_rgba(11,10,12,0.14)] ${
+            scroll ? 'min-h-full' : 'h-full min-h-0 overflow-hidden'
+          }`}
+        >
           {children}
         </div>
       </main>

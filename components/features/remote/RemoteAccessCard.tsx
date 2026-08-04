@@ -56,7 +56,7 @@ export default function RemoteAccessCard() {
   const isLocal = !!origin && /localhost|127\.0\.0\.1/.test(origin);
 
   return (
-    <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
+    <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
       <div className="flex items-center gap-2">
         <DeviceMobile size={18} className="text-[var(--ink-2)]" />
         <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Phone remote</p>

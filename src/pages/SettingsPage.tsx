@@ -145,7 +145,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <StudioShell active="settings" onNavigate={navigate}>
+    <StudioShell active="settings" onNavigate={navigate} scroll>
       <header className="flex shrink-0 items-center gap-6">
         <div>
           <h1 className="text-[1.6rem] font-semibold tracking-[-0.02em] text-[var(--ink)]">
@@ -188,11 +188,20 @@ export default function SettingsPage() {
         the right rail is the booth itself — camera, event, phone remote. The
         rail used to carry all five cards and had to scroll to reach any of them.
       */}
-      <div className="mt-6 grid min-h-0 flex-1 grid-cols-[1fr_330px] gap-5 overflow-hidden">
-        <div className="flex min-h-0 flex-col gap-5 overflow-hidden">
+      {/*
+        Two columns, split by what each thing is about rather than by size:
+        everything to do with the frame pool sits with the pool on the left, and
+        the right rail is the booth itself — camera, event, phone remote.
+
+        Nothing here scrolls on its own. Every card grows to fit its contents
+        and the page scrolls once, so there is one scrollbar to think about
+        rather than a card-within-a-card-within-a-rail.
+      */}
+      <div className="mt-8 grid grid-cols-[1fr_360px] items-start gap-8">
+        <div className="flex flex-col gap-8">
         {/* Frame list */}
-        <section className="flex min-h-[210px] flex-1 flex-col overflow-hidden rounded-[18px] border border-[var(--border)]">
-          <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-5 py-4">
+        <section className="flex flex-col rounded-[18px] border border-[var(--border)]">
+          <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-6 py-5">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame pool</p>
             <p className="text-[0.78rem] text-[var(--ink-3)]">
               {frames.filter(f => draft[f.id]?.enabled !== false).length} of {frames.length} in the wheel
@@ -203,17 +212,17 @@ export default function SettingsPage() {
             </span>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            <div className="flex flex-col gap-3">
+          <div className="px-6 py-5">
+            <div className="flex flex-col gap-4">
               {frames.map((frame) => {
                 const d = draft[frame.id] ?? { weight: frame.weight ?? 1, enabled: true };
                 return (
                   <div
                     key={frame.id}
-                    className="flex items-center gap-4 rounded-[14px] border border-[var(--border)] px-4 py-3.5"
+                    className="flex items-center gap-5 rounded-[14px] border border-[var(--border)] px-5 py-4"
                     style={{ opacity: d.enabled ? 1 : 0.55 }}
                   >
-                    <div className="h-[54px] w-[86px] shrink-0 overflow-hidden rounded-lg" style={{ background: '#8a8f8a' }}>
+                    <div className="h-[62px] w-[99px] shrink-0 overflow-hidden rounded-lg" style={{ background: '#8a8f8a' }}>
                       <img src={frame.src} alt="" className="h-full w-full" draggable={false} />
                     </div>
 
@@ -280,20 +289,20 @@ export default function SettingsPage() {
         <LookSettingsCard {...capture} />
 
         {/* Adding a frame and the resulting odds both belong with the pool. */}
-        <div className="grid shrink-0 grid-cols-2 gap-5">
-          <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
+        <div className="grid grid-cols-2 items-start gap-8">
+          <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Add a frame</p>
-            <p className="mt-1 text-[0.75rem] leading-[1.5] text-[var(--ink-3)]">
+            <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
               A 1921&times;1201 PNG with a transparent centre. Uploads join the wheel
               at weight 1.
             </p>
 
-            <label className="mt-3 block text-[0.78rem] font-semibold text-[var(--ink-2)]">
+            <label className="mt-5 block text-[0.78rem] font-semibold text-[var(--ink-2)]">
               Name
               <input
                 type="text" value={label} onChange={e => setLabel(e.target.value)}
                 placeholder="e.g. Confetti" maxLength={40}
-                className="mt-1.5 w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
+                className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
               />
             </label>
 
@@ -303,18 +312,16 @@ export default function SettingsPage() {
             />
             <button
               type="button" onClick={() => fileRef.current?.click()} disabled={busy}
-              className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--ink-3)] text-[0.88rem] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--ink-3)] text-[0.88rem] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               <UploadSimple size={18} />
               Choose image
             </button>
           </section>
 
-          <section className="flex min-h-0 flex-col rounded-[18px] border border-[var(--border)] px-5 py-4">
-            <p className="shrink-0 text-[0.92rem] font-semibold text-[var(--ink)]">Current odds</p>
-            {/* Scrolls on its own: a long frame pool must not push the row
-                taller than the column and squeeze the list above it. */}
-            <div className="mt-3 flex max-h-[190px] flex-col gap-2 overflow-y-auto pr-1">
+          <section className="flex flex-col rounded-[18px] border border-[var(--border)] px-6 py-5">
+            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Current odds</p>
+            <div className="mt-4 flex flex-col gap-3.5">
               {frames.filter(f => (draft[f.id]?.enabled ?? true)).map(f => {
                 const pct = draft[f.id]?.weight ?? 0;
                 return (
@@ -340,8 +347,8 @@ export default function SettingsPage() {
         </div>
 
         {/* The booth itself: event details and the phone remote. */}
-        <aside className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1">
-          <section className="rounded-[18px] border border-[var(--border)] px-5 py-4">
+        <aside className="flex flex-col gap-8">
+          <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
             <div className="flex items-center gap-2">
               <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame selection</p>
               <span className={`ml-auto text-[0.72rem] font-semibold transition-opacity duration-200 ${
