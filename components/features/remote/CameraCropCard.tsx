@@ -270,20 +270,30 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
               }}
             />
 
-            {/* Dim everything outside the window, including the overspill
-                around the frame, so what is kept reads at a glance. */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background: 'rgba(11,10,12,0.62)',
-                clipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
-                  ${pct(geom.winX)} ${pct(geom.winY)},
-                  ${pct(geom.winX)} ${pct(geom.winY + geom.winH)},
-                  ${pct(geom.winX + geom.winW)} ${pct(geom.winY + geom.winH)},
-                  ${pct(geom.winX + geom.winW)} ${pct(geom.winY)},
-                  ${pct(geom.winX)} ${pct(geom.winY)})`,
-              }}
-            />
+            {/* Everything outside the window is thrown away, so it is dimmed
+                hard — at a glance the bright rectangle is the photo and the
+                rest is offcut. Four panels rather than one clipped box: a
+                clip-path hole is invisible wherever the artwork covers it,
+                which is most of the frame. */}
+            {[
+              { left: 0, top: 0, width: 1, height: geom.winY },
+              { left: 0, top: geom.winY + geom.winH, width: 1, height: 1 - geom.winY - geom.winH },
+              { left: 0, top: geom.winY, width: geom.winX, height: geom.winH },
+              {
+                left: geom.winX + geom.winW, top: geom.winY,
+                width: 1 - geom.winX - geom.winW, height: geom.winH,
+              },
+            ].map((r, i) => (
+              <div
+                key={i}
+                className="pointer-events-none absolute z-10"
+                style={{
+                  left: pct(r.left), top: pct(r.top),
+                  width: pct(Math.max(0, r.width)), height: pct(Math.max(0, r.height)),
+                  background: 'rgba(11,10,12,0.66)',
+                }}
+              />
+            ))}
 
             {/* The artwork, inset so the overspill stays visible around it.
                 It surrounds the photo rather than covering it, and is
@@ -291,18 +301,39 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
                 is lifted. */}
             <img
               src={frame!.src} alt="" draggable={false}
-              className="pointer-events-none absolute"
+              className="pointer-events-none absolute z-20"
               style={{
                 left: pct(geom.frameX), top: pct(geom.frameY),
                 width: pct(geom.frameW), height: pct(geom.frameH),
               }}
             />
 
+            {/* The crop line, above the artwork so it is never buried by it.
+                This is the edge of the photo — the frame's own border sits a
+                little outside it and is easy to mistake for the boundary. */}
+            <div
+              className="pointer-events-none absolute z-30 ring-2 ring-white"
+              style={{
+                left: pct(geom.winX), top: pct(geom.winY),
+                width: pct(geom.winW), height: pct(geom.winH),
+                boxShadow: '0 0 0 1px rgba(11,10,12,0.55)',
+              }}
+            >
+              {['-left-px -top-px border-l-4 border-t-4', '-right-px -top-px border-r-4 border-t-4',
+                '-left-px -bottom-px border-l-4 border-b-4', '-right-px -bottom-px border-r-4 border-b-4',
+              ].map(pos => (
+                <span
+                  key={pos}
+                  className={`absolute h-5 w-5 border-[var(--accent)] ${pos}`}
+                />
+              ))}
+            </div>
+
             {/* The drag surface covers everything, so the picture can be
-                grabbed anywhere — including out in the overspill. */}
+                grabbed anywhere — including out in the offcut. */}
             <div
               onPointerDown={startPan}
-              className={`absolute inset-0 touch-none ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+              className={`absolute inset-0 z-40 touch-none ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
             />
           </>
         ) : (
