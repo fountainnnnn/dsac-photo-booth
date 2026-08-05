@@ -41,7 +41,8 @@ export interface CameraCropCardProps extends CaptureSettingsControl {
 }
 
 export default function CameraCropCard({ settings, push, frame }: CameraCropCardProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -49,26 +50,43 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
   const [error, setError] = useState<string | null>(null);
   const crop = settings.crop ?? FULL_FRAME;
 
+  /**
+   * Hand the stream to whichever <video> is currently mounted.
+   *
+   * Ticking the frame checkbox swaps the plain preview for the framed one,
+   * which is a different element in a different parent — React unmounts the
+   * first and mounts the second. Assigning srcObject once, when the camera
+   * started, left the replacement empty and the window went black. A callback
+   * ref runs on every mount, so the stream follows the element.
+   */
+  const attachVideo = useCallback((el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (el && streamRef.current && el.srcObject !== streamRef.current) {
+      el.srcObject = streamRef.current;
+      void el.play().catch(() => { /* autoplay policy; the attribute retries */ });
+    }
+  }, []);
+
   // Its own stream: this card is open while the capture screen is not, and
   // sharing one across pages would mean keeping the camera awake needlessly.
   useEffect(() => {
-    let stream: MediaStream | null = null;
     let cancelled = false;
     navigator.mediaDevices?.getUserMedia({
       video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: false,
     }).then((s) => {
       if (cancelled) { s.getTracks().forEach(t => t.stop()); return; }
-      stream = s;
-      if (videoRef.current) videoRef.current.srcObject = s;
+      streamRef.current = s;
+      attachVideo(videoRef.current);
       setReady(true);
     }).catch((e: Error) => setError(e.message));
 
     return () => {
       cancelled = true;
-      stream?.getTracks().forEach(t => t.stop());
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
     };
-  }, []);
+  }, [attachVideo]);
 
   const set = useCallback((next: CameraCrop) => {
     push({ ...settings, crop: next, cropEnabled: true });
@@ -202,7 +220,7 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
               style={{ left: pct(win.x), top: pct(win.y), width: pct(win.w), height: pct(win.h) }}
             >
               <video
-                ref={videoRef} autoPlay playsInline muted
+                ref={attachVideo} autoPlay playsInline muted
                 className="absolute max-w-none object-cover"
                 style={{
                   width: pct(1 / crop.w),
@@ -229,7 +247,7 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
                 judged against an unfiltered picture is judged against
                 something the booth never produces. */}
             <video
-              ref={videoRef} autoPlay playsInline muted
+              ref={attachVideo} autoPlay playsInline muted
               className="absolute inset-0 h-full w-full object-cover"
               style={{ transform: 'scaleX(-1)', filter: filtersToCSS(settings.filters) }}
             />
