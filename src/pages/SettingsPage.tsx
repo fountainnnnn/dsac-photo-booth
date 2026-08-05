@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle, LockSimple, Trash, UploadSimple, Warning } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useFrameCatalogue, type FrameSetting } from '@/components/features/frames/useFrameCatalogue';
+import { FRAME_W, FRAME_H } from '@/types/frame';
 import {
   EventSettingsCard, LookSettingsCard, useCaptureSettingsControl,
 } from '@/components/features/remote/CaptureSettingsCard';
@@ -307,11 +308,14 @@ function FrameSwatch({ label, src, selected, onSelect }: {
           : 'hover:bg-[var(--shell-bg)]'
       }`}
     >
+      {/* The box takes the artboard's shape rather than a fixed height, so the
+          thumbnail shows the frame's real proportions instead of a squashed
+          letterbox of it. */}
       <span
-        className={`flex h-[46px] w-full items-center justify-center overflow-hidden rounded ${
+        className={`flex w-full items-center justify-center overflow-hidden rounded ${
           selected ? 'ring-2 ring-[var(--accent)]' : 'ring-1 ring-[var(--border)]'
         }`}
-        style={{ background: src ? '#8a8f8a' : 'var(--shell-bg)' }}
+        style={{ background: src ? '#8a8f8a' : 'var(--shell-bg)', aspectRatio: `${FRAME_W} / ${FRAME_H}` }}
       >
         {src
           ? <img src={src} alt="" draggable={false} className="h-full w-full" />
