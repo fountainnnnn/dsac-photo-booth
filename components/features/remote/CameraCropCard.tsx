@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowsInSimple, ArrowsOut, Crop } from '@phosphor-icons/react';
+import { ArrowsInSimple, ArrowsOut, Crop, MagnifyingGlass } from '@phosphor-icons/react';
 import { FULL_FRAME, type CameraCrop } from './useCaptureSettings';
 import type { CaptureSettingsControl } from './CaptureSettingsCard';
-import type { FrameConfig } from '@/types/frame';
+import { FRAME_W, FRAME_H, type FrameConfig } from '@/types/frame';
 import { filtersToCSS } from '@/types/editor';
 
 /**
@@ -112,7 +112,44 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
     window.addEventListener('pointercancel', onUp);
   };
 
+  /**
+   * Pan the region by dragging the picture itself, in the framed view.
+   *
+   * The frame does not move — it is fixed artwork, and the whole point is to
+   * see how the shot sits inside it. Dragging the picture right reveals more
+   * of its left, so the region travels the other way, scaled by how far it is
+   * zoomed in.
+   */
+  const startPan = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const box = boxRef.current;
+    if (!box) return;
+    const rect = box.getBoundingClientRect();
+    const startX = e.clientX, startY = e.clientY;
+    const from = { ...crop };
+    setDragging(true);
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ((ev.clientX - startX) / rect.width) * from.w;
+      const dy = ((ev.clientY - startY) / rect.height) * from.h;
+      set(clampMove(from, -dx, -dy));
+    };
+    const onUp = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
   const pct = (n: number) => `${n * 100}%`;
+  const win = frame?.window;
+  // The framed view needs a window to place the picture in; without one there
+  // is nothing to preview against, so fall back to the plain crop box.
+  const framed = Boolean(frame && showFrame && win);
 
   return (
     <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
@@ -129,8 +166,9 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
         </button>
       </div>
       <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
-        Drag inside the box to move it, or a corner handle to resize.
-        Everything dimmed is left out of the photo.
+        {framed
+          ? 'Drag the picture to move it inside the frame, and zoom below. The frame stays put.'
+          : 'Drag inside the box to move it, or a corner handle to resize. Everything dimmed is left out of the photo.'}
       </p>
 
       {frame && (
@@ -140,100 +178,140 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
             onChange={e => setShowFrame(e.target.checked)}
             className="h-4 w-4 accent-[var(--accent)]"
           />
-          Show the {frame.label} frame over the region
+          Fit inside the {frame.label} frame
         </label>
       )}
 
       <div
         ref={boxRef}
         className="relative mt-4 w-full overflow-hidden rounded-xl"
-        style={{ aspectRatio: '16 / 9', background: 'var(--stage)' }}
+        style={{
+          aspectRatio: framed ? `${FRAME_W} / ${FRAME_H}` : '16 / 9',
+          background: 'var(--stage)',
+        }}
       >
-        {/* Mirrored to match the booth, so left really is left, and carrying
-            the Look — this is meant to show what the booth will shoot, and a
-            region judged against an unfiltered picture is judged against
-            something the booth never produces. The frame overlay below is
-            deliberately left unfiltered: the artwork is drawn over the photo
-            at capture time, after the filter is lifted. */}
-        <video
-          ref={videoRef} autoPlay playsInline muted
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ transform: 'scaleX(-1)', filter: filtersToCSS(settings.filters) }}
-        />
+        {framed && win ? (
+          <>
+            {/* The picture sits in the frame's window and nowhere else, scaled
+                so the chosen region fills it exactly. Everything here is in
+                mirrored space — the video is flipped about its own centre, so
+                offsetting it afterwards moves what the operator sees. */}
+            <div
+              onPointerDown={startPan}
+              className={`absolute touch-none overflow-hidden ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+              style={{ left: pct(win.x), top: pct(win.y), width: pct(win.w), height: pct(win.h) }}
+            >
+              <video
+                ref={videoRef} autoPlay playsInline muted
+                className="absolute max-w-none object-cover"
+                style={{
+                  width: pct(1 / crop.w),
+                  height: pct(1 / crop.h),
+                  left: pct(-crop.x / crop.w),
+                  top: pct(-crop.y / crop.h),
+                  transform: 'scaleX(-1)',
+                  filter: filtersToCSS(settings.filters),
+                }}
+              />
+            </div>
+
+            {/* Fixed artwork, over the picture, exactly as it lands on the
+                photo — and unfiltered, because at capture time it is drawn
+                after the Look is lifted. */}
+            <img
+              src={frame!.src} alt="" draggable={false}
+              className="pointer-events-none absolute inset-0 h-full w-full"
+            />
+          </>
+        ) : (
+          <>
+            {/* Mirrored to match the booth, and carrying the Look: a region
+                judged against an unfiltered picture is judged against
+                something the booth never produces. */}
+            <video
+              ref={videoRef} autoPlay playsInline muted
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ transform: 'scaleX(-1)', filter: filtersToCSS(settings.filters) }}
+            />
+
+            {ready && (
+              <>
+                {/* Dim everything outside the region, so the framing reads at
+                    a glance rather than having to trace a thin outline. */}
+                <div
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    background: 'rgba(11,10,12,0.58)',
+                    clipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+                      ${pct(crop.x)} ${pct(crop.y)},
+                      ${pct(crop.x)} ${pct(crop.y + crop.h)},
+                      ${pct(crop.x + crop.w)} ${pct(crop.y + crop.h)},
+                      ${pct(crop.x + crop.w)} ${pct(crop.y)},
+                      ${pct(crop.x)} ${pct(crop.y)})`,
+                  }}
+                />
+                <div
+                  onPointerDown={startDrag('move')}
+                  className={`absolute z-20 cursor-move touch-none rounded-[3px] ring-2 ring-[var(--accent)] ${
+                    dragging ? 'ring-[3px]' : ''
+                  }`}
+                  style={{
+                    left: pct(crop.x), top: pct(crop.y),
+                    width: pct(crop.w), height: pct(crop.h),
+                  }}
+                >
+                  {/* A handle on every corner, each anchoring the opposite one.
+                      They sit just inside the edge: hung outside they were
+                      clipped away by the preview's overflow the moment the
+                      region touched one. */}
+                  {(Object.keys(CORNER_STYLE) as Corner[]).map(corner => (
+                    <span
+                      key={corner}
+                      onPointerDown={startDrag(corner)}
+                      title="Drag to resize"
+                      className={`absolute flex h-6 w-6 touch-none items-center justify-center rounded-full border-2 border-white bg-[var(--accent)] shadow-[0_2px_8px_rgba(11,10,12,0.45)] ${CORNER_STYLE[corner]}`}
+                    >
+                      <ArrowsInSimple size={11} weight="bold" className="text-white" />
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
 
         {!ready && (
           <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-[0.78rem] text-white/70">
             {error ? `Camera unavailable — ${error}` : 'Starting the camera…'}
           </p>
         )}
-
-        {ready && (
-          <>
-            {/* Dim everything outside the region, so the framing reads at a
-                glance rather than having to trace a thin outline. */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background: 'rgba(11,10,12,0.58)',
-                clipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
-                  ${pct(crop.x)} ${pct(crop.y)},
-                  ${pct(crop.x)} ${pct(crop.y + crop.h)},
-                  ${pct(crop.x + crop.w)} ${pct(crop.y + crop.h)},
-                  ${pct(crop.x + crop.w)} ${pct(crop.y)},
-                  ${pct(crop.x)} ${pct(crop.y)})`,
-              }}
-            />
-            {/* The frame's window is where the photo lands, so line the
-                artwork up with the region: scale it by window.w and offset so
-                the two rectangles coincide. What spills past the preview is
-                clipped, which is honest — that part is off-camera too. */}
-            {frame && showFrame && frame.window && (
-              <img
-                src={frame.src} alt="" draggable={false}
-                className="pointer-events-none absolute z-10 opacity-95"
-                style={{
-                  width: pct(crop.w / frame.window.w),
-                  height: pct(crop.h / frame.window.h),
-                  left: pct(crop.x - frame.window.x * (crop.w / frame.window.w)),
-                  top: pct(crop.y - frame.window.y * (crop.h / frame.window.h)),
-                }}
-              />
-            )}
-
-            <div
-              onPointerDown={startDrag('move')}
-              className={`absolute z-20 cursor-move touch-none rounded-[3px] ring-2 ring-[var(--accent)] ${
-                dragging ? 'ring-[3px]' : ''
-              }`}
-              style={{
-                left: pct(crop.x), top: pct(crop.y),
-                width: pct(crop.w), height: pct(crop.h),
-              }}
-            >
-              {/* A handle on every corner, each anchoring the opposite one.
-                  They sit just inside the edge, not hanging off it: hung
-                  outside they were clipped away by the preview's overflow the
-                  moment the region touched an edge — which it does by default,
-                  at the full frame, so there was nothing to grab at all. */}
-              {(Object.keys(CORNER_STYLE) as Corner[]).map(corner => (
-                <span
-                  key={corner}
-                  onPointerDown={startDrag(corner)}
-                  title="Drag to resize"
-                  className={`absolute flex h-6 w-6 touch-none items-center justify-center rounded-full border-2 border-white bg-[var(--accent)] shadow-[0_2px_8px_rgba(11,10,12,0.45)] ${CORNER_STYLE[corner]}`}
-                >
-                  <ArrowsInSimple size={11} weight="bold" className="text-white" />
-                </span>
-              ))}
-            </div>
-          </>
-        )}
       </div>
+
+      {/* Zoom belongs here rather than on corner handles: with the frame fixed
+          there are no corners to pull, and zooming about the centre is what
+          "fit it in the frame" actually means. */}
+      {framed && (
+        <label className="mt-4 flex items-center gap-3 text-[0.75rem] font-semibold text-[var(--ink-2)]">
+          <MagnifyingGlass size={15} className="shrink-0" />
+          <input
+            type="range" min={100} max={Math.round(100 / MIN_W)} step={1}
+            value={Math.round(100 / crop.w)}
+            onChange={e => set(clampZoom(crop, 100 / Number(e.target.value)))}
+            aria-label="Zoom"
+            className="dsac-range"
+          />
+          <span className="w-10 shrink-0 text-right tabular-nums text-[var(--ink-3)]">
+            {(1 / crop.w).toFixed(1)}&times;
+          </span>
+        </label>
+      )}
 
       <p className="mt-3 text-[0.72rem] tabular-nums text-[var(--ink-3)]">
         {settings.cropEnabled
-          ? `Cropped to ${Math.round(crop.w * 100)}% of the width — a ${(1 / crop.w).toFixed(1)}× zoom.`
-          : 'Using the whole scene. Drag the box to start cropping.'}
+          ? `Using ${Math.round(crop.w * 100)}% of the camera's width — a ${(1 / crop.w).toFixed(1)}× zoom.`
+          : framed
+            ? 'Using the whole scene. Drag or zoom to change what fills the frame.'
+            : 'Using the whole scene. Drag the box to start cropping.'}
       </p>
     </section>
   );
@@ -273,5 +351,23 @@ export function clampSize(from: CameraCrop, delta: number, corner: Corner = 'br'
     h: w,
     x: corner === 'br' || corner === 'tr' ? from.x : right - w,
     y: corner === 'br' || corner === 'bl' ? from.y : bottom - w,
+  };
+}
+
+/**
+ * Zoom about the centre, so the shot stays pointed where it was.
+ *
+ * `w` is the fraction of the picture kept, which is the reciprocal of zoom:
+ * half the width is a 2x zoom.
+ */
+export function clampZoom(from: CameraCrop, w: number): CameraCrop {
+  const nw = Math.min(1, Math.max(MIN_W, w));
+  const cx = from.x + from.w / 2;
+  const cy = from.y + from.h / 2;
+  return {
+    w: nw,
+    h: nw,
+    x: Math.min(1 - nw, Math.max(0, cx - nw / 2)),
+    y: Math.min(1 - nw, Math.max(0, cy - nw / 2)),
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampMove, clampSize, type Corner } from './CameraCropCard';
+import { clampMove, clampSize, clampZoom, type Corner } from './CameraCropCard';
 import { FULL_FRAME, unmirrorCrop } from './useCaptureSettings';
 
 /**
@@ -62,6 +62,39 @@ describe('camera crop', () => {
 
   it('leaves the whole frame at the camera aspect', () => {
     expect(aspectOf(FULL_FRAME)).toBeCloseTo(16 / 9, 6);
+  });
+
+  describe('zoom', () => {
+    it('keeps the centre still, so the shot stays pointed where it was', () => {
+      // Centred on 0.4, so anything up to 0.8 wide still fits either side.
+      const from = { x: 0.2, y: 0.2, w: 0.4, h: 0.4 };
+      for (const w of [0.25, 0.35, 0.6, 0.8]) {
+        const next = clampZoom(from, w);
+        expect(next.x + next.w / 2).toBeCloseTo(0.4, 6);
+        expect(next.y + next.h / 2).toBeCloseTo(0.4, 6);
+        expect(aspectOf(next)).toBeCloseTo(16 / 9, 6);
+      }
+    });
+
+    it('gives up the centre rather than the edge when it cannot have both', () => {
+      // Wider than the room on one side: staying centred would run off the
+      // picture, so it slides back in and the centre shifts instead.
+      const next = clampZoom({ x: 0.2, y: 0.2, w: 0.4, h: 0.4 }, 0.9);
+      expect(next.w).toBeCloseTo(0.9, 6);
+      expect(inBounds(next)).toBe(true);
+      expect(next.x).toBeCloseTo(0, 6);
+    });
+
+    it('stops at the whole picture and at the tightest crop', () => {
+      const from = { x: 0.2, y: 0.2, w: 0.4, h: 0.4 };
+      expect(clampZoom(from, 9).w).toBeCloseTo(1, 6);
+      expect(clampZoom(from, 0).w).toBeCloseTo(0.2, 6);
+    });
+
+    it('never leaves the picture, even zooming out near an edge', () => {
+      const corner = { x: 0, y: 0, w: 0.3, h: 0.3 };
+      for (const w of [0.4, 0.7, 1]) expect(inBounds(clampZoom(corner, w))).toBe(true);
+    });
   });
 
   /**
