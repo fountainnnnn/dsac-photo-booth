@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ArrowClockwise,
   Camera,
   CameraSlash,
-  Image as ImageIcon,
   Timer as TimerIcon,
   WifiHigh,
   WifiSlash,
@@ -62,7 +61,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   // stage is exactly what gets baked into the photo.
   const [activeFrame, setActiveFrame] = useState<FrameConfig | null>(null);
   const displayFrame = activeFrame;
-  const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [stageSize, setStageSize]     = useState({ w: 0, h: 0 });
   // The camera's own shape. Cameras rarely deliver the 16:10 we ask for — most
   // hand back 16:9 — and with no frame on there is nothing to justify squashing
@@ -83,19 +81,13 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     void saveCaptureSettings({ ...captureSettings, ...patch }).catch(() => {});
   }, [captureSettings, saveCaptureSettings]);
 
-  // Drop the frame if an operator deleted or disabled it mid-event.
+  // The frame is chosen in Settings, so this screen mirrors that choice rather
+  // than holding one of its own. Resolving it every time also covers a frame
+  // being deleted or switched off mid-event: it simply stops resolving.
   useEffect(() => {
-    if (activeFrame && !frames.some(f => f.id === activeFrame.id && f.enabled !== false)) {
-      setActiveFrame(null);
-    }
-  }, [frames, activeFrame]);
-
-  // Restore the frame the operator last chose, so returning to capture — or
-  // relaunching the booth — does not silently drop back to no frame.
-  useEffect(() => {
-    setActiveFrame(prev => prev
-      ?? frames.find(f => f.id === captureSettings.selectedFrameId && f.enabled !== false)
-      ?? null);
+    setActiveFrame(
+      frames.find(f => f.id === captureSettings.selectedFrameId && f.enabled !== false) ?? null,
+    );
   }, [captureSettings.selectedFrameId, frames]);
 
   // ── Camera ───────────────────────────────────────────────────────────────────
@@ -243,7 +235,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
       }
 
       const dataUrl = output.toDataURL('image/jpeg', 0.92);
-      setLastCapture(dataUrl);
       rememberCapture(dataUrl);
       const blob = await canvasToBlob(output);
       onCapture(blob, dataUrl);
@@ -292,7 +283,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-    setLastCapture(dataUrl);
     rememberCapture(dataUrl);
     const blob = await canvasToBlob(canvas);
     onCapture(blob, dataUrl);
@@ -364,7 +354,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     if (section === 'gallery')  { window.location.href = '/gallery'; return; }
   }, []);
 
-  const enabledFrames = useMemo(() => frames.filter((f) => f.enabled !== false), [frames]);
 
   return (
     <StudioShell active="capture" onNavigate={navigate}>
@@ -475,7 +464,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
 
         {/* Capture rail */}
         <aside data-testid="capture-controls"
-          className="flex w-[266px] shrink-0 flex-col rounded-[20px] border border-[var(--border)] px-6 py-6">
+          className="flex w-[180px] shrink-0 flex-col self-center rounded-[20px] border border-[var(--border)] px-5 py-6">
           <p className="text-center text-[1.05rem] font-semibold text-[var(--ink)]">Capture</p>
 
           <div className="mt-5 flex justify-center">
@@ -491,54 +480,10 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
             </button>
           </div>
 
-          {/* The operator picks the frame. Selecting one changes the stage
-              immediately, so what is on screen is always what gets captured. */}
-          <div className="mt-7" data-testid="frame-picker">
-            <p className="text-[0.78rem] font-medium text-[var(--ink-3)]">Frame</p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <FrameSwatch
-                label="None"
-                selected={!activeFrame}
-                onSelect={() => { setActiveFrame(null); updateCaptureSettings({ selectedFrameId: '' }); }}
-              />
-              {enabledFrames.map(f => (
-                <FrameSwatch
-                  key={f.id}
-                  label={f.label}
-                  src={f.src}
-                  selected={activeFrame?.id === f.id}
-                  onSelect={() => { setActiveFrame(f); updateCaptureSettings({ selectedFrameId: f.id }); }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <a
-            href="/gallery"
-            className="mt-2.5 inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-[var(--border)] px-4 text-[0.9rem] font-semibold text-[var(--ink)] transition hover:border-[var(--ink-3)] hover:bg-[var(--shell-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-          >
-            <ImageIcon size={19} />
-            Last capture
-          </a>
-
-          <div className="mt-6 border-t border-[var(--border)] pt-5">
-            <p className="text-[0.78rem] font-medium text-[var(--ink-3)]">Last capture</p>
-            <div className="mt-3 flex items-start gap-3">
-              <div className="h-[52px] w-[74px] shrink-0 overflow-hidden rounded-lg"
-                style={{ background: 'var(--shell-bg)' }}>
-                {lastCapture && <img src={lastCapture} alt="Most recent capture" className="h-full w-full object-cover" />}
-              </div>
-              <p className="text-[0.75rem] leading-[1.45] text-[var(--ink-3)]">
-                {lastCapture ? (
-                  <>Saved<br />Ready to share.</>
-                ) : (
-                  <>No captures yet<br />Your latest photo will appear here.</>
-                )}
-              </p>
-            </div>
-          </div>
-
-          <p className="mt-auto pt-4 text-center text-[0.72rem] text-[var(--ink-3)]">
+          {/* The frame is chosen in Settings, not here. A guest is standing in
+              front of this screen, so it carries the shutter and nothing else
+              they could press by mistake. */}
+          <p className="mt-5 text-center text-[0.72rem] text-[var(--ink-3)]">
             {activeFrame
               ? <>Frame: <strong className="font-semibold text-[var(--ink)]">{activeFrame.label}</strong></>
               : 'No frame'}
@@ -551,41 +496,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-/** One choice in the capture rail's frame picker. */
-function FrameSwatch({ label, src, selected, onSelect }: {
-  label: string; src?: string; selected: boolean; onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      title={label}
-      className={`flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-        selected
-          ? 'bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]'
-          : 'hover:bg-[var(--shell-bg)]'
-      }`}
-    >
-      <span
-        className={`flex h-[38px] w-full items-center justify-center overflow-hidden rounded ${
-          selected ? 'ring-2 ring-[var(--accent)]' : 'ring-1 ring-[var(--border)]'
-        }`}
-        style={{ background: src ? '#8a8f8a' : 'var(--shell-bg)' }}
-      >
-        {src
-          ? <img src={src} alt="" draggable={false} className="h-full w-full" />
-          : <span className="text-[0.62rem] font-semibold text-[var(--ink-3)]">None</span>}
-      </span>
-      <span className={`w-full truncate text-[0.62rem] font-semibold ${
-        selected ? 'text-[var(--accent)]' : 'text-[var(--ink-2)]'
-      }`}>
-        {label}
-      </span>
-    </button>
-  );
-}
 
 function Card({ ref, title, actionLabel, onAction, children }: {
   ref?: React.Ref<HTMLDivElement>;

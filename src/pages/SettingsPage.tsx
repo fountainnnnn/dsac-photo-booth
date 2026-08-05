@@ -8,10 +8,12 @@ import {
 import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 
 /**
- * Settings — which frames the operator can pick from, plus the event details.
+ * Settings — everything an operator changes, so the capture screen can be
+ * nothing but a camera and a shutter.
  *
- * There are no odds any more: the operator chooses the frame on the capture
- * screen, so a frame is either in the picker or it is not.
+ * That includes which frame is live. A guest is standing in front of the booth
+ * and should not be able to change the frame, the look, or the countdown by
+ * leaning on the screen.
  */
 export default function SettingsPage() {
   const { frames, loading, error, saveSettings, uploadFrame, deleteFrame } = useFrameCatalogue();
@@ -99,7 +101,7 @@ export default function SettingsPage() {
             Settings<span className="text-[var(--accent)]">.</span>
           </h1>
           <p className="mt-1 text-[0.85rem] text-[var(--ink-2)]">
-            Choose which frames the operator can pick from, and set the event details.
+            Pick the frame, set the event details, and tune the camera.
           </p>
         </div>
 
@@ -132,12 +134,6 @@ export default function SettingsPage() {
       {/*
         Two columns, split by what each thing is about rather than by size:
         everything to do with the frame pool sits with the pool on the left, and
-        the right rail is the booth itself — camera, event, phone remote. The
-        rail used to carry all five cards and had to scroll to reach any of them.
-      */}
-      {/*
-        Two columns, split by what each thing is about rather than by size:
-        everything to do with the frame pool sits with the pool on the left, and
         the right rail is the booth itself — camera, event, phone remote.
 
         Nothing here scrolls on its own. Every card grows to fit its contents
@@ -151,7 +147,7 @@ export default function SettingsPage() {
           <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-6 py-5">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame pool</p>
             <p className="text-[0.78rem] text-[var(--ink-3)]">
-              {enabledCount} of {frames.length} available to pick
+              {enabledCount} of {frames.length} available to choose
             </p>
           </div>
 
@@ -245,21 +241,89 @@ export default function SettingsPage() {
 
         {/* The booth itself: event details and the phone remote. */}
         <aside className="flex flex-col gap-8">
+          {/* The live frame. It lives here rather than on the capture screen so
+              a guest standing at the booth has nothing to press but the
+              shutter. Saves immediately; the kiosk follows without a reload. */}
+          <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
+            <div className="flex items-center gap-2">
+              <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame in use</p>
+              <span className={`ml-auto text-[0.72rem] font-semibold transition-opacity duration-200 ${
+                capture.saved ? 'text-[#127a4a] opacity-100' : 'opacity-0'
+              }`}>Saved</span>
+            </div>
+            <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
+              What every photo is taken with, until you change it here.
+            </p>
+
+            <div className="mt-4 grid grid-cols-3 gap-2.5">
+              <FrameSwatch
+                label="None"
+                selected={!capture.settings.selectedFrameId}
+                onSelect={() => capture.push({ ...capture.settings, selectedFrameId: '' })}
+              />
+              {frames.filter(f => draft[f.id]?.enabled !== false).map(f => (
+                <FrameSwatch
+                  key={f.id}
+                  label={f.label}
+                  src={f.src}
+                  selected={capture.settings.selectedFrameId === f.id}
+                  onSelect={() => capture.push({ ...capture.settings, selectedFrameId: f.id })}
+                />
+              ))}
+            </div>
+          </section>
+
           <EventSettingsCard {...capture} />
           <RemoteAccessCard />
 
           <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
-            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How frames are chosen</p>
+            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How frames work</p>
             <p className="mt-2.5 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              The operator picks the frame on the capture screen, and the picker
-              offers whatever is switched on here.
+              Every photo uses the frame chosen above. The capture screen shows
+              it live, but cannot change it.
             </p>
             <p className="mt-2.5 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              Switch a frame off to keep it out of the picker without deleting it.
+              Switch a frame off in the pool to keep it out of the chooser
+              without deleting it.
             </p>
           </section>
         </aside>
       </div>
     </StudioShell>
+  );
+}
+
+/** One choice in the frame selector. */
+function FrameSwatch({ label, src, selected, onSelect }: {
+  label: string; src?: string; selected: boolean; onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      title={label}
+      className={`flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+        selected
+          ? 'bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]'
+          : 'hover:bg-[var(--shell-bg)]'
+      }`}
+    >
+      <span
+        className={`flex h-[46px] w-full items-center justify-center overflow-hidden rounded ${
+          selected ? 'ring-2 ring-[var(--accent)]' : 'ring-1 ring-[var(--border)]'
+        }`}
+        style={{ background: src ? '#8a8f8a' : 'var(--shell-bg)' }}
+      >
+        {src
+          ? <img src={src} alt="" draggable={false} className="h-full w-full" />
+          : <span className="text-[0.62rem] font-semibold text-[var(--ink-3)]">None</span>}
+      </span>
+      <span className={`w-full truncate text-[0.66rem] font-semibold ${
+        selected ? 'text-[var(--accent)]' : 'text-[var(--ink-2)]'
+      }`}>
+        {label}
+      </span>
+    </button>
   );
 }
