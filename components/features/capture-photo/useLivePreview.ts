@@ -11,6 +11,12 @@ export interface LivePreviewOptions {
    * covering its edges. Null or undefined fills the whole canvas.
    */
   contentRect?: FrameWindow | null;
+  /**
+   * Which part of the camera's picture to use, as fractions of the video.
+   * Null or undefined uses all of it. Always 16:9 like the video itself, so
+   * cropping zooms in without reshaping anything.
+   */
+  sourceRect?: FrameWindow | null;
 }
 
 export interface UseLivePreviewResult {
@@ -41,7 +47,7 @@ export function useLivePreview(
 
     const w = canvas.width;
     const h = canvas.height;
-    const { filters, contentRect } = optionsRef.current;
+    const { filters, contentRect, sourceRect } = optionsRef.current;
 
     // Destination: the frame's cut-out, or the whole canvas when bare.
     const dx = contentRect ? Math.round(contentRect.x * w) : 0;
@@ -58,12 +64,14 @@ export function useLivePreview(
       ctx.fillRect(0, 0, w, h);
     }
 
-    // Stretch the frame to fill the cut-out exactly. Fitting it left white
-    // letterbox bars whenever the camera's shape differed from the window's,
-    // and cropping would cut people off at the edges; filling keeps every
-    // window fully covered with the whole shot inside it.
+    // Source: the operator's crop region, or the whole picture. Both it and
+    // the destination window are 16:9, so this scales without reshaping.
     const vw = video.videoWidth  || dw;
     const vh = video.videoHeight || dh;
+    const sx = sourceRect ? Math.round(sourceRect.x * vw) : 0;
+    const sy = sourceRect ? Math.round(sourceRect.y * vh) : 0;
+    const sw = sourceRect ? Math.max(1, Math.round(sourceRect.w * vw)) : vw;
+    const sh = sourceRect ? Math.max(1, Math.round(sourceRect.h * vh)) : vh;
 
     ctx.save();
     ctx.filter = filtersToCSS(filters);
@@ -71,7 +79,7 @@ export function useLivePreview(
     // wherever it has been placed.
     ctx.translate(dx + dw, dy);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, vw, vh, 0, 0, dw, dh);
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
     ctx.restore();
 
     rafRef.current = requestAnimationFrame(drawFrame);

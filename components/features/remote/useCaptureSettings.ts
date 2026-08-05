@@ -11,6 +11,22 @@ import { DEFAULT_EVENT_DETAILS } from '@/types/frame';
  * losing the configured look is far better than losing the shutter.
  */
 
+/**
+ * The part of the camera's picture actually used, as fractions of the frame.
+ *
+ * Always 16:9, the camera's own shape, so cropping never changes the output
+ * aspect and nothing downstream has to compensate. The whole frame is
+ * `{ x: 0, y: 0, w: 1, h: 1 }`.
+ */
+export interface CameraCrop {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export const FULL_FRAME: CameraCrop = { x: 0, y: 0, w: 1, h: 1 };
+
 export interface CaptureSettings {
   timerSecs: number;
   selectedFrameId: string;
@@ -19,6 +35,13 @@ export interface CaptureSettings {
   eventName: string;
   /** ISO yyyy-mm-dd. Empty means "use today". */
   eventDate: string;
+  /**
+   * Two framings from one camera: the whole scene, or the region set below.
+   * Kept as a flag rather than "crop === FULL_FRAME" so an operator can switch
+   * back to the wide shot without losing the region they lined up earlier.
+   */
+  cropEnabled: boolean;
+  crop: CameraCrop;
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -27,6 +50,8 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   filters: DEFAULT_FILTERS,
   eventName: DEFAULT_EVENT_DETAILS.eventName,
   eventDate: DEFAULT_EVENT_DETAILS.eventDate,
+  cropEnabled: false,
+  crop: FULL_FRAME,
 };
 
 export function useCaptureSettings() {

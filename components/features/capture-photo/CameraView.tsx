@@ -74,6 +74,8 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   } = useCaptureSettings();
   const filters = captureSettings.filters;
   const timerSecs = captureSettings.timerSecs;
+  // The region of the camera actually used. Null means the whole picture.
+  const crop = captureSettings.cropEnabled ? captureSettings.crop : null;
 
   const [countdown, setCountdown]     = useState<number | null>(null);
 
@@ -157,6 +159,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   const { canvasRef } = useLivePreview(videoRef, {
     filters,
     contentRect: displayFrame?.window ?? null,
+    sourceRect: crop,
   });
 
   // Size the stage in JS rather than with aspect-ratio + max-height. Those two
@@ -263,15 +266,20 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
       ctx.fillRect(0, 0, outW, outH);
     }
 
-    // Stretch to fill the cut-out exactly — matches the live preview.
+    // Same source region as the live preview, or the shot would quietly come
+    // out wide whenever this fallback path ran.
     const vw = video.videoWidth  || dw;
     const vh = video.videoHeight || dh;
+    const sx = crop ? Math.round(crop.x * vw) : 0;
+    const sy = crop ? Math.round(crop.y * vh) : 0;
+    const sw = crop ? Math.max(1, Math.round(crop.w * vw)) : vw;
+    const sh = crop ? Math.max(1, Math.round(crop.h * vh)) : vh;
 
     ctx.save();
     ctx.filter = filtersToCSS(filters);
     ctx.translate(dx + dw, dy);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, vw, vh, 0, 0, dw, dh);
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
     ctx.restore();
 
     if (activeFrame) {
@@ -286,7 +294,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     rememberCapture(dataUrl);
     const blob = await canvasToBlob(canvas);
     onCapture(blob, dataUrl);
-  }, [isStreaming, canvasRef, filters, activeFrame, onCapture]);
+  }, [isStreaming, canvasRef, filters, activeFrame, crop, onCapture]);
 
   const handleCapturePress = useCallback(() => {
     if (countdown !== null) {

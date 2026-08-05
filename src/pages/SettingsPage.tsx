@@ -5,6 +5,7 @@ import { useFrameCatalogue, type FrameSetting } from '@/components/features/fram
 import {
   EventSettingsCard, LookSettingsCard, useCaptureSettingsControl,
 } from '@/components/features/remote/CaptureSettingsCard';
+import CameraCropCard from '@/components/features/remote/CameraCropCard';
 import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 
 /**
@@ -140,7 +141,7 @@ export default function SettingsPage() {
         and the page scrolls once, so there is one scrollbar to think about
         rather than a card-within-a-card-within-a-rail.
       */}
-      <div className="mt-8 grid grid-cols-[1fr_360px] items-start gap-8">
+      <div className="mt-8 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-8">
         <div className="flex flex-col gap-8">
         {/* Frame list */}
         <section className="flex flex-col rounded-[18px] border border-[var(--border)]">
@@ -201,42 +202,38 @@ export default function SettingsPage() {
                 );
               })}
             </div>
+
+            {/* Uploading lives inside the pool it adds to — it was its own card
+                below, which read as an unrelated feature. */}
+            <div className="mt-5 flex items-end gap-3 border-t border-[var(--border)] pt-5">
+              <label className="flex-1 text-[0.78rem] font-semibold text-[var(--ink-2)]">
+                Add a frame
+                <input
+                  type="text" value={label} onChange={e => setLabel(e.target.value)}
+                  placeholder="Name, e.g. Confetti" maxLength={40}
+                  className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-2.5 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
+                />
+              </label>
+              <input
+                ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) void onUpload(f); e.target.value = ''; }}
+              />
+              <button
+                type="button" onClick={() => fileRef.current?.click()} disabled={busy}
+                className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--ink-3)] px-4 text-[0.85rem] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              >
+                <UploadSimple size={17} />
+                Choose image
+              </button>
+            </div>
+            <p className="mt-2 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+              A 1921&times;1201 PNG with a transparent centre.
+            </p>
           </div>
         </section>
 
-        {/* Wide things go left: twelve presets and four sliders are cramped in
-            a 330px rail and comfortable across the full column. */}
         <LookSettingsCard {...capture} />
 
-        {/* Uploading belongs with the pool it adds to. */}
-        <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
-          <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Add a frame</p>
-          <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
-            A 1921&times;1201 PNG with a transparent centre. Uploads appear in
-            the picker straight away.
-          </p>
-
-          <label className="mt-5 block text-[0.78rem] font-semibold text-[var(--ink-2)]">
-            Name
-            <input
-              type="text" value={label} onChange={e => setLabel(e.target.value)}
-              placeholder="e.g. Confetti" maxLength={40}
-              className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
-            />
-          </label>
-
-          <input
-            ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) void onUpload(f); e.target.value = ''; }}
-          />
-          <button
-            type="button" onClick={() => fileRef.current?.click()} disabled={busy}
-            className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--ink-3)] text-[0.88rem] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-          >
-            <UploadSimple size={18} />
-            Choose image
-          </button>
-        </section>
         </div>
 
         {/* The booth itself: event details and the phone remote. */}
@@ -274,6 +271,7 @@ export default function SettingsPage() {
           </section>
 
           <EventSettingsCard {...capture} />
+          <CameraCropCard {...capture} />
           <RemoteAccessCard />
 
           <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">

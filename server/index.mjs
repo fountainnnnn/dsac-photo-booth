@@ -296,6 +296,10 @@ const DEFAULT_CAPTURE_SETTINGS = {
   filters: { brightness: 100, contrast: 100, saturation: 100, hue: 0 },
   eventName: 'Transformation Made Possible',
   eventDate: '', // empty means "use today", so an unattended booth stays right
+  // Which part of the camera to photograph. Off means the whole scene; the
+  // region is kept either way so switching back does not lose the framing.
+  cropEnabled: false,
+  crop: { x: 0, y: 0, w: 1, h: 1 },
 };
 
 app.get('/api/settings/capture', (_req, res) => {
