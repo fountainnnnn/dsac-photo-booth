@@ -3,6 +3,7 @@ import { ArrowsInSimple, ArrowsOut, Crop } from '@phosphor-icons/react';
 import { FULL_FRAME, type CameraCrop } from './useCaptureSettings';
 import type { CaptureSettingsControl } from './CaptureSettingsCard';
 import type { FrameConfig } from '@/types/frame';
+import { filtersToCSS } from '@/types/editor';
 
 /**
  * Line up the part of the room the booth actually photographs.
@@ -148,11 +149,16 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
         className="relative mt-4 w-full overflow-hidden rounded-xl"
         style={{ aspectRatio: '16 / 9', background: 'var(--stage)' }}
       >
-        {/* Mirrored to match the booth, so left really is left. */}
+        {/* Mirrored to match the booth, so left really is left, and carrying
+            the Look — this is meant to show what the booth will shoot, and a
+            region judged against an unfiltered picture is judged against
+            something the booth never produces. The frame overlay below is
+            deliberately left unfiltered: the artwork is drawn over the photo
+            at capture time, after the filter is lifted. */}
         <video
           ref={videoRef} autoPlay playsInline muted
           className="absolute inset-0 h-full w-full object-cover"
-          style={{ transform: 'scaleX(-1)' }}
+          style={{ transform: 'scaleX(-1)', filter: filtersToCSS(settings.filters) }}
         />
 
         {!ready && (
