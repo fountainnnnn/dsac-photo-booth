@@ -20,6 +20,15 @@ import { filtersToCSS } from '@/types/editor';
 /** Small enough to be a tight zoom, large enough that the picture holds up. */
 const MIN_W = 0.2;
 
+/**
+ * How far the frame is inset in the framed preview, per side.
+ *
+ * The margin is what makes this an adjustment view rather than a result view:
+ * the picture is larger than the window, and this is where the part being cut
+ * off stays visible while it is dragged into place.
+ */
+const FRAME_INSET = 0.13;
+
 /** Which corner is held; the opposite one stays put while it is dragged. */
 export type Corner = 'tl' | 'tr' | 'bl' | 'br';
 
@@ -130,26 +139,64 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
     window.addEventListener('pointercancel', onUp);
   };
 
+  const pct = (n: number) => `${n * 100}%`;
+  const win = frame?.window;
+  // The framed view needs a window to place the picture in; without one there
+  // is nothing to preview against, so fall back to the plain crop box.
+  const framed = Boolean(frame && showFrame && win);
+
   /**
-   * Pan the region by dragging the picture itself, in the framed view.
+   * Where the frame, its window and the picture sit, as fractions of the
+   * preview box.
+   *
+   * The frame is inset rather than filling the box, which is the whole point:
+   * the picture is bigger than the window and the margin is where the overflow
+   * shows. Without it the artwork covers everything outside the window and you
+   * are moving a photo you cannot see.
+   */
+  const geom = win && (() => {
+    const frameX = FRAME_INSET, frameY = FRAME_INSET;
+    const frameW = 1 - FRAME_INSET * 2, frameH = 1 - FRAME_INSET * 2;
+
+    const winX = frameX + win.x * frameW;
+    const winY = frameY + win.y * frameH;
+    const winW = win.w * frameW;
+    const winH = win.h * frameH;
+
+    // Scale the picture so the chosen region covers the window exactly.
+    const videoW = winW / crop.w;
+    const videoH = winH / crop.h;
+    return {
+      frameX, frameY, frameW, frameH,
+      winX, winY, winW, winH,
+      videoW, videoH,
+      videoX: winX - crop.x * videoW,
+      videoY: winY - crop.y * videoH,
+    };
+  })();
+
+  /**
+   * Move the camera by dragging the picture, in the framed view.
    *
    * The frame does not move — it is fixed artwork, and the whole point is to
    * see how the shot sits inside it. Dragging the picture right reveals more
-   * of its left, so the region travels the other way, scaled by how far it is
-   * zoomed in.
+   * of its left, so the region travels the other way. The pointer moves in box
+   * fractions and the region lives in picture fractions, so the delta is
+   * divided by how much of the box the picture spans.
    */
   const startPan = (e: React.PointerEvent) => {
     e.preventDefault();
     const box = boxRef.current;
-    if (!box) return;
+    if (!box || !geom) return;
     const rect = box.getBoundingClientRect();
     const startX = e.clientX, startY = e.clientY;
     const from = { ...crop };
+    const { videoW, videoH } = geom;
     setDragging(true);
 
     const onMove = (ev: PointerEvent) => {
-      const dx = ((ev.clientX - startX) / rect.width) * from.w;
-      const dy = ((ev.clientY - startY) / rect.height) * from.h;
+      const dx = ((ev.clientX - startX) / rect.width) / videoW;
+      const dy = ((ev.clientY - startY) / rect.height) / videoH;
       set(clampMove(from, -dx, -dy));
     };
     const onUp = () => {
@@ -162,12 +209,6 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
   };
-
-  const pct = (n: number) => `${n * 100}%`;
-  const win = frame?.window;
-  // The framed view needs a window to place the picture in; without one there
-  // is nothing to preview against, so fall back to the plain crop box.
-  const framed = Boolean(frame && showFrame && win);
 
   return (
     <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
@@ -208,37 +249,60 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
           background: 'var(--stage)',
         }}
       >
-        {framed && win ? (
+        {framed && win && geom ? (
           <>
-            {/* The picture sits in the frame's window and nowhere else, scaled
-                so the chosen region fills it exactly. Everything here is in
-                mirrored space — the video is flipped about its own centre, so
-                offsetting it afterwards moves what the operator sees. */}
-            <div
-              onPointerDown={startPan}
-              className={`absolute touch-none overflow-hidden ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-              style={{ left: pct(win.x), top: pct(win.y), width: pct(win.w), height: pct(win.h) }}
-            >
-              <video
-                ref={attachVideo} autoPlay playsInline muted
-                className="absolute max-w-none object-cover"
-                style={{
-                  width: pct(1 / crop.w),
-                  height: pct(1 / crop.h),
-                  left: pct(-crop.x / crop.w),
-                  top: pct(-crop.y / crop.h),
-                  transform: 'scaleX(-1)',
-                  filter: filtersToCSS(settings.filters),
-                }}
-              />
-            </div>
+            {/* The whole picture, never clipped — the point is to see what is
+                being left out while moving it. It is placed so the chosen
+                region lands exactly on the frame's window, so the bright part
+                is the photo and everything beyond it is what gets cut.
+                Mirrored space throughout: the video is flipped about its own
+                centre, so offsetting it afterwards moves what is seen. */}
+            <video
+              ref={attachVideo} autoPlay playsInline muted
+              className="absolute max-w-none"
+              style={{
+                width: pct(geom.videoW),
+                height: pct(geom.videoH),
+                left: pct(geom.videoX),
+                top: pct(geom.videoY),
+                transform: 'scaleX(-1)',
+                filter: filtersToCSS(settings.filters),
+              }}
+            />
 
-            {/* Fixed artwork, over the picture, exactly as it lands on the
-                photo — and unfiltered, because at capture time it is drawn
-                after the Look is lifted. */}
+            {/* Dim everything outside the window, including the overspill
+                around the frame, so what is kept reads at a glance. */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background: 'rgba(11,10,12,0.62)',
+                clipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+                  ${pct(geom.winX)} ${pct(geom.winY)},
+                  ${pct(geom.winX)} ${pct(geom.winY + geom.winH)},
+                  ${pct(geom.winX + geom.winW)} ${pct(geom.winY + geom.winH)},
+                  ${pct(geom.winX + geom.winW)} ${pct(geom.winY)},
+                  ${pct(geom.winX)} ${pct(geom.winY)})`,
+              }}
+            />
+
+            {/* The artwork, inset so the overspill stays visible around it.
+                It surrounds the photo rather than covering it, and is
+                unfiltered because at capture time it is drawn after the Look
+                is lifted. */}
             <img
               src={frame!.src} alt="" draggable={false}
-              className="pointer-events-none absolute inset-0 h-full w-full"
+              className="pointer-events-none absolute"
+              style={{
+                left: pct(geom.frameX), top: pct(geom.frameY),
+                width: pct(geom.frameW), height: pct(geom.frameH),
+              }}
+            />
+
+            {/* The drag surface covers everything, so the picture can be
+                grabbed anywhere — including out in the overspill. */}
+            <div
+              onPointerDown={startPan}
+              className={`absolute inset-0 touch-none ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
             />
           </>
         ) : (
