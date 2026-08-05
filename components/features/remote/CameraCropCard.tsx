@@ -244,7 +244,12 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
             {framed && art && (
               <img
                 src={frame!.src} alt="" draggable={false}
-                className="pointer-events-none absolute z-20"
+                // Ghosted, not solid. The artwork is opaque and bigger than the
+                // box, so drawn at full strength it buries the very camera the
+                // operator is trying to crop — at a wide crop it covered the
+                // whole preview. Half-strength shows where the border will sit
+                // while everything behind it stays visible.
+                className="pointer-events-none absolute z-20 opacity-50"
                 style={{ left: pct(art.x), top: pct(art.y), width: pct(art.w), height: pct(art.h) }}
               />
             )}
