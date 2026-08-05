@@ -10,7 +10,7 @@ import {
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useLivePreview } from './useLivePreview';
 import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
-import { useCaptureSettings } from '@/components/features/remote/useCaptureSettings';
+import { useCaptureSettings, unmirrorCrop } from '@/components/features/remote/useCaptureSettings';
 import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
 import { rememberCapture } from '@/components/features/gallery/galleryStore';
 import type { FrameConfig, EventDetails } from '@/types/frame';
@@ -74,8 +74,9 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   } = useCaptureSettings();
   const filters = captureSettings.filters;
   const timerSecs = captureSettings.timerSecs;
-  // The region of the camera actually used. Null means the whole picture.
-  const crop = captureSettings.cropEnabled ? captureSettings.crop : null;
+  // The region of the camera actually used, flipped back into the camera's own
+  // coordinates: it was drawn on a mirrored preview. Null means all of it.
+  const crop = captureSettings.cropEnabled ? unmirrorCrop(captureSettings.crop) : null;
 
   const [countdown, setCountdown]     = useState<number | null>(null);
 

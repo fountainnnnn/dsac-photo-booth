@@ -18,6 +18,21 @@ import type { CaptureSettingsControl } from './CaptureSettingsCard';
 /** Small enough to be a tight zoom, large enough that the picture holds up. */
 const MIN_W = 0.2;
 
+/** Which corner is held; the opposite one stays put while it is dragged. */
+export type Corner = 'tl' | 'tr' | 'bl' | 'br';
+
+/** Whether dragging right / down grows the region, per corner. */
+const CORNER_SIGNS: Record<Corner, [number, number]> = {
+  br: [1, 1], bl: [-1, 1], tr: [1, -1], tl: [-1, -1],
+};
+
+const CORNER_STYLE: Record<Corner, string> = {
+  tl: '-top-px -left-px cursor-nwse-resize',
+  tr: '-top-px -right-px cursor-nesw-resize',
+  bl: '-bottom-px -left-px cursor-nesw-resize',
+  br: '-bottom-px -right-px cursor-nwse-resize',
+};
+
 export default function CameraCropCard({ settings, push }: CaptureSettingsControl) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -57,7 +72,7 @@ export default function CameraCropCard({ settings, push }: CaptureSettingsContro
    * Pointer events rather than mouse: the booth laptop may well be a
    * touchscreen, and capture means the drag keeps working past the edge.
    */
-  const startDrag = (mode: 'move' | 'resize') => (e: React.PointerEvent) => {
+  const startDrag = (mode: 'move' | Corner) => (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const box = boxRef.current;
@@ -70,12 +85,13 @@ export default function CameraCropCard({ settings, push }: CaptureSettingsContro
     const onMove = (ev: PointerEvent) => {
       const dx = (ev.clientX - startX) / rect.width;
       const dy = (ev.clientY - startY) / rect.height;
-      // Drag right/down to grow, left/up to shrink. Taking whichever axis moved
-      // more keeps a diagonal drag feeling like it follows the pointer, even
-      // though only one number is actually free.
-      set(mode === 'move'
-        ? clampMove(from, dx, dy)
-        : clampSize(from, Math.abs(dx) >= Math.abs(dy) ? dx : dy));
+      if (mode === 'move') { set(clampMove(from, dx, dy)); return; }
+
+      // Outwards grows, inwards shrinks, whichever corner is held. Following
+      // whichever axis moved further keeps a diagonal drag tracking the
+      // pointer, even though only one number is actually free.
+      const [sx, sy] = CORNER_SIGNS[mode];
+      set(clampSize(from, Math.abs(dx) >= Math.abs(dy) ? dx * sx : dy * sy, mode));
     };
     const onUp = () => {
       setDragging(false);
@@ -153,22 +169,20 @@ export default function CameraCropCard({ settings, push }: CaptureSettingsContro
                 width: pct(crop.w), height: pct(crop.h),
               }}
             >
-              {/* Inside the box, not hanging off its corner. Hung outside, the
-                  handle was clipped away by the preview's overflow the moment
-                  the region touched an edge — which it does by default, at the
-                  full frame, so there was nothing to grab at all. */}
-              <span
-                onPointerDown={startDrag('resize')}
-                title="Drag to resize"
-                className="absolute bottom-1 right-1 flex h-7 w-7 cursor-nwse-resize touch-none items-center justify-center rounded-full border-2 border-white bg-[var(--accent)] shadow-[0_2px_8px_rgba(11,10,12,0.45)]"
-              >
-                <ArrowsInSimple size={13} weight="bold" className="text-white" />
-              </span>
-              {/* Corner ticks, so the region reads as a crop box rather than
-                  a plain outline. */}
-              {['left-0 top-0 border-l-2 border-t-2', 'right-0 top-0 border-r-2 border-t-2',
-                'left-0 bottom-0 border-l-2 border-b-2'].map(pos => (
-                <span key={pos} className={`pointer-events-none absolute h-4 w-4 border-white ${pos}`} />
+              {/* A handle on every corner, each anchoring the opposite one.
+                  They sit just inside the edge, not hanging off it: hung
+                  outside they were clipped away by the preview's overflow the
+                  moment the region touched an edge — which it does by default,
+                  at the full frame, so there was nothing to grab at all. */}
+              {(Object.keys(CORNER_STYLE) as Corner[]).map(corner => (
+                <span
+                  key={corner}
+                  onPointerDown={startDrag(corner)}
+                  title="Drag to resize"
+                  className={`absolute flex h-6 w-6 touch-none items-center justify-center rounded-full border-2 border-white bg-[var(--accent)] shadow-[0_2px_8px_rgba(11,10,12,0.45)] ${CORNER_STYLE[corner]}`}
+                >
+                  <ArrowsInSimple size={11} weight="bold" className="text-white" />
+                </span>
               ))}
             </div>
           </>
@@ -194,14 +208,29 @@ export function clampMove(from: CameraCrop, dx: number, dy: number): CameraCrop 
 }
 
 /**
- * Resize from the top-left corner, keeping 16:9.
+ * Resize by `delta`, holding the corner opposite the one being dragged.
  *
  * Width and height are fractions of *different* dimensions, so a 16:9 region
  * of a 16:9 picture has w and h numerically equal — the aspect is already
  * baked into the coordinate space. That is why this scales both by the same
  * amount rather than dividing by the ratio.
+ *
+ * The size is capped by how much room the anchored corner leaves, so the
+ * region grows until it meets an edge and then stops, rather than sliding
+ * along it.
  */
-export function clampSize(from: CameraCrop, dx: number): CameraCrop {
-  const w = Math.min(Math.min(1 - from.x, 1 - from.y), Math.max(MIN_W, from.w + dx));
-  return { ...from, w, h: w };
+export function clampSize(from: CameraCrop, delta: number, corner: Corner = 'br'): CameraCrop {
+  const right = from.x + from.w;
+  const bottom = from.y + from.h;
+
+  const roomX = corner === 'br' || corner === 'tr' ? 1 - from.x : right;
+  const roomY = corner === 'br' || corner === 'bl' ? 1 - from.y : bottom;
+  const w = Math.min(roomX, roomY, Math.max(MIN_W, from.w + delta));
+
+  return {
+    w,
+    h: w,
+    x: corner === 'br' || corner === 'tr' ? from.x : right - w,
+    y: corner === 'br' || corner === 'bl' ? from.y : bottom - w,
+  };
 }

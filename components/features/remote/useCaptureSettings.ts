@@ -27,6 +27,19 @@ export interface CameraCrop {
 
 export const FULL_FRAME: CameraCrop = { x: 0, y: 0, w: 1, h: 1 };
 
+/**
+ * The same region in the camera's own coordinates.
+ *
+ * Everything an operator looks at is mirrored — the booth shows people their
+ * reflection, and the crop editor mirrors its preview to match — so the region
+ * is stored the way it was drawn, in mirrored space. Sampling the raw video
+ * needs it flipped back, or a box dragged over the left of the preview
+ * photographs the right of the room.
+ */
+export function unmirrorCrop(crop: CameraCrop): CameraCrop {
+  return { ...crop, x: 1 - crop.x - crop.w };
+}
+
 export interface CaptureSettings {
   timerSecs: number;
   selectedFrameId: string;
