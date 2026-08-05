@@ -6,6 +6,17 @@ import type { ImageFilters } from '@/types/editor';
 
 const TIMER_OPTIONS = [0, 3, 5, 10] as const;
 
+/**
+ * What each Look preset is previewed on.
+ *
+ * It was a flat grey, which cannot show what these filters do — grey has no
+ * saturation to change and no hue to rotate, so Warm, Cool, Golden and Punch
+ * all previewed as the same chip. This is a stand-in for a photo instead: skin
+ * tones through to a cool background, the range a booth actually shoots.
+ */
+const SWATCH =
+  'linear-gradient(115deg, #ffdcc0 0%, #eda87a 28%, #c96a5c 48%, #4d9aa8 74%, #33507f 100%)';
+
 export interface CaptureSettingsControl {
   settings: CaptureSettings;
   push: (next: CaptureSettings) => void;
@@ -122,8 +133,8 @@ export function LookSettingsCard({ settings, push }: CaptureSettingsControl) {
                    : 'text-[var(--ink-2)] hover:bg-[var(--shell-bg)]'
               }`}
             >
-              <span className="h-6 w-full rounded"
-                style={{ background: '#b9bcc4', filter: filtersToCSS(p.filters) }} />
+              <span className="h-7 w-full rounded"
+                style={{ background: SWATCH, filter: filtersToCSS(p.filters) }} />
               {p.label}
             </button>
           );
