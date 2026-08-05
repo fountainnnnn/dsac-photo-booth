@@ -6,33 +6,6 @@ import type { ImageFilters } from '@/types/editor';
 
 const TIMER_OPTIONS = [0, 3, 5, 10] as const;
 
-/**
- * Today as yyyy-mm-dd in local time, for the date field's default.
- *
- * `toISOString()` would be UTC and shows yesterday for most of a Singapore
- * morning — the same trap `resolveEventDate` sidesteps at the other end.
- */
-function todayISO(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/**
- * Timer, event details, and image adjustments, moved off the booth screen so
- * the guest only ever sees a camera and a wheel.
- *
- * Saving is debounced rather than manual: an operator dragging a slider expects
- * the kiosk to follow, not to hunt for a Save button afterwards.
- *
- * This is split into two cards so the settings page can put them in different
- * columns — together they were tall enough to make the right rail scroll before
- * you could reach anything. They deliberately share one `useCaptureSettings`,
- * owned by the caller: two independent copies would each PUT their own stale
- * snapshot, so editing the event name and then a slider would silently undo the
- * name.
- */
-
 export interface CaptureSettingsControl {
   settings: CaptureSettings;
   push: (next: CaptureSettings) => void;
@@ -88,19 +61,11 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
             className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
           />
         </label>
-        <label className="text-[0.78rem] font-semibold text-[var(--ink-2)]">
-          Event date
-          <input
-            type="date" value={settings.eventDate || todayISO()}
-            onChange={e => push({ ...settings, eventDate: e.target.value })}
-            className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
-          />
-          <span className="mt-1 block text-[0.7rem] font-normal text-[var(--ink-3)]">
-            {settings.eventDate
-              ? 'Stamped on every photo.'
-              : "Defaulting to today. Change it to pin a different date."}
-          </span>
-        </label>
+        <p className="rounded-lg bg-[var(--shell-bg)] px-3.5 py-3 text-[0.75rem] leading-[1.6] text-[var(--ink-2)]">
+          Photos are stamped with <strong className="font-semibold text-[var(--ink)]">today&rsquo;s date</strong>,
+          taken from this machine. There is nothing to set, and nothing to go
+          stale between events.
+        </p>
       </div>
 
       <div className="mt-6">

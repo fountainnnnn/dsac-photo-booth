@@ -16,7 +16,7 @@ import { rememberCapture } from '@/components/features/gallery/galleryStore';
 import type { FrameConfig, EventDetails } from '@/types/frame';
 import {
   FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
-  NAME_WEIGHT, STAMP_FONT_STACK, drawDateStamp, fitFontPx, stampFontPx, stampText, formatEventDate, resolveEventDate,
+  NAME_WEIGHT, STAMP_FONT_STACK, drawDateStamp, fitFontPx, stampFontPx, stampText, formatEventDate,
 } from '@/types/frame';
 import { filtersToCSS } from '@/types/editor';
 
@@ -168,10 +168,10 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   // the frame artwork gets stretched. Fitting the target shape into the
   // available box keeps it exact on both axes.
   //
-  // Which shape depends on whether a frame is on. With one, the stage is the
-  // artboard and the picture is stretched into its cut-out, because the frame
-  // has to line up exactly. With no frame there is nothing to line up with, so
-  // the stage takes the camera's shape and the picture stays undistorted.
+  // Which shape depends on whether a frame is on. With one the stage is the
+  // artboard, because the artwork has to line up exactly; with none it takes
+  // the camera's own shape. Either way the picture itself is only ever scaled,
+  // never reshaped.
   const stageAspect = displayFrame ? FRAME_ASPECT : cameraAspect;
 
   useLayoutEffect(() => {
@@ -268,7 +268,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     }
 
     // Same source region as the live preview, or the shot would quietly come
-    // out wide whenever this fallback path ran.
+    // out wide whenever this fallback path ran. Straight scale, no fitting.
     const vw = video.videoWidth  || dw;
     const vh = video.videoHeight || dh;
     const sx = crop ? Math.round(crop.x * vw) : 0;
@@ -593,7 +593,7 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
   const stamp = frame.dateStamp;
   const slot = frame.captionSlot;
   const [shrink, setShrink] = useState(1);
-  const date = resolveEventDate(event);
+  const date = new Date();
 
   useEffect(() => {
     if (!stamp?.maxWidthFrac) { setShrink(1); return; }

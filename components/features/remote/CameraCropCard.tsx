@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowsInSimple, ArrowsOut, Crop } from '@phosphor-icons/react';
 import { FULL_FRAME, type CameraCrop } from './useCaptureSettings';
 import type { CaptureSettingsControl } from './CaptureSettingsCard';
+import type { FrameConfig } from '@/types/frame';
 
 /**
  * Line up the part of the room the booth actually photographs.
@@ -33,11 +34,17 @@ const CORNER_STYLE: Record<Corner, string> = {
   br: '-bottom-px -right-px cursor-nwse-resize',
 };
 
-export default function CameraCropCard({ settings, push }: CaptureSettingsControl) {
+export interface CameraCropCardProps extends CaptureSettingsControl {
+  /** The frame in use, so the region can be judged against what it hides. */
+  frame?: FrameConfig | null;
+}
+
+export default function CameraCropCard({ settings, push, frame }: CameraCropCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [showFrame, setShowFrame] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const crop = settings.crop ?? FULL_FRAME;
 
@@ -121,9 +128,20 @@ export default function CameraCropCard({ settings, push }: CaptureSettingsContro
         </button>
       </div>
       <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
-        Drag inside the box to move it, or the round handle to resize.
+        Drag inside the box to move it, or a corner handle to resize.
         Everything dimmed is left out of the photo.
       </p>
+
+      {frame && (
+        <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-[0.78rem] font-medium text-[var(--ink-2)]">
+          <input
+            type="checkbox" checked={showFrame}
+            onChange={e => setShowFrame(e.target.checked)}
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+          Show the {frame.label} frame over the region
+        </label>
+      )}
 
       <div
         ref={boxRef}
@@ -159,9 +177,26 @@ export default function CameraCropCard({ settings, push }: CaptureSettingsContro
                   ${pct(crop.x)} ${pct(crop.y)})`,
               }}
             />
+            {/* The frame's window is where the photo lands, so line the
+                artwork up with the region: scale it by window.w and offset so
+                the two rectangles coincide. What spills past the preview is
+                clipped, which is honest — that part is off-camera too. */}
+            {frame && showFrame && frame.window && (
+              <img
+                src={frame.src} alt="" draggable={false}
+                className="pointer-events-none absolute z-10 opacity-95"
+                style={{
+                  width: pct(crop.w / frame.window.w),
+                  height: pct(crop.h / frame.window.h),
+                  left: pct(crop.x - frame.window.x * (crop.w / frame.window.w)),
+                  top: pct(crop.y - frame.window.y * (crop.h / frame.window.h)),
+                }}
+              />
+            )}
+
             <div
               onPointerDown={startDrag('move')}
-              className={`absolute cursor-move touch-none rounded-[3px] ring-2 ring-[var(--accent)] ${
+              className={`absolute z-20 cursor-move touch-none rounded-[3px] ring-2 ring-[var(--accent)] ${
                 dragging ? 'ring-[3px]' : ''
               }`}
               style={{

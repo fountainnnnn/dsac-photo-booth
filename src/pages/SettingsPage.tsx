@@ -272,7 +272,10 @@ export default function SettingsPage() {
           </section>
 
           <EventSettingsCard {...capture} />
-          <CameraCropCard {...capture} />
+          <CameraCropCard
+            {...capture}
+            frame={frames.find(f => f.id === capture.settings.selectedFrameId) ?? null}
+          />
           <RemoteAccessCard />
 
           <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">

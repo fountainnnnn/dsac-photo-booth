@@ -64,8 +64,13 @@ export function useLivePreview(
       ctx.fillRect(0, 0, w, h);
     }
 
-    // Source: the operator's crop region, or the whole picture. Both it and
-    // the destination window are 16:9, so this scales without reshaping.
+    // Source: the operator's crop region, or the whole picture.
+    //
+    // Nothing is fitted, stretched or letterboxed here. Both the source and
+    // the destination window are 16:9 by construction — the crop is locked to
+    // it, and every frame window is the 16:9 rect covering its cut-out — so
+    // this is a plain scale. The old fill-to-window behaviour existed to paper
+    // over windows that were not 16:9, and reshaped people to do it.
     const vw = video.videoWidth  || dw;
     const vh = video.videoHeight || dh;
     const sx = sourceRect ? Math.round(sourceRect.x * vw) : 0;

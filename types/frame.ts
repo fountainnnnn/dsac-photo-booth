@@ -6,11 +6,11 @@
  * that aspect whenever a frame is on — stretching a 16:10 frame onto a 16:9
  * photo would distort the SP logos and the caption.
  *
- * Every `window` is 16:9, matching the camera, so the photo is drawn into it
- * one-to-one with no fitting, cropping or letterboxing at draw time. Where a
- * cut-out is not 16:9 the window is the 16:9 rect that *covers* it: the photo
- * fills the hole completely and the artwork hides the overhang. Keeping that
- * invariant in the geometry is what lets the drawing code stay dumb.
+ * Every `window` is 16:9, matching the camera, so the photo is only ever
+ * scaled into it — never fitted, stretched or letterboxed. Where a cut-out is
+ * not 16:9 the window is the 16:9 rect that *covers* it: the photo fills the
+ * hole completely and the artwork hides the overhang. Holding that invariant
+ * in the geometry is what removed the reshaping from the drawing code.
  *
  * Neither artboard has the event date baked in, so we stamp it at capture
  * time. All stamp geometry is expressed as a fraction of the frame, measured
@@ -99,29 +99,11 @@ export function fitFontPx(
 /** Event details an operator can change without touching the artwork. */
 export interface EventDetails {
   eventName: string;
-  /** ISO yyyy-mm-dd. Empty means "use today", so an unattended booth stays right. */
-  eventDate: string;
 }
 
 export const DEFAULT_EVENT_DETAILS: EventDetails = {
   eventName: 'Transformation Made Possible',
-  eventDate: '',
 };
-
-/** The date to stamp: the configured one, else today. */
-export function resolveEventDate(details?: Partial<EventDetails> | null): Date {
-  const raw = details?.eventDate?.trim();
-  if (raw) {
-    // Parse as local midnight; `new Date('2026-05-19')` is UTC and can land on
-    // the previous day for anyone east of Greenwich, Singapore included.
-    const [y, m, d] = raw.split('-').map(Number);
-    if (y && m && d) {
-      const parsed = new Date(y, m - 1, d);
-      if (!Number.isNaN(parsed.getTime())) return parsed;
-    }
-  }
-  return new Date();
-}
 
 /** The transparent cut-out a photo sits inside, as fractions of the frame. */
 export interface FrameWindow {
@@ -292,7 +274,9 @@ export function drawDateStamp(
   h: number,
   event?: Partial<EventDetails> | null,
 ) {
-  const date = resolveEventDate(event);
+  // Always today. A booth is set up on the day it runs, and a stale pinned
+  // date is worse than no setting at all — it is wrong silently.
+  const date = new Date();
 
   // Artwork with no caption of its own gets the whole line drawn here, so the
   // event name is ours to set. Artwork that bakes its caption into the pixels

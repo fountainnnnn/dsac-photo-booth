@@ -46,8 +46,6 @@ export interface CaptureSettings {
   filters: ImageFilters;
   /** Printed on frames that do not bake their own caption. */
   eventName: string;
-  /** ISO yyyy-mm-dd. Empty means "use today". */
-  eventDate: string;
   /**
    * Two framings from one camera: the whole scene, or the region set below.
    * Kept as a flag rather than "crop === FULL_FRAME" so an operator can switch
@@ -62,7 +60,6 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   selectedFrameId: '',
   filters: DEFAULT_FILTERS,
   eventName: DEFAULT_EVENT_DETAILS.eventName,
-  eventDate: DEFAULT_EVENT_DETAILS.eventDate,
   cropEnabled: false,
   crop: FULL_FRAME,
 };

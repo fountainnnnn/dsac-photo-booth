@@ -33,7 +33,14 @@ const frame = (id: string) => {
   return f;
 };
 
-const EVENT = { eventName: 'AI Learning Journey', eventDate: '2026-05-19' };
+const EVENT = { eventName: 'AI Learning Journey' };
+
+/** Today, formatted the way the stamp writes it. */
+const TODAY = (() => {
+  const d = new Date();
+  const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear()}`;
+})();
 
 function draw(id: string) {
   const { ctx, drawn } = recorder();
@@ -50,7 +57,7 @@ describe('drawDateStamp', () => {
       expect(name.align).toBe('center');
       expect(name.x).toBeCloseTo(FRAME_W / 2, 0);
       expect(name.y).toBeLessThan(date.y);
-      expect(date.text).toBe('19 May 2026');
+      expect(date.text).toBe(TODAY);
       expect(date.align).toBe('center');
       expect(date.x).toBeCloseTo(FRAME_W / 2, 0);
       expect(date.y).toBeCloseTo(slot.baselineFrac * FRAME_H, 0);
@@ -74,7 +81,7 @@ describe('drawDateStamp', () => {
   it('draws only the date when the event name is blank', () => {
     const { ctx, drawn } = recorder();
     drawDateStamp(ctx, frame('tech'), FRAME_W, FRAME_H, { ...EVENT, eventName: '  ' });
-    expect(drawn.map((d) => d.text)).toEqual(['19 May 2026']);
+    expect(drawn.map((d) => d.text)).toEqual([TODAY]);
   });
 
   it('sets the event name bold and the date regular', () => {
@@ -83,11 +90,10 @@ describe('drawDateStamp', () => {
     expect(date.font).not.toMatch(/bold/);
   });
 
-  it('writes the date as "31 Dec 2026"', () => {
+  it('writes today, spelled out, with no way to pin a stale date', () => {
     const { ctx, drawn } = recorder();
-    drawDateStamp(ctx, frame('tech'), FRAME_W, FRAME_H, {
-      eventName: '', eventDate: '2026-12-31',
-    });
-    expect(drawn[0].text).toBe('31 Dec 2026');
+    drawDateStamp(ctx, frame('tech'), FRAME_W, FRAME_H, { eventName: '' });
+    expect(drawn[0].text).toBe(TODAY);
+    expect(drawn[0].text).toMatch(/^\d{1,2} [A-Z][a-z]{2} \d{4}$/);
   });
 });
