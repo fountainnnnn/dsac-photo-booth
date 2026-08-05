@@ -1,53 +1,51 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowsInSimple, ArrowsOut, Crop } from '@phosphor-icons/react';
+import { ArrowsInSimple, ArrowsOut, Crop, MagnifyingGlass } from '@phosphor-icons/react';
 import { FULL_FRAME, type CameraCrop } from './useCaptureSettings';
 import type { CaptureSettingsControl } from './CaptureSettingsCard';
-import type { FrameConfig } from '@/types/frame';
+import { FRAME_W, FRAME_H, type FrameConfig } from '@/types/frame';
 import { filtersToCSS } from '@/types/editor';
 
 /**
- * Line up the part of the room the booth actually photographs.
+ * Line up the camera inside the photo window.
  *
- * The camera is the fixed thing here, filling the preview, and the crop box
- * moves and resizes over it — that is what an operator is choosing. With a
- * frame on, the artwork rides along with the box so its window sits exactly on
- * the crop, showing how the shot will be wrapped without changing what is
- * being chosen.
+ * The window is the fixed thing here. With a frame on, the artwork fills the
+ * preview and never moves — its window is where the photo lands. Without one,
+ * the whole preview is the window. The movable thing is the CAMERA: the
+ * outlined box is the camera's own bounds, dragged to slide the picture behind
+ * the window and cornered to scale it, the way a layer is positioned under a
+ * mask. Whatever shows through the window is the photo.
  *
- * The region is locked to 16:9. The camera is 16:9 and every frame window is
- * 16:9, so keeping the crop the same shape means it only ever zooms in. Let it
- * be freeform and every photo taken with it would be stretched back.
+ * The camera may be larger than the window (a zoom: the window keeps part of
+ * the scene) or smaller (the whole scene sits inside the photo with white
+ * margins). Either way it stays contained — the bigger rectangle always fully
+ * covers the smaller — so the photo never has half-filled edges.
  */
 
-/** Small enough to be a tight zoom, large enough that the picture holds up. */
-const MIN_W = 0.2;
+/** Zoom range: window keeps 1/5 of the camera up to the camera at half size. */
+const MIN_CROP_W = 0.2;  // 5.0x — tightest zoom in
+const MAX_CROP_W = 2;    // 0.5x — camera at half the window, white margins
 
-/**
- * Margin left around the camera inside the preview, per side.
- *
- * The frame is bigger than its window, so it always overhangs the crop box.
- * Without room to overhang into, it gets sliced off by the edge of the preview
- * the moment the box goes near a corner.
- */
-const CAMERA_INSET = 0.1;
-
-/** Which corner is held; the opposite one stays put while it is dragged. */
+/** Which camera corner is held; the opposite one stays put. */
 export type Corner = 'tl' | 'tr' | 'bl' | 'br';
 
-/** Whether dragging right / down grows the region, per corner. */
+/** Whether dragging right / down grows the camera, per corner. */
 const CORNER_SIGNS: Record<Corner, [number, number]> = {
   br: [1, 1], bl: [-1, 1], tr: [1, -1], tl: [-1, -1],
 };
 
+// Inside the corners, not straddling them: at 1x the camera sits exactly on
+// the preview and a straddling handle is clipped to a sliver by its overflow.
 const CORNER_STYLE: Record<Corner, string> = {
-  tl: '-top-3 -left-3 cursor-nwse-resize',
-  tr: '-top-3 -right-3 cursor-nesw-resize',
-  bl: '-bottom-3 -left-3 cursor-nesw-resize',
-  br: '-bottom-3 -right-3 cursor-nwse-resize',
+  tl: 'top-1 left-1 cursor-nwse-resize',
+  tr: 'top-1 right-1 cursor-nesw-resize',
+  bl: 'bottom-1 left-1 cursor-nesw-resize',
+  br: 'bottom-1 right-1 cursor-nwse-resize',
 };
 
+interface Rect { x: number; y: number; w: number; h: number }
+
 export interface CameraCropCardProps extends CaptureSettingsControl {
-  /** The frame in use, so the crop can be judged against what it wraps. */
+  /** The frame in use — the fixed surround whose window the camera fills. */
   frame?: FrameConfig | null;
 }
 
@@ -62,9 +60,9 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
   const crop = settings.crop ?? FULL_FRAME;
 
   /**
-   * Hand the stream to whichever <video> is mounted. It only ever mounts once
-   * now, but a callback ref costs nothing and survives the next restructure —
-   * an element swap silently emptying srcObject has already cost a round here.
+   * Hand the stream to whichever <video> is mounted. It only mounts once now,
+   * but a callback ref costs nothing and survives the next restructure — an
+   * element swap silently emptying srcObject has already cost a round here.
    */
   const attachVideo = useCallback((el: HTMLVideoElement | null) => {
     videoRef.current = el;
@@ -99,12 +97,43 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
     push({ ...settings, crop: next, cropEnabled: true });
   }, [push, settings]);
 
+  const winRect: Rect | null = frame?.window ?? null;
+  const framed = Boolean(frame && showFrame && winRect);
+
+  // The fixed photo window, in preview fractions. With a frame it is the
+  // artwork's own window; without one the whole preview is the photo — no
+  // stand-in border, no dead margin around it.
+  const win: Rect = framed && winRect ? winRect : { x: 0, y: 0, w: 1, h: 1 };
+
   /**
-   * Drag the box to move it, or a corner to resize it.
+   * The camera's bounds, derived from the crop.
+   *
+   * The crop says where the window sits on the camera, so the camera is the
+   * window scaled by its reciprocal and offset to match. crop = FULL_FRAME
+   * puts the camera exactly on the window.
+   */
+  const cam: Rect = {
+    w: win.w / crop.w,
+    h: win.h / crop.h,
+    x: win.x - crop.x * (win.w / crop.w),
+    y: win.y - crop.y * (win.h / crop.h),
+  };
+
+  /** Back the other way: where the window sits relative to a camera rect. */
+  const cropFromCam = (c: Rect): CameraCrop => clampCropRect({
+    w: win.w / c.w,
+    h: win.h / c.h,
+    x: (win.x - c.x) / c.w,
+    y: (win.y - c.y) / c.h,
+  });
+
+  /**
+   * Drag the camera to slide it behind the window, or a corner to scale it,
+   * holding the opposite corner.
    *
    * Pointer events rather than mouse: the booth laptop may well be a
-   * touchscreen, and listening on the window keeps the drag alive past the
-   * edge of the element.
+   * touchscreen, and listening on the window keeps a drag alive past the edge
+   * of the element.
    */
   const startDrag = (mode: 'move' | Corner) => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -113,22 +142,31 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
     if (!box) return;
     const rect = box.getBoundingClientRect();
     const startX = e.clientX, startY = e.clientY;
-    const from = { ...crop };
+    const from = { ...cam };
     setDragging(true);
 
     const onMove = (ev: PointerEvent) => {
-      // The pointer moves in preview fractions; the crop lives in camera
-      // fractions, and the camera is inset, so convert between them.
-      const span = 1 - CAMERA_INSET * 2;
-      const dx = ((ev.clientX - startX) / rect.width) / span;
-      const dy = ((ev.clientY - startY) / rect.height) / span;
-      if (mode === 'move') { set(clampMove(from, dx, dy)); return; }
+      const dx = (ev.clientX - startX) / rect.width;
+      const dy = (ev.clientY - startY) / rect.height;
 
-      // Outwards grows, inwards shrinks, whichever corner is held. Following
-      // whichever axis moved further keeps a diagonal drag tracking the
-      // pointer, even though only one number is actually free.
+      if (mode === 'move') {
+        // The camera follows the pointer one-to-one; the crop falls out of it.
+        set(cropFromCam({ ...from, x: from.x + dx, y: from.y + dy }));
+        return;
+      }
+
+      // Outwards grows, inwards shrinks, whichever corner is held; following
+      // whichever axis moved further keeps a diagonal drag on the pointer.
       const [sx, sy] = CORNER_SIGNS[mode];
-      set(clampSize(from, Math.abs(dx) >= Math.abs(dy) ? dx * sx : dy * sy, mode));
+      const d = Math.abs(dx) >= Math.abs(dy) ? dx * sx : dy * sy;
+      const w = from.w + d;
+      const h = w * (from.h / from.w);
+      set(cropFromCam({
+        w, h,
+        // The opposite corner stays put while this one is pulled.
+        x: mode === 'br' || mode === 'tr' ? from.x : from.x + from.w - w,
+        y: mode === 'br' || mode === 'bl' ? from.y : from.y + from.h - h,
+      }));
     };
     const onUp = () => {
       setDragging(false);
@@ -142,24 +180,7 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
   };
 
   const pct = (n: number) => `${n * 100}%`;
-  const win = frame?.window;
-  const framed = Boolean(frame && showFrame && win);
-
-  // Everything below is in preview fractions. The camera is inset; the crop
-  // box is placed inside it; the frame is scaled so its window lands on the box.
-  const cam = { x: CAMERA_INSET, y: CAMERA_INSET, w: 1 - CAMERA_INSET * 2, h: 1 - CAMERA_INSET * 2 };
-  const box = {
-    x: cam.x + crop.x * cam.w,
-    y: cam.y + crop.y * cam.h,
-    w: crop.w * cam.w,
-    h: crop.h * cam.h,
-  };
-  const art = win && {
-    w: box.w / win.w,
-    h: box.h / win.h,
-    get x() { return box.x - win.x * this.w; },
-    get y() { return box.y - win.y * this.h; },
-  };
+  const zoom = 1 / crop.w;
 
   return (
     <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
@@ -176,8 +197,8 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
         </button>
       </div>
       <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
-        Drag the box to move it, or a corner to resize. Only what is inside it
-        is photographed.
+        The outlined box is the camera. Drag it to line the picture up, or pull
+        a corner to resize it — larger crops in, smaller leaves white margins.
       </p>
 
       {frame && (
@@ -187,21 +208,31 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
             onChange={e => setShowFrame(e.target.checked)}
             className="h-4 w-4 accent-[var(--accent)]"
           />
-          Show the {frame.label} frame around the box
+          Show the {frame.label} frame
         </label>
       )}
 
       <div
         ref={boxRef}
         className="relative mt-4 w-full overflow-hidden rounded-xl"
-        style={{ aspectRatio: '16 / 9', background: 'var(--stage)' }}
+        style={{
+          aspectRatio: framed ? `${FRAME_W} / ${FRAME_H}` : '16 / 9',
+          background: 'var(--stage)',
+        }}
       >
-        {/* The camera, fixed. Mirrored to match the booth, and carrying the
-            Look — a crop judged against an unfiltered picture is judged
-            against something the booth never produces. */}
+        {/* The photo's paper. A camera smaller than the window leaves margins,
+            and they are white in the JPEG, so they are white here too. */}
+        <div
+          className="absolute bg-white"
+          style={{ left: pct(win.x), top: pct(win.y), width: pct(win.w), height: pct(win.h) }}
+        />
+
+        {/* The camera, wherever its box is. Mirrored to match the booth, and
+            carrying the Look — a shot lined up against an unfiltered picture
+            is lined up against something the booth never produces. */}
         <video
           ref={attachVideo} autoPlay playsInline muted
-          className="absolute"
+          className="absolute max-w-none"
           style={{
             left: pct(cam.x), top: pct(cam.y), width: pct(cam.w), height: pct(cam.h),
             transform: 'scaleX(-1)',
@@ -210,67 +241,38 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
         />
 
         {!ready && (
-          <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-[0.78rem] text-white/70">
+          <p className="absolute inset-0 z-40 flex items-center justify-center px-6 text-center text-[0.78rem] text-white/70">
             {error ? `Camera unavailable — ${error}` : 'Starting the camera…'}
           </p>
         )}
 
         {ready && (
           <>
-            {/* Dim outside the box as four panels rather than one clipped box:
-                a clip-path hole is invisible wherever the artwork covers it. */}
-            {[
-              { left: 0, top: 0, width: 1, height: box.y },
-              { left: 0, top: box.y + box.h, width: 1, height: 1 - box.y - box.h },
-              { left: 0, top: box.y, width: box.x, height: box.h },
-              { left: box.x + box.w, top: box.y, width: 1 - box.x - box.w, height: box.h },
-            ].map((r, i) => (
-              <div
-                key={i}
-                className="pointer-events-none absolute z-10"
-                style={{
-                  left: pct(r.left), top: pct(r.top),
-                  width: pct(Math.max(0, r.width)), height: pct(Math.max(0, r.height)),
-                  background: 'rgba(11,10,12,0.62)',
-                }}
-              />
-            ))}
-
-            {/* The artwork rides with the box, scaled so its window lands on
-                the crop exactly. It overhangs, which is the point — that is
-                the border the photo gets — and the camera is inset to leave
-                room for the overhang instead of slicing it off. Unfiltered,
-                because at capture time it is drawn after the Look is lifted. */}
-            {framed && art && (
+            {/* The frame, stuck outside: full-bleed, fixed, never moving. Its
+                opaque border hides the camera's overflow — the outline below
+                still shows where the camera extends. Unfiltered, because at
+                capture time it is drawn after the Look is lifted. */}
+            {framed && (
               <img
                 src={frame!.src} alt="" draggable={false}
-                // Ghosted, not solid. The artwork is opaque and bigger than the
-                // box, so drawn at full strength it buries the very camera the
-                // operator is trying to crop — at a wide crop it covered the
-                // whole preview. Half-strength shows where the border will sit
-                // while everything behind it stays visible.
-                className="pointer-events-none absolute z-20 opacity-50"
-                style={{ left: pct(art.x), top: pct(art.y), width: pct(art.w), height: pct(art.h) }}
+                className="pointer-events-none absolute inset-0 z-20 h-full w-full"
               />
             )}
 
-            {/* The box itself, above the artwork so the crop edge is never
-                buried by the frame's own printed border. */}
+            {/* The camera's own outline — the movable thing, above everything
+                so it reads even where the artwork covers its overflow. */}
             <div
               onPointerDown={startDrag('move')}
-              className={`absolute z-30 cursor-move touch-none ring-2 ring-white ${
-                dragging ? 'ring-[3px]' : ''
+              className={`absolute z-30 touch-none ring-2 ring-[var(--accent)] ${
+                dragging ? 'cursor-grabbing ring-[3px]' : 'cursor-grab'
               }`}
-              style={{
-                left: pct(box.x), top: pct(box.y), width: pct(box.w), height: pct(box.h),
-                boxShadow: '0 0 0 1px rgba(11,10,12,0.55)',
-              }}
+              style={{ left: pct(cam.x), top: pct(cam.y), width: pct(cam.w), height: pct(cam.h) }}
             >
               {(Object.keys(CORNER_STYLE) as Corner[]).map(corner => (
                 <span
                   key={corner}
                   onPointerDown={startDrag(corner)}
-                  title="Drag to resize"
+                  title="Drag to resize the camera"
                   className={`absolute flex h-6 w-6 touch-none items-center justify-center rounded-full border-2 border-white bg-[var(--accent)] shadow-[0_2px_8px_rgba(11,10,12,0.45)] ${CORNER_STYLE[corner]}`}
                 >
                   <ArrowsInSimple size={11} weight="bold" className="text-white" />
@@ -281,66 +283,63 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
         )}
       </div>
 
+      {/* Backup zoom: past ~1.3x the camera's corners are off the preview, so
+          the slider is how you zoom back out without hunting for a handle. */}
+      <label className="mt-4 flex items-center gap-3 text-[0.75rem] font-semibold text-[var(--ink-2)]">
+        <MagnifyingGlass size={15} className="shrink-0" />
+        <input
+          type="range"
+          min={Math.round(100 / MAX_CROP_W)} max={Math.round(100 / MIN_CROP_W)} step={1}
+          value={Math.round(100 * zoom)}
+          onChange={e => set(clampZoom(crop, 100 / Number(e.target.value)))}
+          aria-label="Zoom"
+          className="dsac-range"
+        />
+        <span className="w-10 shrink-0 text-right tabular-nums text-[var(--ink-3)]">
+          {zoom.toFixed(1)}&times;
+        </span>
+      </label>
+
       <p className="mt-3 text-[0.72rem] tabular-nums text-[var(--ink-3)]">
-        {settings.cropEnabled
-          ? `Using ${Math.round(crop.w * 100)}% of the camera's width — a ${(1 / crop.w).toFixed(1)}× zoom.`
-          : 'Using the whole scene. Drag the box to start cropping.'}
+        {!settings.cropEnabled
+          ? 'The window is the whole camera. Drag the box or zoom to change that.'
+          : zoom >= 1
+            ? `${zoom.toFixed(1)}× zoom — the window keeps ${Math.round(crop.w * 100)}% of the camera's width.`
+            : `${zoom.toFixed(1)}× — the camera sits inside the photo with white margins.`}
       </p>
     </section>
   );
 }
 
-/** Move without leaving the picture. */
-export function clampMove(from: CameraCrop, dx: number, dy: number): CameraCrop {
-  return {
-    ...from,
-    x: Math.min(1 - from.w, Math.max(0, from.x + dx)),
-    y: Math.min(1 - from.h, Math.max(0, from.y + dy)),
-  };
-}
-
 /**
- * Resize by `delta`, holding the corner opposite the one being dragged.
+ * Keep the crop legal: zoom within range, and the smaller rectangle contained
+ * by the larger.
  *
- * Width and height are fractions of *different* dimensions, so a 16:9 region
- * of a 16:9 picture has w and h numerically equal — the aspect is already
- * baked into the coordinate space. That is why this scales both by the same
- * amount rather than dividing by the ratio.
- *
- * The size is capped by how much room the anchored corner leaves, so the
- * region grows until it meets an edge and then stops, rather than sliding
- * along it.
+ * When the window keeps part of the camera (w <= 1) the window must stay on
+ * the camera, so x ∈ [0, 1-w]. When the camera sits inside the photo (w > 1)
+ * the containment flips and the same interval reverses to [1-w, 0]. min/max of
+ * the two endpoints covers both without a branch.
  */
-export function clampSize(from: CameraCrop, delta: number, corner: Corner = 'br'): CameraCrop {
-  const right = from.x + from.w;
-  const bottom = from.y + from.h;
-
-  const roomX = corner === 'br' || corner === 'tr' ? 1 - from.x : right;
-  const roomY = corner === 'br' || corner === 'bl' ? 1 - from.y : bottom;
-  const w = Math.min(roomX, roomY, Math.max(MIN_W, from.w + delta));
-
+export function clampCropRect(c: CameraCrop): CameraCrop {
+  const w = Math.min(MAX_CROP_W, Math.max(MIN_CROP_W, c.w));
+  const lo = Math.min(0, 1 - w);
+  const hi = Math.max(0, 1 - w);
   return {
     w,
     h: w,
-    x: corner === 'br' || corner === 'tr' ? from.x : right - w,
-    y: corner === 'br' || corner === 'bl' ? from.y : bottom - w,
+    x: Math.min(hi, Math.max(lo, c.x)),
+    y: Math.min(hi, Math.max(lo, c.y)),
   };
 }
 
 /**
  * Zoom about the centre, so the shot stays pointed where it was.
  *
- * `w` is the fraction of the picture kept, which is the reciprocal of zoom:
- * half the width is a 2x zoom.
+ * `w` is the fraction of the camera the window keeps — the reciprocal of
+ * zoom: half the width is 2x in, twice the width is 0.5x with margins.
  */
 export function clampZoom(from: CameraCrop, w: number): CameraCrop {
-  const nw = Math.min(1, Math.max(MIN_W, w));
   const cx = from.x + from.w / 2;
   const cy = from.y + from.h / 2;
-  return {
-    w: nw,
-    h: nw,
-    x: Math.min(1 - nw, Math.max(0, cx - nw / 2)),
-    y: Math.min(1 - nw, Math.max(0, cy - nw / 2)),
-  };
+  return clampCropRect({ w, h: w, x: cx - w / 2, y: cy - w / 2 });
 }

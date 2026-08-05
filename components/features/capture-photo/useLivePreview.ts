@@ -55,10 +55,11 @@ export function useLivePreview(
     const dw = contentRect ? Math.round(contentRect.w * w) : w;
     const dh = contentRect ? Math.round(contentRect.h * h) : h;
 
-    // Everything outside the cut-out is covered by the frame artwork, but it
-    // must not be left transparent — a captured JPEG has no alpha and would
-    // turn it black.
-    if (contentRect) {
+    // Anywhere the picture does not reach must be white, not transparent: a
+    // captured JPEG has no alpha and would turn it black. That is the border
+    // around a frame's cut-out, and the margins when the crop is zoomed out
+    // past the whole scene so the camera sits inside the photo.
+    if (contentRect || sourceRect) {
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, w, h);

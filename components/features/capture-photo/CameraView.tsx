@@ -262,7 +262,9 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     const dw = win ? Math.round(win.w * outW) : outW;
     const dh = win ? Math.round(win.h * outH) : outH;
 
-    if (win) {
+    // White wherever the picture does not reach — the frame border, and the
+    // margins when the crop is zoomed out past the whole scene.
+    if (win || crop) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, outW, outH);
     }
