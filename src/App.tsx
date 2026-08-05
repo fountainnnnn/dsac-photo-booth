@@ -4,6 +4,7 @@ import FramesPage from './pages/FramesPage';
 import GalleryPage from './pages/GalleryPage';
 import RemotePage from './pages/RemotePage';
 import SettingsPage from './pages/SettingsPage';
+import PasswordGate from '@/components/features/auth/PasswordGate';
 
 function getDownloadToken(pathname: string): string | null {
   const prefix = '/download/';
@@ -13,16 +14,38 @@ function getDownloadToken(pathname: string): string | null {
   return token ? decodeURIComponent(token) : null;
 }
 
+/** The interface, phone remote included — one password for the whole booth. */
+function boothGated(page: React.ReactNode) {
+  return (
+    <PasswordGate scope="booth" title="Booth locked" hint="Enter the booth password to continue.">
+      {page}
+    </PasswordGate>
+  );
+}
+
 export default function App() {
   const { pathname } = window.location;
   const downloadToken = getDownloadToken(pathname);
 
-  if (pathname === '/capture') return <CapturePage />;
-  if (pathname === '/settings') return <SettingsPage />;
-  if (pathname === '/gallery') return <GalleryPage />;
-  if (pathname === '/frames') return <FramesPage />;
-  if (pathname === '/remote') return <RemotePage />;
-  if (downloadToken) return <DownloadPage token={downloadToken} />;
+  if (pathname === '/capture') return boothGated(<CapturePage />);
+  if (pathname === '/settings') return boothGated(<SettingsPage />);
+  if (pathname === '/gallery') return boothGated(<GalleryPage />);
+  if (pathname === '/frames') return boothGated(<FramesPage />);
+  if (pathname === '/remote') return boothGated(<RemotePage />);
 
-  return <CapturePage />;
+  // The guest side. The password comes before the photo is shown, not before
+  // the save button — a picture you can see is a picture you can keep.
+  if (downloadToken) {
+    return (
+      <PasswordGate
+        scope="download"
+        title="Photo locked"
+        hint="Ask the booth crew for the photo password."
+      >
+        <DownloadPage token={downloadToken} />
+      </PasswordGate>
+    );
+  }
+
+  return boothGated(<CapturePage />);
 }

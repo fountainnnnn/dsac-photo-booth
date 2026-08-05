@@ -8,6 +8,7 @@ import {
 } from '@/components/features/remote/CaptureSettingsCard';
 import CameraCropCard from '@/components/features/remote/CameraCropCard';
 import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
+import PasswordsCard from '@/components/features/auth/PasswordsCard';
 
 /**
  * Settings — everything an operator changes, so the capture screen can be
@@ -277,6 +278,7 @@ export default function SettingsPage() {
             frame={frames.find(f => f.id === capture.settings.selectedFrameId) ?? null}
           />
           <RemoteAccessCard />
+          <PasswordsCard />
 
           <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
             <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How frames work</p>

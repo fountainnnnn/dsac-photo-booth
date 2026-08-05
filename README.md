@@ -21,6 +21,13 @@ Wi-Fi, so a LAN address is no use to them. If the tunnel cannot start the booth
 still runs and falls back to the LAN address — taking photos matters more than
 handing them out.
 
+Two optional passwords guard the booth, set in Settings (or seeded from
+`BOOTH_PASSWORD` / `DOWNLOAD_PASSWORD` in `.env`): one locks the interface —
+capture, gallery, settings and the phone remote — and one is typed by guests
+after scanning the QR, before their photo is shown. A password left unset
+leaves that gate open. The photo routes are enforced on the server, not just
+in the page. This keeps passers-by out; it is a gate, not bank-grade security.
+
 The organiser's phone remote is at `<public URL>/remote`, and Settings shows a
 QR code for it.
 

@@ -8,6 +8,7 @@ import express from 'express';
 import multer from 'multer';
 import QRCode from 'qrcode';
 import { openDatabase } from './db.mjs';
+import { createAuth } from './auth.mjs';
 import { createRemoteHub } from './remote.mjs';
 import { startTunnel } from './tunnel.mjs';
 
@@ -57,6 +58,9 @@ const DATA_DIR = process.env.STORAGE_DIR
   : path.join(ROOT_DIR, 'data');
 const store = openDatabase(DATA_DIR);
 const remote = createRemoteHub();
+// Booth password gates the interface; download password gates the photos.
+const auth = createAuth(store.kv);
+const booth = auth.requireAuth('booth');
 
 // Discovered at boot when the tunnel comes up; QR codes read it live.
 let tunnelOrigin = null;
@@ -150,7 +154,15 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-app.post('/api/photos', upload.single('file'), validateImage, (_req, res) => {
+// ── Passwords ────────────────────────────────────────────────────────────────
+// See server/auth.mjs for the model. Status and login are open by necessity;
+// changing passwords is itself booth-gated.
+
+app.get('/api/auth/status', auth.status);
+app.post('/api/auth/login', auth.login);
+app.put('/api/settings/passwords', booth, auth.updatePasswords);
+
+app.post('/api/photos', booth, upload.single('file'), validateImage, (_req, res) => {
   res.status(201).json({
     id: crypto.randomUUID(),
     url: '/api/photos/preview',
@@ -158,7 +170,7 @@ app.post('/api/photos', upload.single('file'), validateImage, (_req, res) => {
   });
 });
 
-app.post('/api/photos/composed', upload.single('file'), validateImage, async (req, res, next) => {
+app.post('/api/photos/composed', booth, upload.single('file'), validateImage, async (req, res, next) => {
   try {
     const token = crypto.randomUUID();
     const photoDownloadUrl = downloadUrl(token);
@@ -200,7 +212,7 @@ app.post('/api/photos/composed', upload.single('file'), validateImage, async (re
   }
 });
 
-app.get('/api/download/:token', (req, res) => {
+app.get('/api/download/:token', auth.requireAuth('download', 'booth'), (req, res) => {
   const photo = store.photos.get(req.params.token);
   if (!photo) return res.status(404).json({ error: 'Photo not found or link has expired' });
 
@@ -211,7 +223,7 @@ app.get('/api/download/:token', (req, res) => {
   return res.send(photo.bytes);
 });
 
-app.get('/api/preview/:token', (req, res) => {
+app.get('/api/preview/:token', auth.requireAuth('download', 'booth'), (req, res) => {
   const photo = store.photos.get(req.params.token);
   if (!photo) return res.status(404).json({ error: 'Photo not found or link has expired' });
 
@@ -220,7 +232,7 @@ app.get('/api/preview/:token', (req, res) => {
   return res.send(photo.bytes);
 });
 
-app.get('/api/qr/:token', (req, res) => {
+app.get('/api/qr/:token', booth, (req, res) => {
   const photo = store.photos.get(req.params.token);
   if (!photo?.qr) return res.status(404).json({ error: 'QR code not found' });
 
@@ -229,7 +241,7 @@ app.get('/api/qr/:token', (req, res) => {
   return res.send(photo.qr);
 });
 
-app.get('/api/photos/recent', (_req, res) => {
+app.get('/api/photos/recent', booth, (_req, res) => {
   res.json({
     photos: store.photos.recent(60).map(p => ({
       token: p.token,
@@ -243,7 +255,7 @@ app.get('/api/photos/recent', (_req, res) => {
 // The organiser drives the shutter from their phone while standing away from
 // the kiosk. See server/remote.mjs for why this is SSE rather than WebSockets.
 
-app.get('/api/remote/poll', async (req, res) => {
+app.get('/api/remote/poll', booth, async (req, res) => {
   const since = Number.parseInt(String(req.query.since ?? '0'), 10);
   const clientId = String(req.query.client ?? '');
   try {
@@ -256,7 +268,7 @@ app.get('/api/remote/poll', async (req, res) => {
   }
 });
 
-app.get('/api/remote/state', (_req, res) => {
+app.get('/api/remote/state', booth, (_req, res) => {
   res.json({
     state: remote.getState(),
     version: remote.currentVersion(),
@@ -264,7 +276,7 @@ app.get('/api/remote/state', (_req, res) => {
   });
 });
 
-app.post('/api/remote/state', (req, res) => {
+app.post('/api/remote/state', booth, (req, res) => {
   if (!req.body || typeof req.body !== 'object') {
     return res.status(400).json({ error: 'Expected a state object' });
   }
@@ -275,7 +287,7 @@ const REMOTE_ACTIONS = new Set([
   'capture', 'cancel', 'retake', 'reset',
 ]);
 
-app.post('/api/remote/command', (req, res) => {
+app.post('/api/remote/command', booth, (req, res) => {
   const action = req.body?.action;
   if (!REMOTE_ACTIONS.has(action)) {
     return res.status(400).json({
@@ -301,11 +313,11 @@ const DEFAULT_CAPTURE_SETTINGS = {
   crop: { x: 0, y: 0, w: 1, h: 1 },
 };
 
-app.get('/api/settings/capture', (_req, res) => {
+app.get('/api/settings/capture', booth, (_req, res) => {
   res.json({ settings: store.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS) });
 });
 
-app.put('/api/settings/capture', (req, res) => {
+app.put('/api/settings/capture', booth, (req, res) => {
   const incoming = req.body?.settings ?? req.body;
   if (!incoming || typeof incoming !== 'object') {
     return res.status(400).json({ error: 'Expected a settings object' });
@@ -319,7 +331,7 @@ app.put('/api/settings/capture', (req, res) => {
 
 // ── Frame catalogue ──────────────────────────────────────────────────────────
 
-app.get('/api/frames', (_req, res) => {
+app.get('/api/frames', booth, (_req, res) => {
   res.json({
     settings: store.frames.getSettings(),
     custom: store.frames.listCustom().map(f => ({
@@ -329,7 +341,7 @@ app.get('/api/frames', (_req, res) => {
   });
 });
 
-app.put('/api/frames/settings', (req, res) => {
+app.put('/api/frames/settings', booth, (req, res) => {
   if (!req.body || typeof req.body !== 'object') {
     return res.status(400).json({ error: 'Expected a settings object' });
   }
@@ -337,7 +349,7 @@ app.put('/api/frames/settings', (req, res) => {
   return res.json({ settings });
 });
 
-app.post('/api/frames', upload.single('file'), validateImage, (req, res, next) => {
+app.post('/api/frames', booth, upload.single('file'), validateImage, (req, res, next) => {
   try {
     let dateStamp = null;
     if (req.body?.dateStamp) {
@@ -358,20 +370,20 @@ app.post('/api/frames', upload.single('file'), validateImage, (req, res, next) =
   }
 });
 
-app.patch('/api/frames/:id', (req, res) => {
+app.patch('/api/frames/:id', booth, (req, res) => {
   const frame = store.frames.updateCustom(req.params.id, req.body ?? {});
   if (!frame) return res.status(404).json({ error: 'Frame not found' });
   return res.json(frame);
 });
 
-app.delete('/api/frames/:id', (req, res) => {
+app.delete('/api/frames/:id', booth, (req, res) => {
   if (!store.frames.removeCustom(req.params.id)) {
     return res.status(404).json({ error: 'Frame not found (built-in frames cannot be deleted)' });
   }
   return res.status(204).end();
 });
 
-app.get('/api/frames/:id/image', (req, res) => {
+app.get('/api/frames/:id/image', booth, (req, res) => {
   const image = store.frames.image(req.params.id);
   if (!image) return res.status(404).json({ error: 'Frame image not found' });
 
