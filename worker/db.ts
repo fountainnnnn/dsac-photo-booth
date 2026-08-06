@@ -8,10 +8,12 @@
  *    could treat a read as free; here each one is a round trip and the callers
  *    have to await.
  *  - No bytes. Photo, QR and frame artwork live in the blob store (see
- *    worker/blobs.ts); these tables carry metadata only. That is why
- *    `sweepExpired` returns the tokens it removed instead of a count — the
- *    caller needs them to delete the matching blobs, which no longer disappear
- *    for free when the row does.
+ *    worker/blobs.ts); these tables carry metadata only. So a caller deleting a
+ *    photo has two things to remove, not one: the row here and the blob beside
+ *    it, which no longer disappears for free when the row does.
+ *
+ * Nothing in here deletes on a timer. `expires_at` retires a guest's download
+ * link and nothing more — see `photos.get`.
  */
 
 export interface PhotoMeta {
@@ -69,12 +71,13 @@ export function createDb(d1: D1Database) {
     },
 
     /**
-     * Returns null for a missing or expired photo, dropping it on the way out.
+     * Returns the row, expiry and all, or null only when there is no such photo.
      *
-     * The delete-on-read matters because the sweep only runs every few hours:
-     * without it a guest could follow a stale QR code and still be handed a
-     * photo the retention promise says is gone. The blob is left to the caller,
-     * which is the one holding the blob store.
+     * This used to delete an expired row on the way out and report it missing.
+     * It no longer does: expiry now means the guest's download link has lapsed,
+     * not that the picture is gone. The operator's gallery still has to show
+     * it, so the decision of what a lapsed link means belongs to the route —
+     * which knows whether it is talking to a guest or to the booth.
      */
     async get(token: string): Promise<PhotoMeta | null> {
       const row = await d1
@@ -82,10 +85,6 @@ export function createDb(d1: D1Database) {
         .bind(token)
         .first<PhotoRow>();
       if (!row) return null;
-      if (Date.now() > new Date(row.expires_at).getTime()) {
-        await photos.delete(token);
-        return null;
-      }
       return {
         token: row.token,
         mime: row.mime,
@@ -98,24 +97,6 @@ export function createDb(d1: D1Database) {
       await d1.prepare('DELETE FROM photos WHERE token = ?').bind(token).run();
     },
 
-    /**
-     * Returns the tokens it deleted rather than a count. Selecting first and
-     * deleting second is a wider window than the original's single DELETE, but
-     * the alternative is orphaned blobs paying rent forever, and a photo that
-     * lands in that window is one written milliseconds before its own expiry.
-     */
-    async sweepExpired(): Promise<string[]> {
-      const now = new Date().toISOString();
-      const { results } = await d1
-        .prepare('SELECT token FROM photos WHERE expires_at < ?')
-        .bind(now)
-        .all<{ token: string }>();
-      const tokens = (results ?? []).map(r => r.token);
-      if (!tokens.length) return [];
-      await d1.prepare('DELETE FROM photos WHERE expires_at < ?').bind(now).run();
-      return tokens;
-    },
-
     async count(): Promise<number> {
       const row = await d1
         .prepare('SELECT COUNT(*) AS n FROM photos')
@@ -123,7 +104,11 @@ export function createDb(d1: D1Database) {
       return Number(row?.n ?? 0);
     },
 
-    /** Newest first, metadata only — the gallery never needs the bytes. */
+    /**
+     * Newest first, metadata only — the gallery never needs the bytes. Expiry
+     * comes along because the gallery lists lapsed photos too and wants to
+     * mark them, rather than pretending they were never taken.
+     */
     async recent(limit = 60): Promise<PhotoMeta[]> {
       const { results } = await d1
         .prepare(

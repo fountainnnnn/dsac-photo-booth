@@ -66,6 +66,16 @@ export interface CaptureSettings {
    */
   cropEnabled: boolean;
   crop: CameraCrop;
+  /**
+   * How long a guest's download link keeps working, with 0 meaning never
+   * expires. Hours rather than days because the shortest useful setting is
+   * shorter than a day — a company that wants the links dead by the time the
+   * afternoon's event is packed up cannot say that in whole days.
+   *
+   * This governs the link only. The photo itself stays in the gallery until an
+   * operator deletes it.
+   */
+  linkTtlHours: number;
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -77,6 +87,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   eventName: DEFAULT_EVENT_DETAILS.eventName,
   cropEnabled: false,
   crop: FULL_FRAME,
+  linkTtlHours: 168,
 };
 
 export function useCaptureSettings() {

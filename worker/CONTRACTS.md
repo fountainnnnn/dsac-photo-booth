@@ -41,11 +41,10 @@ export interface CustomFrame {
 export function createDb(d1: D1Database): {
   photos: {
     put(meta: PhotoMeta): Promise<void>;
-    /** Null for missing or expired, deleting the expired row on the way out. */
+    /** Null only when there is no such photo. Expiry is reported, not enforced. */
     get(token: string): Promise<PhotoMeta | null>;
+    /** The row only — the caller drops `photo/<token>` from the blob store. */
     delete(token: string): Promise<void>;
-    /** Returns the tokens it deleted, so the caller can drop their blobs too. */
-    sweepExpired(): Promise<string[]>;
     count(): Promise<number>;
     recent(limit?: number): Promise<PhotoMeta[]>;
   };
@@ -98,6 +97,8 @@ export type Scope = 'booth' | 'download';
 
 export function createAuth(db: Db, env: Env): {
   requireAuth(...scopes: Scope[]): MiddlewareHandler;  // hono
+  /** Which scope let a request in, for routes that treat guests differently. */
+  isAuthed(c: Context, scope: Scope): Promise<boolean>;
   login(c: Context): Promise<Response>;
   status(c: Context): Promise<Response>;
   updatePasswords(c: Context): Promise<Response>;

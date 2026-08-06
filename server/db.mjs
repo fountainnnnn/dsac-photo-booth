@@ -62,14 +62,19 @@ export function openDatabase(dir) {
       `).run(token, mime, bytes, qr ?? null, createdAt, expiresAt);
     },
 
-    /** Returns null for a missing or expired photo, dropping it on the way out. */
+    /**
+     * Returns the row, expiry and all, or null only when there is no such photo.
+     *
+     * This used to delete an expired row on the way out and report it missing.
+     * It no longer does: expiry now means the guest's download link has lapsed,
+     * not that the picture is gone. The organiser's gallery still has to show
+     * it, so the decision of what a lapsed link means belongs to the route —
+     * which knows whether it is talking to a guest or to the booth — and this
+     * layer just hands back the facts.
+     */
     get(token) {
       const row = db.prepare('SELECT * FROM photos WHERE token = ?').get(token);
       if (!row) return null;
-      if (Date.now() > new Date(row.expires_at).getTime()) {
-        photos.delete(token);
-        return null;
-      }
       return {
         token: row.token,
         mime: row.mime,
@@ -84,21 +89,24 @@ export function openDatabase(dir) {
       db.prepare('DELETE FROM photos WHERE token = ?').run(token);
     },
 
-    sweepExpired() {
-      const { changes } = db.prepare('DELETE FROM photos WHERE expires_at < ?')
-        .run(new Date().toISOString());
-      return Number(changes ?? 0);
-    },
-
     count() {
       return Number(db.prepare('SELECT COUNT(*) AS n FROM photos').get().n);
     },
 
-    /** Newest first, metadata only — the gallery never needs the bytes. */
+    /**
+     * Newest first, metadata only — the gallery never needs the bytes. Expiry
+     * comes along because the gallery lists lapsed photos too and wants to
+     * mark them, rather than pretending they were never taken.
+     */
     recent(limit = 60) {
       return db.prepare(
-        'SELECT token, mime, created_at FROM photos ORDER BY created_at DESC LIMIT ?',
-      ).all(limit).map(r => ({ token: r.token, mime: r.mime, createdAt: r.created_at }));
+        'SELECT token, mime, created_at, expires_at FROM photos ORDER BY created_at DESC LIMIT ?',
+      ).all(limit).map(r => ({
+        token: r.token,
+        mime: r.mime,
+        createdAt: r.created_at,
+        expiresAt: r.expires_at,
+      }));
     },
   };
 

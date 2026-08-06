@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowClockwise, Camera, DownloadSimple, FolderOpen, X,
+  ArrowClockwise, Camera, DownloadSimple, FolderOpen, Trash, X,
 } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 
@@ -18,6 +18,10 @@ interface RecentPhoto {
   token: string;
   createdAt: string;
   src: string;
+  /** When the guest's link stops working; null when it never does. */
+  expiresAt?: string | null;
+  /** The link has lapsed. The photo is still here — only the QR is dead. */
+  expired?: boolean;
 }
 
 export default function GalleryPage() {
@@ -63,6 +67,22 @@ export default function GalleryPage() {
     }
   }, []);
 
+  // Deleting is the only way a photo ever leaves now, so it asks first and
+  // then drops the tile locally rather than reloading — a full refetch would
+  // scroll an operator back to the top of a long evening's grid.
+  const remove = useCallback(async (photo: RecentPhoto) => {
+    if (!window.confirm('Delete this photo? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/photos/${encodeURIComponent(photo.token)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setPhotos(prev => prev.filter(p => p.token !== photo.token));
+      setZoomed(null);
+      setNote({ kind: 'ok', text: 'Photo deleted.' });
+    } catch (err) {
+      setNote({ kind: 'err', text: err instanceof Error ? err.message : 'Could not delete the photo' });
+    }
+  }, []);
+
   useEffect(() => {
     if (!zoomed) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setZoomed(null); };
@@ -88,7 +108,8 @@ export default function GalleryPage() {
             Gallery<span className="text-[var(--accent)]">.</span>
           </h1>
           <p className="mt-1 text-[0.85rem] text-[var(--ink-2)]">
-            Recent photos from this kiosk. Guests keep their copy via the QR code.
+            Every photo from this kiosk. They stay here until you delete one —
+            only the guest&rsquo;s QR link expires.
           </p>
         </div>
 
@@ -149,8 +170,15 @@ export default function GalleryPage() {
                 className="group overflow-hidden rounded-[16px] border border-[var(--border)] text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--ink-3)] hover:shadow-[0_14px_34px_-16px_rgba(11,10,12,0.3)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               >
                 <img src={photo.src} alt="" loading="lazy" className="block w-full" />
-                <span className="block px-3 py-2 text-[0.72rem] text-[var(--ink-3)]">
+                {/* The badge is deliberately quiet: a lapsed link says nothing
+                    about the photo, which is still here and still good. */}
+                <span className="flex items-center gap-2 px-3 py-2 text-[0.72rem] text-[var(--ink-3)]">
                   {stamp(photo.createdAt)}
+                  {photo.expired && (
+                    <span className="rounded-full bg-[var(--shell-bg)] px-2 py-0.5 text-[0.66rem] font-semibold text-[var(--ink-3)]">
+                      Link expired
+                    </span>
+                  )}
                 </span>
               </button>
             ))}
@@ -158,8 +186,8 @@ export default function GalleryPage() {
         )}
       </div>
 
-      {/* Full-screen viewer, with the one action worth having here: save a
-          copy to this machine's Downloads. */}
+      {/* Full-screen viewer, with the two actions worth having here: save a
+          copy to this machine's Downloads, or take the photo out for good. */}
       {zoomed && (
         <div
           role="dialog" aria-modal="true" aria-label="Photo, full screen"
@@ -186,13 +214,25 @@ export default function GalleryPage() {
           />
 
           <div className="flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
-            <a
-              href={`/api/download/${encodeURIComponent(zoomed.token)}`}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-6 text-[0.85rem] font-semibold text-white transition hover:bg-[var(--accent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-            >
-              <DownloadSimple size={17} />
-              Save
-            </a>
+            {/* Save stays the filled one. Deleting is permanent, so it sits
+                beside it as an outline — reachable, but never the button a
+                tired operator hits by reflex. */}
+            <div className="flex items-center gap-3">
+              <a
+                href={`/api/download/${encodeURIComponent(zoomed.token)}`}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-6 text-[0.85rem] font-semibold text-white transition hover:bg-[var(--accent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              >
+                <DownloadSimple size={17} />
+                Save
+              </a>
+              <button
+                type="button" onClick={() => void remove(zoomed)}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/25 px-6 text-[0.85rem] font-semibold text-white/75 transition hover:border-white/50 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              >
+                <Trash size={17} />
+                Delete
+              </button>
+            </div>
             <p className="text-[0.8rem] text-white/55">
               {stamp(zoomed.createdAt)} · press Esc to close
             </p>

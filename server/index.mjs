@@ -52,9 +52,22 @@ const ACCEPTED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 // fixed artboard: a 4K webcam writes a ~4600px JPEG, which 10 MB would reject
 // and the guest would watch the upload fail after the shutter had already gone.
 const MAX_BYTES = 64 * 1024 * 1024;
-// How long a download link stays live before it is swept away.
+// How long a guest's download link stays live, when nothing in Settings says
+// otherwise. It is only the fallback now: link validity is a capture setting
+// (`linkTtlHours`), so an operator can change it mid-event without a restart.
+// It has never meant "delete the photo" and no longer looks like it might.
 const PHOTO_TTL_DAYS = Number.parseFloat(process.env.PHOTO_TTL_DAYS ?? '7');
-const TTL_MS = PHOTO_TTL_DAYS * 24 * 60 * 60 * 1000;
+const FALLBACK_TTL_HOURS = (Number.isFinite(PHOTO_TTL_DAYS) ? PHOTO_TTL_DAYS : 7) * 24;
+
+/**
+ * A link that never lapses still needs a timestamp: `expires_at` is NOT NULL in
+ * both stores, and making it nullable is a migration on two databases to
+ * express something a date already can. So "never" is a date no event will
+ * outlive, and every expiry check is an ordinary comparison.
+ */
+const NEVER_EXPIRES = '9999-12-31T23:59:59.999Z';
+
+const hasExpired = (expiresAt) => Date.now() > new Date(expiresAt).getTime();
 
 // One SQLite file holds photos, uploaded frames, and every setting.
 const DATA_DIR = process.env.STORAGE_DIR
@@ -66,11 +79,11 @@ const remote = createRemoteHub();
 /**
  * The organiser's own copy of the event, as ordinary files.
  *
- * The database is the guest-facing side: rows there carry the QR link and are
- * swept away once the TTL passes. These files are the archive and are never
- * touched by the sweep — the whole point is that the folder still holds the
- * event's photos after every download link has expired. Deleting them is a
- * job for the organiser and Finder/Explorer, not for the booth.
+ * The database is the guest-facing side: rows there carry the QR link, which
+ * lapses on its own. These files are the archive, and no clock touches them —
+ * the whole point is that the folder still holds the event's photos after
+ * every download link has expired. Only an explicit delete removes one, and
+ * it removes both copies at once so the gallery and the folder cannot drift.
  */
 const PHOTOS_DIR = path.join(DATA_DIR, 'photos');
 fs.mkdirSync(PHOTOS_DIR, { recursive: true });
@@ -219,14 +232,14 @@ app.post('/api/photos/composed', booth, upload.single('file'), validateImage, as
     });
 
     const createdAt = new Date();
-    const expiresAt = new Date(createdAt.getTime() + TTL_MS);
+    const expiresAt = linkExpiresAt(createdAt);
     store.photos.put({
       token,
       mime: req.file.mimetype,
       bytes: req.file.buffer,
       qr: qrBuffer,
       createdAt: createdAt.toISOString(),
-      expiresAt: expiresAt.toISOString(),
+      expiresAt,
     });
 
     // Second copy, on disk, outliving the row above.
@@ -245,16 +258,33 @@ app.post('/api/photos/composed', booth, upload.single('file'), validateImage, as
       downloadUrl: photoDownloadUrl,
       qrUrl: qrUrl(token),
       linkedInShareUrl: linkedInShareUrl(token),
-      expiresAt: expiresAt.toISOString(),
+      expiresAt,
     });
   } catch (err) {
     next(err);
   }
 });
 
+/**
+ * A lapsed link is the guest's problem, never the operator's.
+ *
+ * Both routes below admit two kinds of caller: the guest who scanned the QR
+ * (download scope) and the operator paging through the gallery (booth scope).
+ * The photo itself is kept either way — expiry only retires the link — so the
+ * guest gets a plain 410 while the booth is waved through on the same URL.
+ * Returns a truthy reason when the request must be refused.
+ */
+function expiredForGuest(req, photo) {
+  if (!hasExpired(photo.expiresAt)) return false;
+  return !auth.isAuthed(req, 'booth');
+}
+
+const GONE = { error: 'This download link has expired. Ask the booth crew for a new one.' };
+
 app.get('/api/download/:token', auth.requireAuth('download', 'booth'), (req, res) => {
   const photo = store.photos.get(req.params.token);
-  if (!photo) return res.status(404).json({ error: 'Photo not found or link has expired' });
+  if (!photo) return res.status(404).json({ error: 'Photo not found' });
+  if (expiredForGuest(req, photo)) return res.status(410).json(GONE);
 
   const ext = `.${extForMime(photo.mime)}`;
   res.setHeader('Content-Type', photo.mime);
@@ -265,30 +295,75 @@ app.get('/api/download/:token', auth.requireAuth('download', 'booth'), (req, res
 
 app.get('/api/preview/:token', auth.requireAuth('download', 'booth'), (req, res) => {
   const photo = store.photos.get(req.params.token);
-  if (!photo) return res.status(404).json({ error: 'Photo not found or link has expired' });
+  if (!photo) return res.status(404).json({ error: 'Photo not found' });
+  if (expiredForGuest(req, photo)) return res.status(410).json(GONE);
 
   res.setHeader('Content-Type', photo.mime);
   res.setHeader('Cache-Control', 'public, max-age=86400');
   return res.send(photo.bytes);
 });
 
+// The QR code *is* the link, so it lapses with it — though in practice the
+// booth gate means only an operator ever gets this far.
 app.get('/api/qr/:token', booth, (req, res) => {
   const photo = store.photos.get(req.params.token);
   if (!photo?.qr) return res.status(404).json({ error: 'QR code not found' });
+  if (expiredForGuest(req, photo)) return res.status(410).json(GONE);
 
   res.setHeader('Content-Type', 'image/png');
   res.setHeader('Cache-Control', 'public, max-age=86400');
   return res.send(photo.qr);
 });
 
+/**
+ * The whole event, newest first — lapsed links included.
+ *
+ * Nothing is filtered out here: photos are kept until an operator deletes one
+ * by hand, so a gallery that hid expired rows would be hiding pictures that
+ * still exist. `expired` is the flag the UI marks them with. The limit is
+ * generous because this is the only view of the event the operator has.
+ */
 app.get('/api/photos/recent', booth, (_req, res) => {
   res.json({
-    photos: store.photos.recent(60).map(p => ({
+    photos: store.photos.recent(200).map(p => ({
       token: p.token,
       createdAt: p.createdAt,
+      expiresAt: p.expiresAt,
+      expired: hasExpired(p.expiresAt),
       src: `/api/preview/${encodeURIComponent(p.token)}`,
     })),
   });
+});
+
+/**
+ * Delete one photo, for good — the row, and the archive file beside it.
+ *
+ * Retention is manual now, so this is the only thing that removes a picture.
+ * The archive name embeds a capture timestamp we no longer have in hand, so
+ * the file is found by scanning the folder for the token fragment the name
+ * ends with. A booth's folder holds an event's worth of photos, not a
+ * library's, so a readdir is cheaper than storing the name to avoid it.
+ */
+app.delete('/api/photos/:token', booth, (req, res) => {
+  const { token } = req.params;
+  if (!store.photos.get(token)) return res.status(404).json({ error: 'Photo not found' });
+
+  store.photos.delete(token);
+
+  const suffix = `-${token.slice(0, 8)}.`;
+  try {
+    for (const name of fs.readdirSync(PHOTOS_DIR)) {
+      if (name.startsWith('dsac-') && name.includes(suffix)) {
+        fs.rmSync(path.join(PHOTOS_DIR, name), { force: true });
+      }
+    }
+  } catch (err) {
+    // The row is gone, which is what the operator asked for; a stranded file
+    // is a folder they can see and clean up themselves.
+    console.error(`  Could not remove the archive copy of ${token}: ${err.message}`);
+  }
+
+  return res.status(204).end();
 });
 
 /**
@@ -382,7 +457,24 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // region is kept either way so switching back does not lose the framing.
   cropEnabled: false,
   crop: { x: 0, y: 0, w: 1, h: 1 },
+  // How long a guest's download link stays good for. 0 means it never lapses.
+  // This is about the link only — the photo is kept until someone deletes it.
+  linkTtlHours: 168,
 };
+
+/**
+ * When a link handed out right now should stop working, read from the setting
+ * as it stands at this moment rather than from whatever the process booted
+ * with. An operator who shortens the window mid-event means the next photo,
+ * not the next restart.
+ */
+function linkExpiresAt(createdAt) {
+  const stored = store.kv.get('captureSettings', {});
+  const hours = Number(stored?.linkTtlHours ?? FALLBACK_TTL_HOURS);
+  const usable = Number.isFinite(hours) && hours >= 0 ? hours : FALLBACK_TTL_HOURS;
+  if (usable === 0) return NEVER_EXPIRES;
+  return new Date(createdAt.getTime() + usable * 60 * 60 * 1000).toISOString();
+}
 
 app.get('/api/settings/capture', booth, (_req, res) => {
   res.json({ settings: store.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS) });
@@ -502,9 +594,13 @@ app.get('/api/frames/:id/image', booth, (req, res) => {
   return res.send(image.buffer);
 });
 
+// Open to the world, because LinkedIn's crawler has no cookie to send. That
+// makes every caller a guest unless they happen to be the operator, so the
+// lapsed-link rule applies here as it does on the download itself.
 app.get('/api/share/:token', (req, res) => {
   const photo = store.photos.get(req.params.token);
   if (!photo) return res.status(404).send('Photo not found');
+  if (expiredForGuest(req, photo)) return res.status(410).send(GONE.error);
 
   const safeTitle = 'My AI Learning Journey at SP DSAC';
   const safeDescription = 'A photo from the Singapore Polytechnic Data Science and Analytics Centre AI Learning Journey.';
@@ -571,9 +667,10 @@ app.use((err, _req, res, next) => {
   return res.status(500).json({ error: 'Unexpected server error' });
 });
 
-// Drop anything already past its TTL on boot, then keep sweeping periodically.
-store.photos.sweepExpired();
-setInterval(() => store.photos.sweepExpired(), 6 * 60 * 60 * 1000).unref();
+// There is no sweep any more. Expiry retires a guest's download link and does
+// nothing else: photos stay until an operator deletes one from the gallery
+// (DELETE /api/photos/:token). Losing an event's pictures to a clock nobody
+// was watching cost more than the disk they sit on ever will.
 
 const banner = (label, value) => console.log(`  ${label.padEnd(20)} ${value}`);
 
@@ -606,7 +703,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
   banner('Database', store.file);
   banner('Photos stored', `${store.photos.count()}`);
   banner('Photo folder', PHOTOS_DIR);
-  banner('Retention', `${PHOTO_TTL_DAYS} day(s)`);
+  banner('Link validity', `${FALLBACK_TTL_HOURS} hour(s) by default, set in Settings`);
+  banner('Retention', 'manual — photos are kept until deleted');
   banner('Frontend', SERVES_FRONTEND ? 'served from ./dist' : 'dev server (Vite)');
 
   // The booth runs on a laptop now, with nothing hosting it. The tunnel is

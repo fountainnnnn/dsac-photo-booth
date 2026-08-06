@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import QRCode from 'qrcode';
 import type { Env } from './env';
@@ -17,7 +18,7 @@ export { RemoteHub } from './remote';
  *
  * Three things genuinely differ:
  *
- *  - There is no long-lived process, so the TTL sweep is a cron trigger and
+ *  - There is no long-lived process, so the session sweep is a cron trigger and
  *    the remote hub is a Durable Object rather than module state.
  *  - There is no filesystem, so photo bytes go to a blob store and the
  *    organiser's local archive (and the button that opened it) cannot exist.
@@ -38,9 +39,28 @@ const DEFAULT_CAPTURE_SETTINGS = {
   cameraDeviceId: '',
   cropEnabled: false,
   crop: { x: 0, y: 0, w: 1, h: 1 },
+  // How long a guest's download link stays good for. 0 means it never lapses.
+  // This is about the link only — the photo is kept until someone deletes it.
+  linkTtlHours: 168,
 };
 
-type Ctx = { Bindings: Env };
+/**
+ * A link that never lapses still needs a timestamp: `expires_at` is NOT NULL in
+ * both stores, and making it nullable is a migration on two databases to
+ * express something a date already can. So "never" is a date no event will
+ * outlive, and every expiry check is an ordinary comparison.
+ */
+const NEVER_EXPIRES = '9999-12-31T23:59:59.999Z';
+
+const hasExpired = (expiresAt: string) => Date.now() > new Date(expiresAt).getTime();
+
+/**
+ * The per-request wiring is stashed on the context rather than rebuilt in each
+ * handler, so `Variables` carries its type and every `c` below stays checked.
+ */
+type Services = ReturnType<typeof services>;
+type Ctx = { Bindings: Env; Variables: { svc: Services } };
+type C = Context<Ctx>;
 
 const app = new Hono<Ctx>();
 
@@ -60,17 +80,45 @@ function origin(c: { req: { url: string }; env: Env }): string {
   return new URL(c.req.url).origin;
 }
 
-const downloadUrl = (c: any, token: string) =>
+const downloadUrl = (c: C, token: string) =>
   `${origin(c)}/download/${encodeURIComponent(token)}`;
-const sharePreviewUrl = (c: any, token: string) =>
+const sharePreviewUrl = (c: C, token: string) =>
   `${origin(c)}/api/share/${encodeURIComponent(token)}`;
-const linkedInShareUrl = (c: any, token: string) =>
+const linkedInShareUrl = (c: C, token: string) =>
   `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(sharePreviewUrl(c, token))}`;
 
-function ttlMs(env: Env): number {
-  const days = Number.parseFloat(env.PHOTO_TTL_DAYS ?? '7');
-  return (Number.isFinite(days) ? days : 7) * 24 * 60 * 60 * 1000;
+/**
+ * When a link handed out right now should stop working, read from the setting
+ * as it stands at this moment rather than from a value fixed at deploy time.
+ * An operator who shortens the window mid-event means the next photo, not the
+ * next deployment. PHOTO_TTL_DAYS survives only as the fallback for a booth
+ * whose settings have never been written.
+ */
+async function linkExpiresAt(c: C, createdAt: Date): Promise<string> {
+  const days = Number.parseFloat(c.env.PHOTO_TTL_DAYS ?? '7');
+  const fallbackHours = (Number.isFinite(days) ? days : 7) * 24;
+
+  const stored = await svc(c).db.kv.get<Record<string, unknown>>('captureSettings', {});
+  const hours = Number(stored?.linkTtlHours ?? fallbackHours);
+  const usable = Number.isFinite(hours) && hours >= 0 ? hours : fallbackHours;
+  if (usable === 0) return NEVER_EXPIRES;
+  return new Date(createdAt.getTime() + usable * 60 * 60 * 1000).toISOString();
 }
+
+/**
+ * A lapsed link is the guest's problem, never the operator's.
+ *
+ * The photo-serving routes admit two kinds of caller: the guest who scanned
+ * the QR (download scope) and the operator paging through the gallery (booth
+ * scope). The photo is kept either way — expiry only retires the link — so the
+ * guest gets a plain 410 while the booth is waved through on the same URL.
+ */
+async function expiredForGuest(c: C, expiresAt: string): Promise<boolean> {
+  if (!hasExpired(expiresAt)) return false;
+  return !(await svc(c).auth.isAuthed(c, 'booth'));
+}
+
+const GONE = { error: 'This download link has expired. Ask the booth crew for a new one.' };
 
 function escapeHtml(value: unknown): string {
   return String(value)
@@ -82,7 +130,7 @@ function escapeHtml(value: unknown): string {
 }
 
 /** The uploaded image, or a Response explaining why it is not usable. */
-async function readImage(c: any): Promise<File | Response> {
+async function readImage(c: C): Promise<File | Response> {
   const form = await c.req.formData().catch(() => null);
   const file = form?.get('file');
   if (!(file instanceof File)) {
@@ -104,12 +152,12 @@ function services(env: Env) {
 }
 
 app.use('/api/*', async (c, next) => {
-  c.set('svc' as never, services(c.env) as never);
+  c.set('svc', services(c.env));
   await next();
 });
 
-const svc = (c: any) => c.get('svc') as ReturnType<typeof services>;
-const booth = (c: any, next: any) => svc(c).auth.requireAuth('booth')(c, next);
+const svc = (c: C): Services => c.get('svc');
+const booth: MiddlewareHandler<Ctx> = (c, next) => svc(c).auth.requireAuth('booth')(c, next);
 
 // ── Health ───────────────────────────────────────────────────────────────────
 
@@ -137,7 +185,7 @@ app.post('/api/photos/composed', booth, async (c) => {
   const { db, blobs } = svc(c);
   const token = crypto.randomUUID();
   const createdAt = new Date();
-  const expiresAt = new Date(createdAt.getTime() + ttlMs(c.env));
+  const expiresAt = await linkExpiresAt(c, createdAt);
 
   // Bytes first, then the row: a row without bytes is a broken photo, whereas
   // bytes without a row are merely storage nobody can reach.
@@ -159,7 +207,7 @@ app.post('/api/photos/composed', booth, async (c) => {
     token,
     mime: file.type,
     createdAt: createdAt.toISOString(),
-    expiresAt: expiresAt.toISOString(),
+    expiresAt,
   });
 
   // Tell the organiser's phone the shot has landed, so it can offer a retake.
@@ -173,19 +221,20 @@ app.post('/api/photos/composed', booth, async (c) => {
     downloadUrl: url,
     qrUrl: `${origin(c)}/api/qr/${encodeURIComponent(token)}`,
     linkedInShareUrl: linkedInShareUrl(c, token),
-    expiresAt: expiresAt.toISOString(),
+    expiresAt,
   }, 201);
 });
 
 /** Shared by the download and preview routes, which differ only in disposition. */
-async function servePhoto(c: any, attach: boolean) {
+async function servePhoto(c: C, attach: boolean) {
   const { db, blobs } = svc(c);
   const token = c.req.param('token');
   const meta = await db.photos.get(token);
-  if (!meta) return c.json({ error: 'Photo not found or link has expired' }, 404);
+  if (!meta) return c.json({ error: 'Photo not found' }, 404);
+  if (await expiredForGuest(c, meta.expiresAt)) return c.json(GONE, 410);
 
   const blob = await blobs.get(`photo/${token}`);
-  if (!blob) return c.json({ error: 'Photo not found or link has expired' }, 404);
+  if (!blob) return c.json({ error: 'Photo not found' }, 404);
 
   const ext = meta.mime === 'image/png' ? 'png' : meta.mime === 'image/webp' ? 'webp' : 'jpg';
   const headers: Record<string, string> = {
@@ -196,9 +245,9 @@ async function servePhoto(c: any, attach: boolean) {
   return new Response(blob.body as BodyInit, { headers });
 }
 
-app.get('/api/download/:token', (c, next) => svc(c).auth.requireAuth('download', 'booth')(c, next),
+app.get('/api/download/:token', ((c, next) => svc(c).auth.requireAuth('download', 'booth')(c, next)) as MiddlewareHandler<Ctx>,
   (c) => servePhoto(c, true));
-app.get('/api/preview/:token', (c, next) => svc(c).auth.requireAuth('download', 'booth')(c, next),
+app.get('/api/preview/:token', ((c, next) => svc(c).auth.requireAuth('download', 'booth')(c, next)) as MiddlewareHandler<Ctx>,
   (c) => servePhoto(c, false));
 
 /**
@@ -213,9 +262,11 @@ app.get('/api/preview/:token', (c, next) => svc(c).auth.requireAuth('download', 
  */
 app.get('/api/qr/:token', booth, async (c) => {
   const token = c.req.param('token');
-  if (!(await svc(c).db.photos.get(token))) {
-    return c.json({ error: 'QR code not found' }, 404);
-  }
+  const meta = await svc(c).db.photos.get(token);
+  if (!meta) return c.json({ error: 'QR code not found' }, 404);
+  // The QR code *is* the link, so it lapses with it — though in practice the
+  // booth gate means only an operator ever gets this far.
+  if (await expiredForGuest(c, meta.expiresAt)) return c.json(GONE, 410);
   const svg = await QRCode.toString(downloadUrl(c, token), {
     type: 'svg', width: 512, margin: 2, color: { dark: '#18181b', light: '#FFFFFF' },
   });
@@ -224,15 +275,42 @@ app.get('/api/qr/:token', booth, async (c) => {
   });
 });
 
+/**
+ * The whole event, newest first — lapsed links included.
+ *
+ * Nothing is filtered out here: photos are kept until an operator deletes one
+ * by hand, so a gallery that hid expired rows would be hiding pictures that
+ * still exist. `expired` is the flag the UI marks them with. The limit is
+ * generous because this is the only view of the event the operator has.
+ */
 app.get('/api/photos/recent', booth, async (c) => {
-  const photos = await svc(c).db.photos.recent(60);
+  const photos = await svc(c).db.photos.recent(200);
   return c.json({
     photos: photos.map(p => ({
       token: p.token,
       createdAt: p.createdAt,
+      expiresAt: p.expiresAt,
+      expired: hasExpired(p.expiresAt),
       src: `/api/preview/${encodeURIComponent(p.token)}`,
     })),
   });
+});
+
+/**
+ * Delete one photo, for good — the row and the bytes beside it.
+ *
+ * Retention is manual now, so this is the only thing that removes a picture.
+ * Row first, then the blob: a blob nobody has a row for is unreachable
+ * storage, whereas a row whose blob is gone is a broken photo in the gallery.
+ */
+app.delete('/api/photos/:token', booth, async (c) => {
+  const token = c.req.param('token');
+  const { db, blobs } = svc(c);
+  if (!(await db.photos.get(token))) return c.json({ error: 'Photo not found' }, 404);
+
+  await db.photos.delete(token);
+  await blobs.delete(`photo/${token}`).catch(() => { /* the row is gone; a stray blob is harmless */ });
+  return c.body(null, 204);
 });
 
 /**
@@ -251,11 +329,11 @@ app.post('/api/gallery/open-folder', booth, (c) => c.json({
 // One hub, so one Durable Object instance: every kiosk and phone must land on
 // the same object or a held poll would never see the other's command.
 
-function remoteStub(c: any) {
+function remoteStub(c: C) {
   return c.env.REMOTE.get(c.env.REMOTE.idFromName('booth'));
 }
 
-async function remoteFetch(c: any, method: string, path: string, body?: unknown) {
+async function remoteFetch(c: C, method: string, path: string, body?: unknown) {
   return remoteStub(c).fetch(`https://remote${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
@@ -275,7 +353,7 @@ app.post('/api/remote/state', booth, async (c) =>
 const REMOTE_ACTIONS = new Set(['capture', 'cancel', 'retake', 'reset']);
 
 app.post('/api/remote/command', booth, async (c) => {
-  const body = await c.req.json().catch(() => null) as any;
+  const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
   if (!REMOTE_ACTIONS.has(body?.action)) {
     return c.json({
       error: `Unknown action. Expected one of: ${[...REMOTE_ACTIONS].join(', ')}`,
@@ -291,7 +369,7 @@ app.get('/api/settings/capture', booth, async (c) =>
   c.json({ settings: await svc(c).db.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS) }));
 
 app.put('/api/settings/capture', booth, async (c) => {
-  const body = await c.req.json().catch(() => null) as any;
+  const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
   const incoming = body?.settings ?? body;
   if (!incoming || typeof incoming !== 'object') {
     return c.json({ error: 'Expected a settings object' }, 400);
@@ -311,11 +389,11 @@ app.get('/api/settings/presets', booth, async (c) =>
   c.json({ presets: await svc(c).db.kv.get('capturePresets', [] as unknown[]) }));
 
 app.put('/api/settings/presets', booth, async (c) => {
-  const body = await c.req.json().catch(() => null) as any;
+  const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
   const incoming = body?.presets ?? body;
   if (!Array.isArray(incoming)) return c.json({ error: 'Expected a presets array' }, 400);
 
-  const presets = incoming.slice(0, MAX_PRESETS).map((p: any) => ({
+  const presets = incoming.slice(0, MAX_PRESETS).map((p: Record<string, unknown>) => ({
     id: String(p?.id ?? crypto.randomUUID()),
     name: String(p?.name ?? 'Preset').slice(0, MAX_PRESET_NAME),
     createdAt: String(p?.createdAt ?? new Date().toISOString()),
@@ -337,7 +415,7 @@ app.get('/api/frames', booth, async (c) => {
 });
 
 app.put('/api/frames/settings', booth, async (c) => {
-  const body = await c.req.json().catch(() => null) as any;
+  const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
   if (!body || typeof body !== 'object') return c.json({ error: 'Expected a settings object' }, 400);
   return c.json({ settings: await svc(c).db.frames.setSettings(body.settings ?? body) });
 });
@@ -390,9 +468,14 @@ app.get('/api/frames/:id/image', booth, async (c) => {
 
 // ── LinkedIn share preview ───────────────────────────────────────────────────
 
+// Open to the world, because LinkedIn's crawler has no cookie to send. That
+// makes every caller a guest unless they happen to be the operator, so the
+// lapsed-link rule applies here as it does on the download itself.
 app.get('/api/share/:token', async (c) => {
   const token = c.req.param('token');
-  if (!(await svc(c).db.photos.get(token))) return c.text('Photo not found', 404);
+  const meta = await svc(c).db.photos.get(token);
+  if (!meta) return c.text('Photo not found', 404);
+  if (await expiredForGuest(c, meta.expiresAt)) return c.text(GONE.error, 410);
 
   const title = 'My AI Learning Journey at SP DSAC';
   const description = 'A photo from the Singapore Polytechnic Data Science and Analytics Centre AI Learning Journey.';
@@ -443,24 +526,19 @@ export default {
   fetch: app.fetch,
 
   /**
-   * The sweep that used to be a setInterval in a process that never exited.
+   * Housekeeping only — no photo has ever been deleted from here again.
    *
-   * Blob deletion is driven by the tokens the database hands back, so the two
-   * stores cannot drift: a row without bytes is a broken photo, and bytes
-   * without a row are storage nobody can reach.
+   * This used to drop expired photos and their blobs. Retention is manual now:
+   * an expiry retires a guest's download link, and the picture stays until an
+   * operator deletes it (DELETE /api/photos/:token). Losing an event's photos
+   * to a clock nobody was watching cost more than the storage they sit in.
+   *
+   * Sessions are a different matter. They are rows nobody will ever ask for
+   * again — `tokenValid` already refuses an expired one — so the table would
+   * otherwise grow without bound across a long-running deployment.
    */
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
-    const db = createDb(env.DB);
-    const blobs = createBlobStore(env);
-    const auth = createAuth(db, env);
-
-    ctx.waitUntil((async () => {
-      const tokens = await db.photos.sweepExpired();
-      for (const token of tokens) {
-        await blobs.delete(`photo/${token}`).catch(() => { /* already gone */ });
-      }
-      await auth.sweepSessions();
-      if (tokens.length) console.log(`Swept ${tokens.length} expired photo(s)`);
-    })());
+    const auth = createAuth(createDb(env.DB), env);
+    ctx.waitUntil(auth.sweepSessions());
   },
 } satisfies ExportedHandler<Env>;

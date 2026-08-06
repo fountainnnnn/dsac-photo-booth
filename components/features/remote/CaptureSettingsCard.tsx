@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowCounterClockwise, ArrowDown, ArrowLeft, ArrowRight, ArrowUp,
-  CircleHalf, Drop, Palette, Sun, Timer as TimerIcon,
+  CircleHalf, Drop, LinkSimple, Palette, Sun, Timer as TimerIcon,
 } from '@phosphor-icons/react';
 import { useCaptureSettings, type CaptureSettings } from './useCaptureSettings';
 import { DEFAULT_FILTERS, DEFAULT_RAMP, filtersAreNeutral } from '@/types/editor';
 import type { LookRamp, ImageFilters } from '@/types/editor';
 
 const TIMER_OPTIONS = [0, 3, 5, 10] as const;
+
+/** Link lifetimes worth a button, shortest first, with 0 meaning never. */
+const LINK_TTL_OPTIONS: { hours: number; label: string }[] = [
+  { hours: 1,   label: '1 hour' },
+  { hours: 6,   label: '6 hours' },
+  { hours: 24,  label: '1 day' },
+  { hours: 168, label: '7 days' },
+  { hours: 0,   label: 'Never' },
+];
 
 /** Which edge the ramp starts from, in the order they sit on screen. */
 /** The arrow points the way the effect fades: ↓ is strong at the top, gone at
@@ -98,6 +107,35 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
               }`}
             >
               {s === 0 ? 'Off' : `${s}s`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Expiry and deletion are two different things, and an operator has no
+          reason to assume so — the helper line spends its one sentence on that
+          rather than on restating the buttons. */}
+      <div className="mt-6">
+        <p className="mb-1.5 flex items-center gap-1.5 text-[0.78rem] font-semibold text-[var(--ink-2)]">
+          <LinkSimple size={15} /> Download link
+        </p>
+        <p className="mb-3 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+          How long a guest&rsquo;s QR link keeps working. The photo itself stays
+          in the gallery either way, until you delete it there.
+        </p>
+        <div className="flex gap-2">
+          {LINK_TTL_OPTIONS.map(o => (
+            <button
+              key={o.hours} type="button" disabled={loading}
+              aria-pressed={settings.linkTtlHours === o.hours}
+              onClick={() => push({ ...settings, linkTtlHours: o.hours })}
+              className={`min-h-11 flex-1 rounded-xl text-[0.82rem] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                settings.linkTtlHours === o.hours
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'border border-[var(--border)] bg-white text-[var(--ink-2)] hover:border-[var(--ink-3)]'
+              }`}
+            >
+              {o.label}
             </button>
           ))}
         </div>

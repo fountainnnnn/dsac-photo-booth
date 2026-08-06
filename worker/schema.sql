@@ -20,8 +20,10 @@ CREATE TABLE IF NOT EXISTS photos (
   expires_at TEXT NOT NULL
 );
 
--- The sweep runs on a range scan over expires_at; without this it is a table
--- scan of the whole event every few hours.
+-- Kept from when a cron sweep ranged over expires_at. Nothing does now —
+-- expiry retires a download link and never deletes a photo — but the index
+-- costs little and dropping it would be a migration against live databases
+-- for no gain.
 CREATE INDEX IF NOT EXISTS photos_expires ON photos (expires_at);
 
 CREATE TABLE IF NOT EXISTS custom_frames (
@@ -42,7 +44,8 @@ CREATE TABLE IF NOT EXISTS kv (
 
 -- Sessions were a Map in the Node build. Isolates share no memory, so a login
 -- handled by one of them has to be visible to all the others; that means a
--- table. Rows are swept by the same cron that expires photos.
+-- table. The cron trigger sweeps these rows — they are the only thing it
+-- deletes now that photo retention is manual.
 CREATE TABLE IF NOT EXISTS sessions (
   token      TEXT PRIMARY KEY,
   scope      TEXT NOT NULL,

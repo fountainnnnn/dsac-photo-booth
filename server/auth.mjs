@@ -143,5 +143,9 @@ export function createAuth(kv) {
     return status(req, res);
   }
 
-  return { requireAuth, login, status, updatePasswords };
+  // `isAuthed` is exported as well as used by the middleware: routes that are
+  // reachable by either scope sometimes need to know *which* one let the
+  // request in. A guest holding a lapsed download link is turned away where
+  // the operator, on the same URL, is not.
+  return { requireAuth, isAuthed, login, status, updatePasswords };
 }

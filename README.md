@@ -80,9 +80,11 @@ starts, then points a window at it. Nothing in the booth knows it is inside
 Electron, so the CLI and the packaged app stay the same program.
 
 One SQLite file (via `node:sqlite`, hence Node 22+) holds photos, uploaded
-frames, and every setting. Download links expire after `PHOTO_TTL_DAYS`
-(default 7), after which the photo and its QR are swept. No emails are
-collected.
+frames, and every setting. Download links expire after the `linkTtlHours`
+capture setting (default 168, i.e. 7 days; 0 means never), falling back to
+`PHOTO_TTL_DAYS` when that setting has never been written. Expiry only retires
+the guest's link — photos are kept until an operator deletes one from the
+gallery. No emails are collected.
 
 Frame artwork lives in `public/frames/` at 1921x1201, each with a transparent
 cut-out the photo is drawn into — the frame wraps the photo rather than
