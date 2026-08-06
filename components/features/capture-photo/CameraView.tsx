@@ -9,6 +9,7 @@ import {
 } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useLivePreview, drawPhoto } from './useLivePreview';
+import { cameraConstraints, raiseToMaxResolution } from './cameras';
 import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
 import { useCaptureSettings, unmirrorCrop } from '@/components/features/remote/useCaptureSettings';
 import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
@@ -21,7 +22,6 @@ import {
 type PermissionStatus = 'prompt' | 'granted' | 'denied' | 'unsupported';
 
 export interface CameraViewProps {
-  facingMode?: 'user' | 'environment';
   onCapture: (blob: Blob, dataUrl: string) => void;
   onError?: (error: Error) => void;
   /** Fired when the phone remote asks to retake, so the flow can reset. */
@@ -52,7 +52,7 @@ function isDrawable(img: HTMLImageElement | undefined): img is HTMLImageElement 
   return !!img && img.complete && img.naturalWidth > 0;
 }
 
-export default function CameraView({ facingMode = 'user', onCapture, onError, onRetake }: CameraViewProps) {
+export default function CameraView({ onCapture, onError, onRetake }: CameraViewProps) {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
@@ -81,6 +81,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     reload: reloadSettings,
   } = useCaptureSettings();
   const filters = captureSettings.filters;
+  const cameraDeviceId = captureSettings.cameraDeviceId;
   const lookRamp = captureSettings.lookRamp;
   const timerSecs = captureSettings.timerSecs;
   // The region of the camera actually used, flipped back into the camera's own
@@ -122,16 +123,15 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
         // cost us: webcams are 16:9, so a browser that honours it crops away
         // field of view, and one that ignores it hands back 16:9 anyway. Take
         // the camera's native shape and let the stage adapt to it.
-        //
-        // The size is asked for absurdly large on purpose. `ideal` is a target
-        // the browser clamps to whatever the device can actually do, so this
-        // reads "give me everything you have" — 1080p from a 1080p webcam, 4K
-        // from a 4K one. Dropping the constraint entirely would be the
-        // opposite: cameras then hand back their *default* mode, which is
-        // routinely 640x480.
-        video: { facingMode, width: { ideal: 7680 }, height: { ideal: 4320 } },
+        video: cameraConstraints(cameraDeviceId),
         audio: false,
       });
+      // `ideal` only asks the browser to land *near* the target, and cameras
+      // under-report what they can do — so walk a ladder of real modes and
+      // keep the largest one that is actually accepted. This is what gets 4K
+      // out of a webcam that advertises 1080p.
+      await raiseToMaxResolution(stream);
+
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
       setPermission('granted');
@@ -147,7 +147,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
       }
       onError?.(error);
     }
-  }, [facingMode, onError]);
+  }, [cameraDeviceId, onError]);
 
   useEffect(() => {
     queueMicrotask(() => { void startCamera(); });

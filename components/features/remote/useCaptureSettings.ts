@@ -51,6 +51,12 @@ export interface CaptureSettings {
    * express a ramp — it is painted as a second layer at draw time.
    */
   lookRamp: LookRamp;
+  /**
+   * Which camera to shoot with, as a MediaDevices deviceId. Empty means the
+   * browser's default — the built-in one on a laptop, which is rarely the
+   * best camera present at an event.
+   */
+  cameraDeviceId: string;
   /** Printed on frames that do not bake their own caption. */
   eventName: string;
   /**
@@ -67,6 +73,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   selectedFrameId: '',
   filters: DEFAULT_FILTERS,
   lookRamp: DEFAULT_RAMP,
+  cameraDeviceId: '',
   eventName: DEFAULT_EVENT_DETAILS.eventName,
   cropEnabled: false,
   crop: FULL_FRAME,

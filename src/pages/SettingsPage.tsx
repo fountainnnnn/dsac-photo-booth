@@ -7,6 +7,7 @@ import {
   EventSettingsCard, LookSettingsCard, useCaptureSettingsControl,
 } from '@/components/features/remote/CaptureSettingsCard';
 import CameraCropCard from '@/components/features/remote/CameraCropCard';
+import CameraPickerCard from '@/components/features/remote/CameraPickerCard';
 import PresetsCard from '@/components/features/remote/PresetsCard';
 import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 import PasswordsCard from '@/components/features/auth/PasswordsCard';
@@ -274,6 +275,7 @@ export default function SettingsPage() {
           </section>
 
           <EventSettingsCard {...capture} />
+          <CameraPickerCard {...capture} />
           <CameraCropCard
             {...capture}
             frame={frames.find(f => f.id === capture.settings.selectedFrameId) ?? null}

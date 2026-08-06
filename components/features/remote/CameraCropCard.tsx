@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowsInSimple, ArrowsOut, Crop, MagnifyingGlass } from '@phosphor-icons/react';
 import { FULL_FRAME, type CameraCrop } from './useCaptureSettings';
+import { cameraConstraints, raiseToMaxResolution } from '@/components/features/capture-photo/cameras';
 import type { CaptureSettingsControl } from './CaptureSettingsCard';
 import { FRAME_W, FRAME_H, type FrameConfig } from '@/types/frame';
 import { filtersAreNeutral, filtersToCSS, rampStartEdge, type LookRamp } from '@/types/editor';
@@ -99,9 +100,10 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
   useEffect(() => {
     let cancelled = false;
     navigator.mediaDevices?.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } },
+      video: cameraConstraints(settings.cameraDeviceId),
       audio: false,
-    }).then((s) => {
+    }).then(async (s) => {
+      await raiseToMaxResolution(s);
       if (cancelled) { s.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = s;
       for (const el of videosRef.current) {
@@ -118,7 +120,7 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
       streamRef.current?.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     };
-  }, [attachVideo]);
+  }, [attachVideo, settings.cameraDeviceId]);
 
   const set = useCallback((next: CameraCrop) => {
     push({ ...settings, crop: next, cropEnabled: true });

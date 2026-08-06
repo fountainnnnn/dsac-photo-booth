@@ -375,6 +375,9 @@ const DEFAULT_CAPTURE_SETTINGS = {
   selectedFrameId: '',
   filters: { brightness: 100, contrast: 100, saturation: 100, hue: 0 },
   eventName: 'Transformation Made Possible',
+  // Empty means the browser's default camera. A booth with an external webcam
+  // should point this at it — see the Camera card in Settings.
+  cameraDeviceId: '',
   // Which part of the camera to photograph. Off means the whole scene; the
   // region is kept either way so switching back does not lose the framing.
   cropEnabled: false,
