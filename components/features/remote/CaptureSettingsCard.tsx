@@ -10,13 +10,22 @@ import type { LookRamp, ImageFilters } from '@/types/editor';
 const TIMER_OPTIONS = [0, 3, 5, 10] as const;
 
 /** Link lifetimes worth a button, shortest first, with 0 meaning never. */
+/** Quick picks. Any other number is typed in beside them. */
 const LINK_TTL_OPTIONS: { hours: number; label: string }[] = [
-  { hours: 1,   label: '1 hour' },
   { hours: 6,   label: '6 hours' },
   { hours: 24,  label: '1 day' },
   { hours: 168, label: '7 days' },
   { hours: 0,   label: 'Never' },
 ];
+
+/**
+ * Show a span of hours in the largest unit that divides it exactly, so a
+ * setting typed as "3 days" comes back as 3 days rather than 72 hours.
+ */
+function splitTtl(hours: number): { value: number; unit: 'hours' | 'days' } {
+  if (hours > 0 && hours % 24 === 0) return { value: hours / 24, unit: 'days' };
+  return { value: hours, unit: 'hours' };
+}
 
 /** Which edge the ramp starts from, in the order they sit on screen. */
 /** The arrow points the way the effect fades: ↓ is strong at the top, gone at
@@ -139,6 +148,11 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
             </button>
           ))}
         </div>
+
+        {/* The quick picks are the common cases, not the whole range. An event
+            that wants the link dead in 90 minutes should be able to say so
+            without one of us having guessed at it in advance. */}
+        <LinkTtlCustom settings={settings} push={push} loading={loading} />
       </div>
     </section>
   );
@@ -218,6 +232,68 @@ export function LookSettingsCard({ settings, push }: CaptureSettingsControl) {
         )}
       </div>
     </section>
+  );
+}
+
+/** A number and a unit, for any link lifetime the buttons above do not cover. */
+function LinkTtlCustom({ settings, push, loading }: {
+  settings: CaptureSettings; push: (next: CaptureSettings) => void; loading: boolean;
+}) {
+  const never = settings.linkTtlHours === 0;
+  const { value, unit } = splitTtl(settings.linkTtlHours);
+  // Held locally while typing: pushing every keystroke would turn "12" into a
+  // one-hour setting the moment the "1" landed.
+  const [draft, setDraft] = useState(String(value));
+  const [draftUnit, setDraftUnit] = useState<'hours' | 'days'>(unit);
+
+  // Follow the buttons when they are used, but never fight the operator's
+  // own typing — only resync when the stored value is not what we last sent.
+  useEffect(() => {
+    const next = splitTtl(settings.linkTtlHours);
+    const asHours = draftUnit === 'days' ? Number(draft) * 24 : Number(draft);
+    if (asHours !== settings.linkTtlHours) {
+      setDraft(String(next.value));
+      setDraftUnit(next.unit);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.linkTtlHours]);
+
+  const commit = (raw: string, u: 'hours' | 'days') => {
+    const n = Math.max(0, Math.floor(Number(raw)));
+    if (!Number.isFinite(n)) return;
+    push({ ...settings, linkTtlHours: u === 'days' ? n * 24 : n });
+  };
+
+  return (
+    <div className="mt-3 flex items-center gap-2">
+      <span className="text-[0.72rem] text-[var(--ink-3)]">or</span>
+      <input
+        type="number" min={0} step={1} inputMode="numeric"
+        value={never ? '' : draft}
+        placeholder={never ? '—' : ''}
+        disabled={loading}
+        aria-label="Link lifetime"
+        onChange={(e) => { setDraft(e.target.value); commit(e.target.value, draftUnit); }}
+        className="w-20 rounded-xl border border-[var(--border)] px-3 py-2 text-[0.82rem] text-[var(--ink)] outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
+      />
+      <select
+        value={draftUnit}
+        disabled={loading}
+        aria-label="Link lifetime unit"
+        onChange={(e) => {
+          const u = e.target.value as 'hours' | 'days';
+          setDraftUnit(u);
+          commit(draft, u);
+        }}
+        className="rounded-xl border border-[var(--border)] px-3 py-2 text-[0.82rem] font-medium text-[var(--ink)] outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
+      >
+        <option value="hours">hours</option>
+        <option value="days">days</option>
+      </select>
+      <span className="text-[0.72rem] text-[var(--ink-3)]">
+        {never ? 'links never expire' : '0 also means never'}
+      </span>
+    </div>
   );
 }
 

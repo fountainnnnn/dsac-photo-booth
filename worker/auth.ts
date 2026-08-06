@@ -128,27 +128,39 @@ function isScope(value: unknown): value is Scope {
 
 export function createAuth(db: Db, env: Env) {
   /**
-   * The env passwords are hashed on first use rather than at module load: a
-   * Worker isolate has no boot step we can await, and PBKDF2 is async. The
-   * promise is memoised, so the cost is paid once per isolate as before.
+   * A password from the environment is compared as plain text, never hashed.
+   *
+   * Hashing it was the obvious thing and was wrong twice over. It buys nothing
+   * — the secret is already in our hands, so a hash of it protects against no
+   * attacker we do not already lose to — and it is ruinously expensive here: a
+   * Worker gets a small slice of CPU per request, PBKDF2 is designed to eat
+   * exactly that, and every cold isolate paying 150k iterations before its
+   * first answer meant the booth returned 500s until an isolate warmed up.
+   *
+   * The stored-in-Settings path still derives a key, because there we hold a
+   * hash and never the password. That cost falls on logins only, not on every
+   * request that merely asks whether the caller is already in.
    */
-  const envHash: Partial<Record<Scope, Promise<StoredHash> | null>> = {};
-
-  function envHashFor(scope: Scope): Promise<StoredHash> | null {
-    if (!(scope in envHash)) {
-      const raw = scope === 'booth' ? env.BOOTH_PASSWORD : env.DOWNLOAD_PASSWORD;
-      envHash[scope] = raw ? hashPassword(raw) : null;
-    }
-    return envHash[scope] ?? null;
+  function envPassword(scope: Scope): string | null {
+    const raw = scope === 'booth' ? env.BOOTH_PASSWORD : env.DOWNLOAD_PASSWORD;
+    return raw || null;
   }
 
-  /** The active hash for a scope, and where it came from. */
-  async function resolve(scope: Scope): Promise<{ hash: StoredHash | null; source: string | null }> {
+  /** Where a scope's password comes from, and what to check against. */
+  async function resolve(scope: Scope): Promise<{
+    hash: StoredHash | null; plain: string | null; source: string | null;
+  }> {
     const stored = await db.kv.get<StoredHash | null>(`password:${scope}`, null);
-    if (stored?.hash) return { hash: stored, source: 'settings' };
-    const seeded = envHashFor(scope);
-    if (seeded) return { hash: await seeded, source: 'env' };
-    return { hash: null, source: null };
+    if (stored?.hash) return { hash: stored, plain: null, source: 'settings' };
+    const plain = envPassword(scope);
+    if (plain) return { hash: null, plain, source: 'env' };
+    return { hash: null, plain: null, source: null };
+  }
+
+  /** True when this scope has a password at all, whatever its provenance. */
+  async function isGuarded(scope: Scope): Promise<boolean> {
+    const { hash, plain } = await resolve(scope);
+    return Boolean(hash || plain);
   }
 
   async function tokenValid(token: string, scope: Scope): Promise<boolean> {
@@ -161,8 +173,7 @@ export function createAuth(db: Db, env: Env) {
   }
 
   async function isAuthed(c: Context, scope: Scope): Promise<boolean> {
-    const { hash } = await resolve(scope);
-    if (!hash) return true; // no password anywhere -> the scope is open
+    if (!(await isGuarded(scope))) return true; // no password anywhere -> open
 
     const cookies = parseCookies(c.req.header('Cookie'));
     const bearer = /^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1];
@@ -186,10 +197,13 @@ export function createAuth(db: Db, env: Env) {
     const password = String(body?.password ?? '');
     if (!isScope(scope)) return c.json({ error: 'Unknown scope' }, 400);
 
-    const { hash } = await resolve(scope);
-    if (!hash) return c.json({ ok: true }); // open scope; nothing to check
+    const { hash, plain } = await resolve(scope);
+    if (!hash && !plain) return c.json({ ok: true }); // open scope; nothing to check
 
-    if (!await verifyAgainst(hash, password)) {
+    const ok = plain
+      ? timingSafeEqual(new TextEncoder().encode(plain), new TextEncoder().encode(password))
+      : await verifyAgainst(hash, password);
+    if (!ok) {
       // A beat of delay blunts brute force without a rate-limiter dependency.
       await new Promise((r) => setTimeout(r, WRONG_PASSWORD_DELAY_MS));
       return c.json({ error: 'Wrong password' }, 401);
@@ -215,8 +229,8 @@ export function createAuth(db: Db, env: Env) {
   async function statusBody(c: Context) {
     const out: Record<string, { required: boolean; authed: boolean; source: string | null }> = {};
     for (const scope of SCOPES) {
-      const { hash, source } = await resolve(scope);
-      out[scope] = { required: Boolean(hash), authed: await isAuthed(c, scope), source };
+      const { hash, plain, source } = await resolve(scope);
+      out[scope] = { required: Boolean(hash || plain), authed: await isAuthed(c, scope), source };
     }
     return out;
   }
