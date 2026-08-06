@@ -323,10 +323,10 @@ app.get('/api/qr/:token', booth, (req, res) => {
 /**
  * The whole event, newest first — lapsed links included.
  *
- * Nothing is filtered out here: photos are kept until an operator deletes one
- * by hand, so a gallery that hid expired rows would be hiding pictures that
- * still exist. `expired` is the flag the UI marks them with. The limit is
- * generous because this is the only view of the event the operator has.
+ * Nothing is filtered out here: a lapsed link does not remove a photo, so a
+ * gallery that hid expired rows would be hiding pictures that still exist.
+ * `expired` is the flag the UI marks them with. The limit is generous because
+ * this is the only view of the event the operator has.
  */
 app.get('/api/photos/recent', booth, (_req, res) => {
   res.json({
@@ -343,16 +343,20 @@ app.get('/api/photos/recent', booth, (_req, res) => {
 /**
  * Delete one photo, for good — the row, and the archive file beside it.
  *
- * Retention is manual now, so this is the only thing that removes a picture.
+ * Two callers want this: the operator's delete button below, and the hourly
+ * gallery sweep near the bottom of this file. It lives in one function so the
+ * two can never drift into deleting different halves of a photo.
+ *
+ * Row first, then the file: the row is the copy guests and the gallery reach,
+ * so losing it is what "deleted" means, and a stranded file is a folder the
+ * operator can see and clear themselves. The file half therefore never throws.
+ *
  * The archive name embeds a capture timestamp we no longer have in hand, so
  * the file is found by scanning the folder for the token fragment the name
  * ends with. A booth's folder holds an event's worth of photos, not a
  * library's, so a readdir is cheaper than storing the name to avoid it.
  */
-app.delete('/api/photos/:token', booth, (req, res) => {
-  const { token } = req.params;
-  if (!store.photos.get(token)) return res.status(404).json({ error: 'Photo not found' });
-
+function deletePhoto(token) {
   store.photos.delete(token);
 
   const suffix = `-${token.slice(0, 8)}.`;
@@ -363,11 +367,15 @@ app.delete('/api/photos/:token', booth, (req, res) => {
       }
     }
   } catch (err) {
-    // The row is gone, which is what the operator asked for; a stranded file
-    // is a folder they can see and clean up themselves.
     console.error(`  Could not remove the archive copy of ${token}: ${err.message}`);
   }
+}
 
+app.delete('/api/photos/:token', booth, (req, res) => {
+  const { token } = req.params;
+  if (!store.photos.get(token)) return res.status(404).json({ error: 'Photo not found' });
+
+  deletePhoto(token);
   return res.status(204).end();
 });
 
@@ -463,8 +471,13 @@ const DEFAULT_CAPTURE_SETTINGS = {
   cropEnabled: false,
   crop: { x: 0, y: 0, w: 1, h: 1 },
   // How long a guest's download link stays good for. 0 means it never lapses.
-  // This is about the link only — the photo is kept until someone deletes it.
+  // This is about the link only — the photo outlives it.
   linkTtlHours: 168,
+  // How long the photo itself is kept, counted from when it was taken. 0 means
+  // forever, which is what the booth did before this existed — nobody should
+  // lose an event to an upgrade. Deliberately unrelated to the link's life: a
+  // link may die in an hour while the photo lives a month.
+  galleryTtlHours: 0,
 };
 
 /**
@@ -672,10 +685,50 @@ app.use((err, _req, res, next) => {
   return res.status(500).json({ error: 'Unexpected server error' });
 });
 
-// There is no sweep any more. Expiry retires a guest's download link and does
-// nothing else: photos stay until an operator deletes one from the gallery
-// (DELETE /api/photos/:token). Losing an event's pictures to a clock nobody
-// was watching cost more than the disk they sit on ever will.
+/**
+ * The automatic half of retention: photos past `galleryTtlHours` go for good.
+ *
+ * Measured from each photo's `createdAt` — the moment the shutter went — and
+ * never from its link expiry. Those are two clocks the operator sets separately
+ * and on purpose: a link may lapse within the hour while the photo it pointed
+ * at lives a month, or a photo may be swept while its link would still have
+ * worked. Only `createdAt` is asked about here.
+ *
+ * Zero means keep forever, and zero is the default, so a booth nobody has
+ * configured leaves this function having touched nothing. That matters: the old
+ * sweep deleted on link expiry and cost an event its pictures to a clock nobody
+ * was watching. This one only ever does what was asked for in Settings.
+ *
+ * The setting is read on every run rather than at boot, so shortening the span
+ * mid-event takes effect within the hour and not at the next restart.
+ */
+function sweepGallery() {
+  const stored = store.kv.get('captureSettings', {});
+  const hours = Number(stored?.galleryTtlHours ?? 0);
+  if (!Number.isFinite(hours) || hours <= 0) return;
+
+  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const tokens = store.photos.olderThan(cutoff);
+  if (!tokens.length) return;
+
+  // One photo at a time, each guarded: a single unreadable file must not
+  // abandon the rest of the run, or one bad photo keeps every older one alive.
+  let swept = 0;
+  for (const token of tokens) {
+    try {
+      deletePhoto(token);
+      swept += 1;
+    } catch (err) {
+      console.error(`  Gallery sweep could not delete ${token}: ${err.message}`);
+    }
+  }
+  console.log(`  Gallery sweep removed ${swept} of ${tokens.length} photo(s) older than ${hours}h`);
+}
+
+// Hourly, matching the Worker's cron so the two booths forget at the same rate.
+// Unrefed: housekeeping should never be the reason the process stays alive.
+const GALLERY_SWEEP_MS = 60 * 60 * 1000;
+setInterval(sweepGallery, GALLERY_SWEEP_MS).unref();
 
 const banner = (label, value) => console.log(`  ${label.padEnd(20)} ${value}`);
 
@@ -709,7 +762,10 @@ const server = app.listen(port, '0.0.0.0', async () => {
   banner('Photos stored', `${store.photos.count()}`);
   banner('Photo folder', PHOTOS_DIR);
   banner('Link validity', `${FALLBACK_TTL_HOURS} hour(s) by default, set in Settings`);
-  banner('Retention', 'manual — photos are kept until deleted');
+  const galleryTtl = Number(store.kv.get('captureSettings', {})?.galleryTtlHours ?? 0);
+  banner('Retention', galleryTtl > 0
+    ? `${galleryTtl} hour(s) from capture, swept hourly`
+    : 'photos are kept until deleted, set in Settings');
   banner('Frontend', SERVES_FRONTEND ? 'served from ./dist' : 'dev server (Vite)');
 
   // The booth runs on a laptop now, with nothing hosting it. The tunnel is

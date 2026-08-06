@@ -40,8 +40,13 @@ const DEFAULT_CAPTURE_SETTINGS = {
   cropEnabled: false,
   crop: { x: 0, y: 0, w: 1, h: 1 },
   // How long a guest's download link stays good for. 0 means it never lapses.
-  // This is about the link only — the photo is kept until someone deletes it.
+  // This is about the link only — the photo outlives it.
   linkTtlHours: 168,
+  // How long the photo itself is kept, counted from when it was taken. 0 means
+  // forever, which is what the booth did before this existed — an upgrade must
+  // not start deleting an event. Deliberately unrelated to the link's life: a
+  // link may die in an hour while the photo lives a month.
+  galleryTtlHours: 0,
 };
 
 /**
@@ -281,10 +286,10 @@ app.get('/api/qr/:token', booth, async (c) => {
 /**
  * The whole event, newest first — lapsed links included.
  *
- * Nothing is filtered out here: photos are kept until an operator deletes one
- * by hand, so a gallery that hid expired rows would be hiding pictures that
- * still exist. `expired` is the flag the UI marks them with. The limit is
- * generous because this is the only view of the event the operator has.
+ * Nothing is filtered out here: a lapsed link does not remove a photo, so a
+ * gallery that hid expired rows would be hiding pictures that still exist.
+ * `expired` is the flag the UI marks them with. The limit is generous because
+ * this is the only view of the event the operator has.
  */
 app.get('/api/photos/recent', booth, async (c) => {
   const photos = await svc(c).db.photos.recent(200);
@@ -302,17 +307,29 @@ app.get('/api/photos/recent', booth, async (c) => {
 /**
  * Delete one photo, for good — the row and the bytes beside it.
  *
- * Retention is manual now, so this is the only thing that removes a picture.
+ * Two callers want this: the operator's delete button below, and the cron
+ * sweep at the bottom of this file. It lives in one function so the two can
+ * never drift into deleting different halves of a photo.
+ *
  * Row first, then the blob: a blob nobody has a row for is unreachable
  * storage, whereas a row whose blob is gone is a broken photo in the gallery.
+ * The blob failing is therefore survivable and swallowed — the photo is
+ * already unreachable, which is what was asked for.
  */
-app.delete('/api/photos/:token', booth, async (c) => {
-  const token = c.req.param('token');
-  const { db, blobs } = svc(c);
-  if (!(await db.photos.get(token))) return c.json({ error: 'Photo not found' }, 404);
-
+async function deletePhoto(
+  { db, blobs }: Pick<Services, 'db' | 'blobs'>,
+  token: string,
+): Promise<void> {
   await db.photos.delete(token);
   await blobs.delete(`photo/${token}`).catch(() => { /* the row is gone; a stray blob is harmless */ });
+}
+
+app.delete('/api/photos/:token', booth, async (c) => {
+  const token = c.req.param('token');
+  const s = svc(c);
+  if (!(await s.db.photos.get(token))) return c.json({ error: 'Photo not found' }, 404);
+
+  await deletePhoto(s, token);
   return c.body(null, 204);
 });
 
@@ -525,23 +542,135 @@ app.all('*', async (c) => {
   return c.env.ASSETS.fetch(new Request(url, c.req.raw));
 });
 
+/**
+ * The automatic half of retention: photos past `galleryTtlHours` go for good.
+ *
+ * Measured from each photo's `createdAt` — the moment the shutter went — and
+ * never from its link expiry. Those are two clocks an operator sets separately
+ * and on purpose: a link may lapse within the hour while the photo it pointed
+ * at lives a month, or a photo may be swept while its link would still have
+ * worked. Only `createdAt` is asked about here.
+ *
+ * Zero means keep forever, and zero is the default, so a booth nobody has
+ * configured leaves this function having touched nothing.
+ */
+/**
+ * Hand a photo to the Drive archive, and say whether it is safely there.
+ *
+ * Returns false only when an archive is configured and the upload did not
+ * confirm. The sweep treats that as a reason to keep the photo: a Drive
+ * outage should delay a deletion, never turn into one.
+ *
+ * When no archive is configured this returns true — the operator set a
+ * retention window knowing there was nowhere else for the photos to go, and
+ * second-guessing that would leave the gallery filling up regardless of the
+ * setting.
+ */
+async function archiveToDrive(
+  env: Env,
+  s: Pick<Services, 'blobs'>,
+  photo: { token: string; mime: string; createdAt: string },
+): Promise<boolean> {
+  const url = env.DRIVE_WEBHOOK_URL;
+  const secret = env.DRIVE_WEBHOOK_SECRET;
+  if (!url || !secret) return true; // no archive configured
+
+  const blob = await s.blobs.get(`photo/${photo.token}`);
+  if (!blob) return true; // nothing left to save; let the row go
+
+  const bytes = blob.body instanceof ArrayBuffer
+    ? new Uint8Array(blob.body)
+    : new Uint8Array(await new Response(blob.body as ReadableStream).arrayBuffer());
+
+  // Chunked so a multi-megabyte photo does not blow the argument limit that
+  // spreading a whole array into String.fromCharCode would.
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        secret,
+        name: archiveName(photo.token, photo.mime, new Date(photo.createdAt)),
+        mimeType: photo.mime,
+        dataBase64: btoa(binary),
+      }),
+    });
+    // Apps Script answers 200 with an ok flag rather than an HTTP status, so
+    // the body is the only trustworthy signal here.
+    const out = await res.json().catch(() => null) as { ok?: boolean } | null;
+    return Boolean(res.ok && out?.ok);
+  } catch (err) {
+    console.error('Drive archive failed', { token: photo.token, err });
+    return false;
+  }
+}
+
+/** Same shape the laptop booth writes to disk, so the two archives read alike. */
+function archiveName(token: string, mime: string, at: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${at.getFullYear()}${p(at.getMonth() + 1)}${p(at.getDate())}`
+    + `-${p(at.getHours())}${p(at.getMinutes())}${p(at.getSeconds())}`;
+  const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+  return `dsac-${stamp}-${token.slice(0, 8)}.${ext}`;
+}
+
+async function sweepGallery(env: Env, s: Pick<Services, 'db' | 'blobs'>): Promise<void> {
+  const stored = await s.db.kv.get<Record<string, unknown>>('captureSettings', {});
+  const hours = Number(stored?.galleryTtlHours ?? 0);
+  if (!Number.isFinite(hours) || hours <= 0) return;
+
+  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const tokens = await s.db.photos.olderThan(cutoff);
+  if (!tokens.length) return;
+
+  // One photo at a time, each in its own try: a single wedged blob must not
+  // abandon the rest of the run, or one bad object keeps every older photo
+  // alive forever.
+  let swept = 0;
+  let held = 0;
+  for (const token of tokens) {
+    try {
+      const meta = await s.db.photos.get(token);
+      if (meta && !(await archiveToDrive(env, s, meta))) {
+        held += 1;
+        continue; // try again next hour rather than lose it
+      }
+      await deletePhoto(s, token);
+      swept += 1;
+    } catch (err) {
+      console.error('Gallery sweep could not delete a photo', { token, err });
+    }
+  }
+  console.log(
+    `Gallery sweep removed ${swept} of ${tokens.length} photo(s) older than ${hours}h`
+    + (held ? `; ${held} held back because the Drive archive did not confirm` : ''),
+  );
+}
+
 export default {
   fetch: app.fetch,
 
   /**
-   * Housekeeping only — no photo has ever been deleted from here again.
+   * Hourly housekeeping: dead sessions always, old photos only if asked.
    *
-   * This used to drop expired photos and their blobs. Retention is manual now:
-   * an expiry retires a guest's download link, and the picture stays until an
-   * operator deletes it (DELETE /api/photos/:token). Losing an event's photos
-   * to a clock nobody was watching cost more than the storage they sit in.
+   * Sessions are rows nobody will ever ask for again — `tokenValid` already
+   * refuses an expired one — so the table would otherwise grow without bound
+   * across a long-running deployment.
    *
-   * Sessions are a different matter. They are rows nobody will ever ask for
-   * again — `tokenValid` already refuses an expired one — so the table would
-   * otherwise grow without bound across a long-running deployment.
+   * Photos are the careful half. This once deleted everything past its link
+   * expiry, which meant losing an event to a clock nobody was watching; now it
+   * deletes nothing unless an operator has set `galleryTtlHours`, and it reads
+   * that setting on every run so a change takes effect within the hour.
    */
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
-    const auth = createAuth(createDb(env.DB), env);
+    const db = createDb(env.DB);
+    const auth = createAuth(db, env);
     ctx.waitUntil(auth.sweepSessions());
+    ctx.waitUntil(sweepGallery(env, { db, blobs: createBlobStore(env) }));
   },
 } satisfies ExportedHandler<Env>;

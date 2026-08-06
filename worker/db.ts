@@ -12,8 +12,10 @@
  *    photo has two things to remove, not one: the row here and the blob beside
  *    it, which no longer disappears for free when the row does.
  *
- * Nothing in here deletes on a timer. `expires_at` retires a guest's download
- * link and nothing more — see `photos.get`.
+ * Nothing in here deletes on a timer of its own. `expires_at` retires a guest's
+ * download link and nothing more — see `photos.get`. Photos are removed only
+ * when something asks: an operator's delete, or the cron sweep, which finds its
+ * candidates through `photos.olderThan` and works from `created_at`.
  */
 
 export interface PhotoMeta {
@@ -95,6 +97,21 @@ export function createDb(d1: D1Database) {
 
     async delete(token: string): Promise<void> {
       await d1.prepare('DELETE FROM photos WHERE token = ?').bind(token).run();
+    },
+
+    /**
+     * Tokens of every photo taken before `iso`, for the gallery sweep.
+     *
+     * Tokens only, because the caller has two things to remove and needs
+     * nothing else to do either. Ordered by age so a run that is cut short
+     * has at least cleared the oldest, which is what the operator asked for.
+     */
+    async olderThan(iso: string): Promise<string[]> {
+      const { results } = await d1
+        .prepare('SELECT token FROM photos WHERE created_at < ? ORDER BY created_at')
+        .bind(iso)
+        .all<{ token: string }>();
+      return (results ?? []).map(r => r.token);
     },
 
     async count(): Promise<number> {

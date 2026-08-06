@@ -89,6 +89,19 @@ export function openDatabase(dir) {
       db.prepare('DELETE FROM photos WHERE token = ?').run(token);
     },
 
+    /**
+     * Tokens of every photo taken before `iso`, for the gallery sweep.
+     *
+     * Tokens only: the sweep has a row and an archive file to remove and needs
+     * nothing else to find either. Oldest first, so a run cut short has at
+     * least cleared the photos furthest past their span.
+     */
+    olderThan(iso) {
+      return db.prepare(
+        'SELECT token FROM photos WHERE created_at < ? ORDER BY created_at',
+      ).all(iso).map(r => r.token);
+    },
+
     count() {
       return Number(db.prepare('SELECT COUNT(*) AS n FROM photos').get().n);
     },

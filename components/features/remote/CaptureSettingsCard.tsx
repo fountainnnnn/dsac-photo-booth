@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowCounterClockwise, ArrowDown, ArrowLeft, ArrowRight, ArrowUp,
-  CircleHalf, Drop, LinkSimple, Palette, Sun, Timer as TimerIcon,
+  CircleHalf, Drop, LinkSimple, Palette, Sun, Timer as TimerIcon, Trash,
 } from '@phosphor-icons/react';
 import { useCaptureSettings, type CaptureSettings } from './useCaptureSettings';
 import { DEFAULT_FILTERS, DEFAULT_RAMP, filtersAreNeutral } from '@/types/editor';
@@ -19,10 +19,23 @@ const LINK_TTL_OPTIONS: { hours: number; label: string }[] = [
 ];
 
 /**
+ * How long the photos themselves are kept. Never comes first here, unlike the
+ * link picks above: it is both the default and the safe answer, and an
+ * operator skimming the row should meet it before they meet a number that
+ * deletes things.
+ */
+export const GALLERY_TTL_OPTIONS: { hours: number; label: string }[] = [
+  { hours: 0,    label: 'Never' },
+  { hours: 168,  label: '7 days' },
+  { hours: 720,  label: '30 days' },
+  { hours: 2160, label: '90 days' },
+];
+
+/**
  * Show a span of hours in the largest unit that divides it exactly, so a
  * setting typed as "3 days" comes back as 3 days rather than 72 hours.
  */
-function splitTtl(hours: number): { value: number; unit: 'hours' | 'days' } {
+export function splitTtl(hours: number): { value: number; unit: 'hours' | 'days' } {
   if (hours > 0 && hours % 24 === 0) return { value: hours / 24, unit: 'days' };
   return { value: hours, unit: 'hours' };
 }
@@ -122,39 +135,92 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
       </div>
 
       {/* Expiry and deletion are two different things, and an operator has no
-          reason to assume so — the helper line spends its one sentence on that
-          rather than on restating the buttons. */}
+          reason to assume so — each helper line spends its one sentence on
+          that rather than on restating the buttons. */}
       <div className="mt-6">
         <p className="mb-1.5 flex items-center gap-1.5 text-[0.78rem] font-semibold text-[var(--ink-2)]">
           <LinkSimple size={15} /> Download link
         </p>
         <p className="mb-3 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
-          How long a guest&rsquo;s QR link keeps working. The photo itself stays
-          in the gallery either way, until you delete it there.
+          How long a guest&rsquo;s QR link keeps working. This only retires the
+          link — the photo stays in the gallery.
         </p>
-        <div className="flex gap-2">
-          {LINK_TTL_OPTIONS.map(o => (
-            <button
-              key={o.hours} type="button" disabled={loading}
-              aria-pressed={settings.linkTtlHours === o.hours}
-              onClick={() => push({ ...settings, linkTtlHours: o.hours })}
-              className={`min-h-11 flex-1 rounded-xl text-[0.82rem] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-                settings.linkTtlHours === o.hours
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'border border-[var(--border)] bg-white text-[var(--ink-2)] hover:border-[var(--ink-3)]'
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
+        <TtlPicks
+          options={LINK_TTL_OPTIONS} value={settings.linkTtlHours} loading={loading}
+          onPick={h => push({ ...settings, linkTtlHours: h })}
+        />
 
         {/* The quick picks are the common cases, not the whole range. An event
             that wants the link dead in 90 minutes should be able to say so
             without one of us having guessed at it in advance. */}
-        <LinkTtlCustom settings={settings} push={push} loading={loading} />
+        <TtlCustom
+          value={settings.linkTtlHours} loading={loading}
+          label="Link lifetime" neverHint="links never expire"
+          onChange={h => push({ ...settings, linkTtlHours: h })}
+        />
+      </div>
+
+      {/* Deliberately the same shape as the block above, because the pair is
+          only understandable side by side: one span retires a link, the other
+          destroys the picture. The wording carries the whole difference. */}
+      <div className="mt-6">
+        <p className="mb-1.5 flex items-center gap-1.5 text-[0.78rem] font-semibold text-[var(--ink-2)]">
+          <Trash size={15} /> Gallery cleanup
+        </p>
+        <p className="mb-3 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+          How long a photo is kept after it is taken. When the time is up the
+          booth <strong className="font-semibold text-[var(--ink)]">deletes the photo
+          itself</strong> — out of the gallery and out of storage, permanently, with
+          no way back. Never keeps every photo until you delete it by hand.
+        </p>
+        <TtlPicks
+          options={GALLERY_TTL_OPTIONS} value={settings.galleryTtlHours} loading={loading}
+          onPick={h => push({ ...settings, galleryTtlHours: h })}
+        />
+        <TtlCustom
+          value={settings.galleryTtlHours} loading={loading}
+          label="Photo lifetime" neverHint="photos are kept forever"
+          onChange={h => push({ ...settings, galleryTtlHours: h })}
+        />
+
+        {/* Not an error — an operator may well want the photos gone before the
+            links lapse. But a guest holding a link to a photo that no longer
+            exists is worth hearing about before the event, not during it. A
+            link set to Never is infinite, so it outlives any cleanup at all. */}
+        {settings.galleryTtlHours > 0
+          && (settings.linkTtlHours === 0 || settings.galleryTtlHours < settings.linkTtlHours) && (
+          <p className="mt-2 text-[0.72rem] leading-[1.6] font-medium text-[var(--accent-ink)]">
+            Download links outlive the photos here, so a guest could scan a QR
+            code and find the picture already deleted.
+          </p>
+        )}
       </div>
     </section>
+  );
+}
+
+/** The quick picks, shared so both spans stay one design rather than two. */
+function TtlPicks({ options, value, loading, onPick }: {
+  options: { hours: number; label: string }[];
+  value: number; loading: boolean; onPick: (hours: number) => void;
+}) {
+  return (
+    <div className="flex gap-2">
+      {options.map(o => (
+        <button
+          key={o.hours} type="button" disabled={loading}
+          aria-pressed={value === o.hours}
+          onClick={() => onPick(o.hours)}
+          className={`min-h-11 flex-1 rounded-xl text-[0.82rem] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+            value === o.hours
+              ? 'bg-[var(--accent)] text-white'
+              : 'border border-[var(--border)] bg-white text-[var(--ink-2)] hover:border-[var(--ink-3)]'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -235,12 +301,24 @@ export function LookSettingsCard({ settings, push }: CaptureSettingsControl) {
   );
 }
 
-/** A number and a unit, for any link lifetime the buttons above do not cover. */
-function LinkTtlCustom({ settings, push, loading }: {
-  settings: CaptureSettings; push: (next: CaptureSettings) => void; loading: boolean;
+/**
+ * A number and a unit, for any span the quick picks above do not cover.
+ *
+ * Deliberately knows nothing about which setting it is editing — it takes a
+ * number of hours and hands one back — so the link's life and the photo's are
+ * typed into the same control and cannot drift into behaving differently.
+ */
+function TtlCustom({ value: hours, onChange, loading, label, neverHint }: {
+  value: number;
+  onChange: (hours: number) => void;
+  loading: boolean;
+  /** Names the pair of fields for screen readers, e.g. "Link lifetime". */
+  label: string;
+  /** What 0 means for this particular span, said in the operator's words. */
+  neverHint: string;
 }) {
-  const never = settings.linkTtlHours === 0;
-  const { value, unit } = splitTtl(settings.linkTtlHours);
+  const never = hours === 0;
+  const { value, unit } = splitTtl(hours);
   // Held locally while typing: pushing every keystroke would turn "12" into a
   // one-hour setting the moment the "1" landed.
   const [draft, setDraft] = useState(String(value));
@@ -249,19 +327,19 @@ function LinkTtlCustom({ settings, push, loading }: {
   // Follow the buttons when they are used, but never fight the operator's
   // own typing — only resync when the stored value is not what we last sent.
   useEffect(() => {
-    const next = splitTtl(settings.linkTtlHours);
+    const next = splitTtl(hours);
     const asHours = draftUnit === 'days' ? Number(draft) * 24 : Number(draft);
-    if (asHours !== settings.linkTtlHours) {
+    if (asHours !== hours) {
       setDraft(String(next.value));
       setDraftUnit(next.unit);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.linkTtlHours]);
+  }, [hours]);
 
   const commit = (raw: string, u: 'hours' | 'days') => {
     const n = Math.max(0, Math.floor(Number(raw)));
     if (!Number.isFinite(n)) return;
-    push({ ...settings, linkTtlHours: u === 'days' ? n * 24 : n });
+    onChange(u === 'days' ? n * 24 : n);
   };
 
   return (
@@ -272,14 +350,14 @@ function LinkTtlCustom({ settings, push, loading }: {
         value={never ? '' : draft}
         placeholder={never ? '—' : ''}
         disabled={loading}
-        aria-label="Link lifetime"
+        aria-label={label}
         onChange={(e) => { setDraft(e.target.value); commit(e.target.value, draftUnit); }}
         className="w-20 rounded-xl border border-[var(--border)] px-3 py-2 text-[0.82rem] text-[var(--ink)] outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
       />
       <select
         value={draftUnit}
         disabled={loading}
-        aria-label="Link lifetime unit"
+        aria-label={`${label} unit`}
         onChange={(e) => {
           const u = e.target.value as 'hours' | 'days';
           setDraftUnit(u);
@@ -291,7 +369,7 @@ function LinkTtlCustom({ settings, push, loading }: {
         <option value="days">days</option>
       </select>
       <span className="text-[0.72rem] text-[var(--ink-3)]">
-        {never ? 'links never expire' : '0 also means never'}
+        {never ? neverHint : '0 also means never'}
       </span>
     </div>
   );

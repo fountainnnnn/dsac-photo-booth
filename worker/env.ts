@@ -23,4 +23,13 @@ export interface Env {
   PHOTO_TTL_DAYS?: string;
   BOOTH_PASSWORD?: string;
   DOWNLOAD_PASSWORD?: string;
+
+  /**
+   * Where swept photos are archived before they are deleted — an Apps Script
+   * web app writing into the operator's own Drive (see scripts/drive-archive.gs
+   * for why not a service account). Absent means no archive, and the sweep
+   * simply deletes.
+   */
+  DRIVE_WEBHOOK_URL?: string;
+  DRIVE_WEBHOOK_SECRET?: string;
 }

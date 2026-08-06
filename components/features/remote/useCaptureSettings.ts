@@ -73,9 +73,20 @@ export interface CaptureSettings {
    * afternoon's event is packed up cannot say that in whole days.
    *
    * This governs the link only. The photo itself stays in the gallery until an
-   * operator deletes it.
+   * operator deletes it — or until `galleryTtlHours` below comes for it.
    */
   linkTtlHours: number;
+  /**
+   * How long the photo itself is kept before the booth deletes it on its own,
+   * with 0 meaning kept forever. Measured from the moment the shutter went,
+   * never from the link's expiry: the two clocks are deliberately unrelated,
+   * so a link can lapse in an hour while the picture it pointed at lives a
+   * month, or the other way about.
+   *
+   * Defaults to 0 because that is what the booth did before this setting
+   * existed. Nobody should lose an event's photos to an upgrade.
+   */
+  galleryTtlHours: number;
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -88,6 +99,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   cropEnabled: false,
   crop: FULL_FRAME,
   linkTtlHours: 168,
+  galleryTtlHours: 0,
 };
 
 export function useCaptureSettings() {
