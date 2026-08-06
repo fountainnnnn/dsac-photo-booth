@@ -16,10 +16,14 @@ import { FULL_FRAME, unmirrorCrop } from './useCaptureSettings';
 const aspectOf = (c: { w: number; h: number }, vw = 1920, vh = 1080) =>
   (c.w * vw) / (c.h * vh);
 
-/** The smaller rectangle must be contained by the larger, whichever way round. */
-const contained = (c: { x: number; y: number; w: number; h: number }) => {
-  const lo = Math.min(0, 1 - c.w);
-  const hi = Math.max(0, 1 - c.w);
+/**
+ * The camera must stay within reach of the photo: containment, plus the half
+ * window of slack that lets the framing be nudged up or down.
+ */
+const PAN_SLACK = 0.5;
+const inReach = (c: { x: number; y: number; w: number; h: number }) => {
+  const lo = Math.min(0, 1 - c.w) - PAN_SLACK;
+  const hi = Math.max(0, 1 - c.w) + PAN_SLACK;
   return c.x >= lo - 1e-9 && c.x <= hi + 1e-9 && c.y >= lo - 1e-9 && c.y <= hi + 1e-9;
 };
 
@@ -28,7 +32,7 @@ describe('camera crop', () => {
     for (const w of [0.1, 0.2, 0.6, 1, 1.5, 2, 3]) {
       const next = clampCropRect({ x: 0.2, y: 0.2, w, h: w });
       expect(aspectOf(next)).toBeCloseTo(16 / 9, 6);
-      expect(contained(next)).toBe(true);
+      expect(inReach(next)).toBe(true);
     }
   });
 
@@ -37,16 +41,28 @@ describe('camera crop', () => {
     expect(clampCropRect({ x: 0, y: 0, w: 9, h: 9 }).w).toBeCloseTo(2, 6);
   });
 
-  it('keeps the window on the camera when zoomed in', () => {
+  it('stops the window a half-frame past the camera when zoomed in', () => {
     const c = clampCropRect({ x: 5, y: -5, w: 0.5, h: 0.5 });
-    expect(c.x).toBeCloseTo(0.5, 6);
-    expect(c.y).toBeCloseTo(0, 6);
+    expect(c.x).toBeCloseTo(0.5 + 0.5, 6);   // 1-w, plus the slack
+    expect(c.y).toBeCloseTo(0 - 0.5, 6);
   });
 
-  it('keeps the camera inside the photo when zoomed out', () => {
-    // w = 1.5: the camera is smaller than the window, so x lives in [-0.5, 0].
-    expect(clampCropRect({ x: 5, y: 5, w: 1.5, h: 1.5 }).x).toBeCloseTo(0, 6);
-    expect(clampCropRect({ x: -5, y: -5, w: 1.5, h: 1.5 }).x).toBeCloseTo(-0.5, 6);
+  it('stops the camera a half-frame past the photo when zoomed out', () => {
+    // w = 1.5: containment alone would give [-0.5, 0]; slack widens it.
+    expect(clampCropRect({ x: 5, y: 5, w: 1.5, h: 1.5 }).x).toBeCloseTo(0.5, 6);
+    expect(clampCropRect({ x: -5, y: -5, w: 1.5, h: 1.5 }).x).toBeCloseTo(-1, 6);
+  });
+
+  /**
+   * The reason the slack exists. At 1.0x the camera sits exactly on the photo,
+   * so strict containment pinned it to dead centre and the framing could not
+   * be nudged at all — which is the complaint this answers.
+   */
+  it('lets the framing be moved up and down at 1.0x', () => {
+    const up = clampCropRect({ x: 0, y: -0.2, w: 1, h: 1 });
+    const down = clampCropRect({ x: 0, y: 0.2, w: 1, h: 1 });
+    expect(up.y).toBeCloseTo(-0.2, 6);
+    expect(down.y).toBeCloseTo(0.2, 6);
   });
 
   it('leaves the whole frame at the camera aspect', () => {
@@ -65,19 +81,21 @@ describe('camera crop', () => {
       }
     });
 
-    it('gives up the centre rather than the edge when it cannot have both', () => {
-      // Wider than the room on one side: staying centred would run off the
-      // picture, so it slides back in and the centre shifts instead.
+    it('keeps the centre even when that hangs off the camera', () => {
+      // Centred on 0.4 and 0.9 wide, so the left edge lands at -0.05: off the
+      // camera by a sliver. Containment used to shove it back to 0 and shift
+      // the shot; the pan slack now lets it stay pointed where it was, and
+      // the sliver is white in the photo.
       const next = clampZoom({ x: 0.2, y: 0.2, w: 0.4, h: 0.4 }, 0.9);
       expect(next.w).toBeCloseTo(0.9, 6);
-      expect(contained(next)).toBe(true);
-      expect(next.x).toBeCloseTo(0, 6);
+      expect(inReach(next)).toBe(true);
+      expect(next.x).toBeCloseTo(-0.05, 6);
     });
 
     it('zooms out past the whole scene into margins, still contained', () => {
       const next = clampZoom(FULL_FRAME, 1.6);
       expect(next.w).toBeCloseTo(1.6, 6);
-      expect(contained(next)).toBe(true);
+      expect(inReach(next)).toBe(true);
       // Symmetric around the same centre: equal margins both sides.
       expect(next.x).toBeCloseTo(-0.3, 6);
     });

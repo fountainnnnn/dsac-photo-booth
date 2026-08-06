@@ -27,6 +27,22 @@ import { filtersAreNeutral, filtersToCSS, rampStartEdge, type LookRamp } from '@
 const MIN_CROP_W = 0.2;  // 5.0x — tightest zoom in
 const MAX_CROP_W = 2;    // 0.5x — camera at half the window, white margins
 
+/**
+ * How far the camera may be pushed past the edge of the photo, as a fraction
+ * of the window.
+ *
+ * Strict containment sounded right and was too strict in practice: at 1.0x the
+ * camera sits exactly on the window, so the only legal position was dead
+ * centre and the framing could not be nudged at all. A booth camera is
+ * usually a little too high or too low, and the fix is to slide the picture,
+ * not to zoom in and throw away pixels for the privilege of moving it.
+ *
+ * Whatever the camera no longer covers is white in the photo — the drawing
+ * code already fills it — so half a window of slack is as far as anyone would
+ * sensibly want before the margin is more obvious than the framing.
+ */
+const PAN_SLACK = 0.5;
+
 /** Which camera corner is held; the opposite one stays put. */
 export type Corner = 'tl' | 'tr' | 'bl' | 'br';
 
@@ -419,18 +435,19 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
 }
 
 /**
- * Keep the crop legal: zoom within range, and the smaller rectangle contained
- * by the larger.
+ * Keep the crop legal: zoom within range, and the camera near enough the photo
+ * to be worth having.
  *
- * When the window keeps part of the camera (w <= 1) the window must stay on
- * the camera, so x ∈ [0, 1-w]. When the camera sits inside the photo (w > 1)
- * the containment flips and the same interval reverses to [1-w, 0]. min/max of
- * the two endpoints covers both without a branch.
+ * When the window keeps part of the camera (w <= 1) containment would put x in
+ * [0, 1-w]; when the camera sits inside the photo (w > 1) that interval
+ * reverses to [1-w, 0]. min/max of the two endpoints covers both without a
+ * branch, and PAN_SLACK then opens each end so the picture can be slid up,
+ * down or sideways past the edge — see the constant for why that is wanted.
  */
 export function clampCropRect(c: CameraCrop): CameraCrop {
   const w = Math.min(MAX_CROP_W, Math.max(MIN_CROP_W, c.w));
-  const lo = Math.min(0, 1 - w);
-  const hi = Math.max(0, 1 - w);
+  const lo = Math.min(0, 1 - w) - PAN_SLACK;
+  const hi = Math.max(0, 1 - w) + PAN_SLACK;
   return {
     w,
     h: w,
