@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle, LockSimple, Trash, UploadSimple, Warning } from '@phosphor-icons/react';
+import {
+  CheckCircle, Camera, Images, LockSimple, Trash, UploadSimple, Warning,
+  CalendarBlank,
+} from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useFrameCatalogue, type FrameSetting } from '@/components/features/frames/useFrameCatalogue';
 import { FRAME_W, FRAME_H } from '@/types/frame';
@@ -20,7 +23,30 @@ import PasswordsCard from '@/components/features/auth/PasswordsCard';
  * and should not be able to change the frame, the look, or the countdown by
  * leaning on the screen.
  */
+type TabId = 'frames' | 'camera' | 'event' | 'access';
+
+const TABS: { id: TabId; label: string; Icon: typeof Camera }[] = [
+  { id: 'frames', label: 'Frames',  Icon: Images },
+  { id: 'camera', label: 'Camera',  Icon: Camera },
+  { id: 'event',  label: 'Event',   Icon: CalendarBlank },
+  { id: 'access', label: 'Access',  Icon: LockSimple },
+];
+
+/** Remembered per device: an operator setting a booth up returns to the same
+ *  job repeatedly, and landing on Frames every time is a small daily tax. */
+const TAB_KEY = 'dsac.settings.tab';
+
 export default function SettingsPage() {
+  const [tab, setTab] = useState<TabId>(() => {
+    try {
+      const saved = localStorage.getItem(TAB_KEY);
+      return TABS.some(t => t.id === saved) ? saved as TabId : 'frames';
+    } catch { return 'frames'; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(TAB_KEY, tab); } catch { /* private mode */ }
+  }, [tab]);
   const { frames, loading, error, saveSettings, uploadFrame, deleteFrame } = useFrameCatalogue();
   // Owned here, not in the cards: they sit in different columns but must write
   // to one snapshot, or each would save over the other's edits.
@@ -106,7 +132,7 @@ export default function SettingsPage() {
             Settings<span className="text-[var(--accent)]">.</span>
           </h1>
           <p className="mt-1 text-[0.85rem] text-[var(--ink-2)]">
-            Pick the frame, set the event details, and tune the camera.
+            Everything the booth runs on. Guests never see these controls.
           </p>
         </div>
 
@@ -119,6 +145,10 @@ export default function SettingsPage() {
               {status.text}
             </span>
           )}
+          {/* The only unsaved state on this page is the frame pool's draft;
+              every other card writes as it is touched. So the button travels
+              with its tab rather than implying the rest needs saving. */}
+          {tab === 'frames' && (
           <button
             type="button"
             onClick={save}
@@ -127,6 +157,7 @@ export default function SettingsPage() {
           >
             {busy ? 'Saving…' : 'Save changes'}
           </button>
+          )}
         </div>
       </header>
 
@@ -137,167 +168,204 @@ export default function SettingsPage() {
       )}
 
       {/*
-        Two columns, split by what each thing is about rather than by size:
-        everything to do with the frame pool sits with the pool on the left, and
-        the right rail is the booth itself — camera, event, phone remote.
+        One page of ten cards was a wall. The tabs are not decoration: each
+        one is a job an operator actually sits down to do — set the frames up,
+        aim the camera, write the event details, hand out access — and nothing
+        from the other three is on screen while they do it.
 
-        Nothing here scrolls on its own. Every card grows to fit its contents
-        and the page scrolls once, so there is one scrollbar to think about
-        rather than a card-within-a-card-within-a-rail.
+        Every card still saves the moment it is touched, so moving between
+        tabs never loses anything. Only the frame pool has a Save button, and
+        it appears with its own tab.
       */}
-      <div className="mt-8 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-8">
-        <div className="flex flex-col gap-8">
-        {/* Frame list */}
-        <section className="flex flex-col rounded-[18px] border border-[var(--border)]">
-          <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-6 py-5">
-            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame pool</p>
-            <p className="text-[0.78rem] text-[var(--ink-3)]">
-              {enabledCount} of {frames.length} available to choose
-            </p>
-          </div>
+      <nav className="mt-7 flex shrink-0 gap-1.5 border-b border-[var(--border)]" aria-label="Settings sections">
+        {TABS.map(({ id, label, Icon }) => {
+          const on = tab === id;
+          return (
+            <button
+              key={id} type="button" onClick={() => setTab(id)}
+              aria-current={on ? 'page' : undefined}
+              className={`-mb-px flex min-h-11 items-center gap-2 border-b-2 px-4 text-[0.85rem] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                on
+                  ? 'border-[var(--accent)] text-[var(--accent)]'
+                  : 'border-transparent text-[var(--ink-3)] hover:text-[var(--ink)]'
+              }`}
+            >
+              <Icon size={16} weight={on ? 'fill' : 'regular'} />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
 
-          <div className="px-6 py-5">
-            <div className="flex flex-col gap-4">
-              {frames.map((frame) => {
-                const d = draft[frame.id] ?? { enabled: true };
-                return (
-                  <div
-                    key={frame.id}
-                    className="flex items-center gap-5 rounded-[14px] border border-[var(--border)] px-5 py-4"
-                    style={{ opacity: d.enabled ? 1 : 0.55 }}
-                  >
-                    <div className="h-[62px] w-[99px] shrink-0 overflow-hidden rounded-lg" style={{ background: '#8a8f8a' }}>
-                      <img src={frame.src} alt="" className="h-full w-full" draggable={false} />
-                    </div>
+      {tab === 'frames' && (
+        <div className="mt-8 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-8">
+          <div className="flex flex-col gap-8">
+          {/* Frame list */}
+          <section className="flex flex-col rounded-[18px] border border-[var(--border)]">
+            <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-6 py-5">
+              <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame pool</p>
+              <p className="text-[0.78rem] text-[var(--ink-3)]">
+                {enabledCount} of {frames.length} available to choose
+              </p>
+            </div>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1.5 truncate text-[0.9rem] font-semibold text-[var(--ink)]">
-                        {frame.label}
-                        {frame.builtIn && (
-                          <span title="Built-in frame" className="text-[var(--ink-3)]"><LockSimple size={13} /></span>
-                        )}
-                      </p>
-                      <p className="mt-0.5 text-[0.75rem] text-[var(--ink-3)]">
-                        {d.enabled ? 'In the picker' : 'Hidden from the picker'}
-                        {frame.dateStamp ? ' · stamps the date' : ''}
-                      </p>
-                    </div>
-
-                    <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[0.78rem] font-medium text-[var(--ink-2)]">
-                      <input
-                        type="checkbox" checked={d.enabled}
-                        onChange={e => setEnabled(frame.id, e.target.checked)}
-                        className="h-4 w-4 accent-[var(--accent)]"
-                      />
-                      On
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={() => onDelete(frame.id, frame.label)}
-                      disabled={frame.builtIn || busy}
-                      title={frame.builtIn ? 'Built-in frames cannot be deleted' : 'Delete frame'}
-                      aria-label={`Delete ${frame.label}`}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--ink-3)] transition hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-[var(--ink-3)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            <div className="px-6 py-5">
+              <div className="flex flex-col gap-4">
+                {frames.map((frame) => {
+                  const d = draft[frame.id] ?? { enabled: true };
+                  return (
+                    <div
+                      key={frame.id}
+                      className="flex items-center gap-5 rounded-[14px] border border-[var(--border)] px-5 py-4"
+                      style={{ opacity: d.enabled ? 1 : 0.55 }}
                     >
-                      <Trash size={17} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                      <div className="h-[62px] w-[99px] shrink-0 overflow-hidden rounded-lg" style={{ background: '#8a8f8a' }}>
+                        <img src={frame.src} alt="" className="h-full w-full" draggable={false} />
+                      </div>
 
-            {/* Uploading lives inside the pool it adds to — it was its own card
-                below, which read as an unrelated feature. */}
-            <div className="mt-5 flex items-end gap-3 border-t border-[var(--border)] pt-5">
-              <label className="flex-1 text-[0.78rem] font-semibold text-[var(--ink-2)]">
-                Add a frame
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-1.5 truncate text-[0.9rem] font-semibold text-[var(--ink)]">
+                          {frame.label}
+                          {frame.builtIn && (
+                            <span title="Built-in frame" className="text-[var(--ink-3)]"><LockSimple size={13} /></span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 text-[0.75rem] text-[var(--ink-3)]">
+                          {d.enabled ? 'In the picker' : 'Hidden from the picker'}
+                          {frame.dateStamp ? ' · stamps the date' : ''}
+                        </p>
+                      </div>
+
+                      <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[0.78rem] font-medium text-[var(--ink-2)]">
+                        <input
+                          type="checkbox" checked={d.enabled}
+                          onChange={e => setEnabled(frame.id, e.target.checked)}
+                          className="h-4 w-4 accent-[var(--accent)]"
+                        />
+                        On
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => onDelete(frame.id, frame.label)}
+                        disabled={frame.builtIn || busy}
+                        title={frame.builtIn ? 'Built-in frames cannot be deleted' : 'Delete frame'}
+                        aria-label={`Delete ${frame.label}`}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--ink-3)] transition hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-[var(--ink-3)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                      >
+                        <Trash size={17} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Uploading lives inside the pool it adds to — it was its own card
+                  below, which read as an unrelated feature. */}
+              <div className="mt-5 flex items-end gap-3 border-t border-[var(--border)] pt-5">
+                <label className="flex-1 text-[0.78rem] font-semibold text-[var(--ink-2)]">
+                  Add a frame
+                  <input
+                    type="text" value={label} onChange={e => setLabel(e.target.value)}
+                    placeholder="Name, e.g. Confetti" maxLength={40}
+                    className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-2.5 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
+                  />
+                </label>
                 <input
-                  type="text" value={label} onChange={e => setLabel(e.target.value)}
-                  placeholder="Name, e.g. Confetti" maxLength={40}
-                  className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-2.5 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
+                  ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) void onUpload(f); e.target.value = ''; }}
                 />
-              </label>
-              <input
-                ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) void onUpload(f); e.target.value = ''; }}
-              />
-              <button
-                type="button" onClick={() => fileRef.current?.click()} disabled={busy}
-                className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--ink-3)] px-4 text-[0.85rem] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-              >
-                <UploadSimple size={17} />
-                Choose image
-              </button>
-            </div>
-            <p className="mt-2 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
-              A 1921&times;1201 PNG with a transparent centre.
-            </p>
-          </div>
-        </section>
-
-        <LookSettingsCard {...capture} />
-
-        </div>
-
-        {/* The booth itself: event details and the phone remote. */}
-        <aside className="flex flex-col gap-8">
-          {/* The live frame. It lives here rather than on the capture screen so
-              a guest standing at the booth has nothing to press but the
-              shutter. Saves immediately; the kiosk follows without a reload. */}
-          <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
-            <div className="flex items-center gap-2">
-              <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame in use</p>
-              <span className={`ml-auto text-[0.72rem] font-semibold transition-opacity duration-200 ${
-                capture.saved ? 'text-[#127a4a] opacity-100' : 'opacity-0'
-              }`}>Saved</span>
-            </div>
-            <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
-              What every photo is taken with, until you change it here.
-            </p>
-
-            <div className="mt-4 grid grid-cols-3 gap-2.5">
-              <FrameSwatch
-                label="None"
-                selected={!capture.settings.selectedFrameId}
-                onSelect={() => capture.push({ ...capture.settings, selectedFrameId: '' })}
-              />
-              {frames.filter(f => draft[f.id]?.enabled !== false).map(f => (
-                <FrameSwatch
-                  key={f.id}
-                  label={f.label}
-                  src={f.src}
-                  selected={capture.settings.selectedFrameId === f.id}
-                  onSelect={() => capture.push({ ...capture.settings, selectedFrameId: f.id })}
-                />
-              ))}
+                <button
+                  type="button" onClick={() => fileRef.current?.click()} disabled={busy}
+                  className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--ink-3)] px-4 text-[0.85rem] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                >
+                  <UploadSimple size={17} />
+                  Choose image
+                </button>
+              </div>
+              <p className="mt-2 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+                A 1921&times;1201 PNG with a transparent centre.
+              </p>
             </div>
           </section>
+          </div>
+          <aside className="flex flex-col gap-8">
+            {/* The live frame. It lives here rather than on the capture screen so
+                a guest standing at the booth has nothing to press but the
+                shutter. Saves immediately; the kiosk follows without a reload. */}
+            <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
+              <div className="flex items-center gap-2">
+                <p className="text-[0.92rem] font-semibold text-[var(--ink)]">Frame in use</p>
+                <span className={`ml-auto text-[0.72rem] font-semibold transition-opacity duration-200 ${
+                  capture.saved ? 'text-[#127a4a] opacity-100' : 'opacity-0'
+                }`}>Saved</span>
+              </div>
+              <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
+                What every photo is taken with, until you change it here.
+              </p>
 
+              <div className="mt-4 grid grid-cols-3 gap-2.5">
+                <FrameSwatch
+                  label="None"
+                  selected={!capture.settings.selectedFrameId}
+                  onSelect={() => capture.push({ ...capture.settings, selectedFrameId: '' })}
+                />
+                {frames.filter(f => draft[f.id]?.enabled !== false).map(f => (
+                  <FrameSwatch
+                    key={f.id}
+                    label={f.label}
+                    src={f.src}
+                    selected={capture.settings.selectedFrameId === f.id}
+                    onSelect={() => capture.push({ ...capture.settings, selectedFrameId: f.id })}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
+              <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How frames work</p>
+              <p className="mt-2.5 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
+                Every photo uses the frame chosen above. The capture screen shows
+                it live, but cannot change it.
+              </p>
+              <p className="mt-2.5 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
+                Switch a frame off in the pool to keep it out of the chooser
+                without deleting it.
+              </p>
+            </section>
+          </aside>
+        </div>
+      )}
+
+      {tab === 'camera' && (
+        <div className="mt-8 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-8">
+          <div className="flex flex-col gap-8">
+            <CameraPickerCard {...capture} />
+            <LookSettingsCard {...capture} />
+          </div>
+          <aside className="flex flex-col gap-8">
+            <CameraCropCard
+              {...capture}
+              frame={frames.find(f => f.id === capture.settings.selectedFrameId) ?? null}
+            />
+            {/* Sits under the camera cards because it saves what they set. */}
+            <PresetsCard {...capture} />
+          </aside>
+        </div>
+      )}
+
+      {tab === 'event' && (
+        <div className="mt-8 max-w-[46rem]">
           <EventSettingsCard {...capture} />
-          <CameraPickerCard {...capture} />
-          <CameraCropCard
-            {...capture}
-            frame={frames.find(f => f.id === capture.settings.selectedFrameId) ?? null}
-          />
-          {/* Sits under the camera cards because it saves what they set. */}
-          <PresetsCard {...capture} />
+        </div>
+      )}
+
+      {tab === 'access' && (
+        <div className="mt-8 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-8">
           <RemoteAccessCard />
           <PasswordsCard />
-
-          <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
-            <p className="text-[0.92rem] font-semibold text-[var(--ink)]">How frames work</p>
-            <p className="mt-2.5 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              Every photo uses the frame chosen above. The capture screen shows
-              it live, but cannot change it.
-            </p>
-            <p className="mt-2.5 text-[0.78rem] leading-[1.6] text-[var(--ink-2)]">
-              Switch a frame off in the pool to keep it out of the chooser
-              without deleting it.
-            </p>
-          </section>
-        </aside>
-      </div>
+        </div>
+      )}
     </StudioShell>
   );
 }
