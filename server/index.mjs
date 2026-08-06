@@ -201,6 +201,11 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     publicOrigin: getPublicOrigin(),
+    // Whether this booth keeps its own copy of the photos in a folder the
+    // operator can open. True here and false on the hosted booth, which has
+    // no filesystem — the gallery reads this rather than offering a button
+    // that can only apologise.
+    localArchive: true,
   });
 });
 

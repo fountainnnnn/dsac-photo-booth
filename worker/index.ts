@@ -168,6 +168,9 @@ app.get('/api/health', (c) => c.json({
   // exposing: it is the difference between "R2 is on" and "still on the D1
   // stopgap", and it is invisible from the outside otherwise.
   storage: svc(c).blobs.kind,
+  // No filesystem and no desktop, so there is no folder to open. The gallery
+  // hides its Open folder button when it sees this.
+  localArchive: false,
 }));
 
 // ── Passwords ────────────────────────────────────────────────────────────────

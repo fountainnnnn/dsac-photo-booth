@@ -30,6 +30,9 @@ export default function GalleryPage() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [zoomed, setZoomed] = useState<RecentPhoto | null>(null);
+  // Null until the booth has said which kind it is, so the button never
+  // flashes into view on the hosted one before being taken away again.
+  const [localArchive, setLocalArchive] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,6 +50,13 @@ export default function GalleryPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    void fetch('/api/health')
+      .then(r => r.json() as Promise<{ localArchive?: boolean }>)
+      .then(h => setLocalArchive(Boolean(h.localArchive)))
+      .catch(() => setLocalArchive(false));
+  }, []);
 
   // The folder note is an acknowledgement, not a state — it fades on its own
   // so the header does not accumulate stale messages over an evening.
@@ -128,11 +138,13 @@ export default function GalleryPage() {
             Refresh
           </button>
 
-          <button type="button" onClick={() => void openFolder()}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--border)] px-5 text-[0.85rem] font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
-            <FolderOpen size={17} />
-            Open folder
-          </button>
+          {localArchive && (
+            <button type="button" onClick={() => void openFolder()}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--border)] px-5 text-[0.85rem] font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
+              <FolderOpen size={17} />
+              Open folder
+            </button>
+          )}
 
           <a href="/capture"
             className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-6 text-[0.85rem] font-semibold text-white transition hover:bg-[var(--accent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2">
