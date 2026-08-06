@@ -293,18 +293,35 @@ export function drawDateStamp(
     ctx.fillStyle = slot.colour;
     ctx.textBaseline = 'alphabetic';
 
+    /**
+     * The name, drawn heavier than a synthesised bold manages on its own.
+     *
+     * Ink Free has no bold face, so `NAME_WEIGHT` only asks the rasteriser to
+     * fake one and the result still looks light against the artwork. Stroking
+     * the same text in the same colour before filling it thickens every stroke
+     * evenly; a round join keeps the corners from spiking. Only the name gets
+     * this — the date is meant to read as the lighter of the two lines.
+     */
+    const drawName = (size: number, x: number, y: number) => {
+      ctx.strokeStyle = slot.colour;
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = size / 24;
+      ctx.strokeText(name, x, y);
+      ctx.fillText(name, x, y);
+    };
+
     if (name && above) {
       // Its own centred line, set larger than the date below it.
       const size = fitFontPx(ctx, name, Math.round(above.sizeFrac * h), above.maxWidthFrac * w, NAME_WEIGHT);
       ctx.font = `${NAME_WEIGHT} ${size}px ${STAMP_FONT_STACK}`;
       ctx.textAlign = 'center';
-      ctx.fillText(name, above.centreFrac * w, above.baselineFrac * h);
+      drawName(size, above.centreFrac * w, above.baselineFrac * h);
     } else if (name) {
       // Inline, shrunk only if it would collide with the surrounding artwork.
       const size = fitFontPx(ctx, name, Math.round(slot.sizeFrac * h), slot.maxNameWidthFrac * w, NAME_WEIGHT);
       ctx.font = `${NAME_WEIGHT} ${size}px ${STAMP_FONT_STACK}`;
       ctx.textAlign = 'right';
-      ctx.fillText(name, slot.nameRightFrac * w - gap, baseline);
+      drawName(size, slot.nameRightFrac * w - gap, baseline);
     }
 
     ctx.font = `${Math.round(slot.sizeFrac * h)}px ${STAMP_FONT_STACK}`;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ImageFilters } from '@/types/editor';
-import { DEFAULT_FILTERS } from '@/types/editor';
+import type { LookRamp, ImageFilters } from '@/types/editor';
+import { DEFAULT_FILTERS, DEFAULT_RAMP } from '@/types/editor';
 import { DEFAULT_EVENT_DETAILS } from '@/types/frame';
 
 /**
@@ -44,6 +44,13 @@ export interface CaptureSettings {
   timerSecs: number;
   selectedFrameId: string;
   filters: ImageFilters;
+  /**
+   * How the Look is spread across the picture — evenly, or as a ramp that
+   * starts at one edge and fades to the untouched camera. Kept beside
+   * `filters` rather than inside it because a CSS filter string cannot
+   * express a ramp — it is painted as a second layer at draw time.
+   */
+  lookRamp: LookRamp;
   /** Printed on frames that do not bake their own caption. */
   eventName: string;
   /**
@@ -59,6 +66,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   timerSecs: 3,
   selectedFrameId: '',
   filters: DEFAULT_FILTERS,
+  lookRamp: DEFAULT_RAMP,
   eventName: DEFAULT_EVENT_DETAILS.eventName,
   cropEnabled: false,
   crop: FULL_FRAME,
@@ -74,7 +82,18 @@ export function useCaptureSettings() {
       const res = await fetch('/api/settings/capture');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { settings: CaptureSettings };
-      setSettings({ ...DEFAULT_CAPTURE_SETTINGS, ...data.settings });
+      // A shallow spread is enough for settings saved before a field existed:
+      // an absent `lookRamp` takes the default. Keys from the two retired
+      // experiments are dropped, though a brightness-only ramp carries its
+      // direction over — same gesture, wider effect.
+      const { gradient: _retired, brightnessRamp, ...stored } =
+        data.settings as CaptureSettings & { gradient?: unknown; brightnessRamp?: LookRamp };
+      void _retired;
+      setSettings({
+        ...DEFAULT_CAPTURE_SETTINGS,
+        ...(brightnessRamp ? { lookRamp: brightnessRamp } : null),
+        ...stored,
+      });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load settings');

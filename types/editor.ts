@@ -16,17 +16,36 @@ export function filtersToCSS(f: ImageFilters): string {
   return `brightness(${f.brightness}%) contrast(${f.contrast}%) saturate(${f.saturation}%) hue-rotate(${f.hue}deg)`;
 }
 
-export const FILTER_PRESETS: { label: string; emoji: string; filters: ImageFilters }[] = [
-  { label: 'Normal',  emoji: '◻️', filters: { brightness: 100, contrast: 100, saturation: 100, hue:   0 } },
-  { label: 'Vivid',   emoji: '🌈', filters: { brightness: 105, contrast: 112, saturation: 165, hue:   0 } },
-  { label: 'Warm',    emoji: '🌅', filters: { brightness: 108, contrast: 105, saturation: 118, hue:  18 } },
-  { label: 'Cool',    emoji: '❄️', filters: { brightness: 102, contrast: 106, saturation: 108, hue: -22 } },
-  { label: 'Drama',   emoji: '🎭', filters: { brightness:  94, contrast: 148, saturation:  72, hue:   0 } },
-  { label: 'Fade',    emoji: '🌫️', filters: { brightness: 118, contrast:  78, saturation:  65, hue:   0 } },
-  { label: 'B&W',     emoji: '⬛', filters: { brightness: 100, contrast: 112, saturation:   0, hue:   0 } },
-  { label: 'Noir',    emoji: '🎬', filters: { brightness:  85, contrast: 158, saturation:   0, hue:   0 } },
-  { label: 'Golden',  emoji: '✨', filters: { brightness: 112, contrast: 106, saturation: 145, hue:  28 } },
-  { label: 'Pastel',  emoji: '🍬', filters: { brightness: 122, contrast:  86, saturation:  58, hue:   0 } },
-  { label: 'Punch',   emoji: '💥', filters: { brightness:  98, contrast: 128, saturation: 175, hue:   0 } },
-  { label: 'Dusk',    emoji: '🌆', filters: { brightness:  92, contrast: 110, saturation: 125, hue: -12 } },
-];
+/**
+ * How the Look is spread across the picture.
+ *
+ * 'even' is the ordinary case: the adjustments apply everywhere. A direction
+ * applies the whole Look — brightness, contrast, saturation and hue together —
+ * in full at the edge the ramp starts from, fading linearly to the untouched
+ * camera at the other end: 'down' starts fully adjusted at the top and fades
+ * toward the bottom. There is no second amount to set; the sliders are the
+ * amount.
+ *
+ * Deliberately not part of `ImageFilters`: a CSS filter string is uniform by
+ * definition, so a ramp cannot be expressed in one. It is painted as a faded
+ * second layer in the shared draw routine instead.
+ */
+export type LookRamp = 'even' | 'down' | 'up' | 'rightward' | 'leftward';
+
+export const DEFAULT_RAMP: LookRamp = 'even';
+
+/** The edge a ramp starts from, i.e. where the Look applies in full. */
+export function rampStartEdge(ramp: LookRamp): 'top' | 'bottom' | 'left' | 'right' | null {
+  switch (ramp) {
+    case 'down': return 'top';
+    case 'up': return 'bottom';
+    case 'rightward': return 'left';
+    case 'leftward': return 'right';
+    default: return null;
+  }
+}
+
+/** True when the sliders sit at their no-op values and there is nothing to spread. */
+export function filtersAreNeutral(f: ImageFilters): boolean {
+  return f.brightness === 100 && f.contrast === 100 && f.saturation === 100 && f.hue === 0;
+}

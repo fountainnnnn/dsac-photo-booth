@@ -8,17 +8,15 @@ import {
   WifiSlash,
 } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
-import { useLivePreview } from './useLivePreview';
+import { useLivePreview, drawPhoto } from './useLivePreview';
 import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
 import { useCaptureSettings, unmirrorCrop } from '@/components/features/remote/useCaptureSettings';
 import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
-import { rememberCapture } from '@/components/features/gallery/galleryStore';
 import type { FrameConfig, EventDetails } from '@/types/frame';
 import {
   FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
   NAME_WEIGHT, STAMP_FONT_STACK, drawDateStamp, fitFontPx, stampFontPx, stampText, formatEventDate,
 } from '@/types/frame';
-import { filtersToCSS } from '@/types/editor';
 
 type PermissionStatus = 'prompt' | 'granted' | 'denied' | 'unsupported';
 
@@ -73,6 +71,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     reload: reloadSettings,
   } = useCaptureSettings();
   const filters = captureSettings.filters;
+  const lookRamp = captureSettings.lookRamp;
   const timerSecs = captureSettings.timerSecs;
   // The region of the camera actually used, flipped back into the camera's own
   // coordinates: it was drawn on a mirrored preview. Null means all of it.
@@ -159,6 +158,7 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
   // rather than covering its edges.
   const { canvasRef } = useLivePreview(videoRef, {
     filters,
+    lookRamp,
     contentRect: displayFrame?.window ?? null,
     sourceRect: crop,
   });
@@ -184,8 +184,14 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
       const h = Math.max(1, Math.floor(w / stageAspect));
       setStageSize({ w, h });
       if (canvasRef.current) {
-        canvasRef.current.width = w;
-        canvasRef.current.height = h;
+        // The bitmap is the display size in *device* pixels, while CSS keeps
+        // it at the display size — otherwise a retina stage upscales a
+        // half-resolution preview and the feed looks soft next to the crisp
+        // frame PNG over it. Capped at 2: past that the rAF loop is pushing
+        // several times the pixels for a difference nobody can see.
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        canvasRef.current.width = Math.round(w * dpr);
+        canvasRef.current.height = Math.round(h * dpr);
       }
     };
 
@@ -218,86 +224,52 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     const video = videoRef.current;
     if (!video || !isStreaming) return;
 
-    const liveCanvas = canvasRef.current;
-    if (liveCanvas?.width && liveCanvas.height) {
-      const output = document.createElement('canvas');
-      output.width = liveCanvas.width;
-      output.height = liveCanvas.height;
-      const ctx = output.getContext('2d')!;
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(liveCanvas, 0, 0);
+    // Always redraw from the raw <video>, never by copying the preview canvas.
+    // The preview is sized to the stage in screen pixels — perhaps 900 wide —
+    // so copying it threw away most of a 1080p camera and handed the guest a
+    // photo the size of the window they were standing in front of.
+    //
+    // With a frame on, the output is the artboard so the PNG lands
+    // pixel-for-pixel. With no frame there is nothing to line up against, so
+    // the cropped region is written at its own native size: a straight 1:1
+    // read of the sensor, no resampling at all.
+    const vw = video.videoWidth  || FRAME_W_PX;
+    const vh = video.videoHeight || FRAME_H_PX;
+    const outW = activeFrame ? FRAME_W_PX : Math.max(1, Math.round((crop?.w ?? 1) * vw));
+    const outH = activeFrame ? FRAME_H_PX : Math.max(1, Math.round((crop?.h ?? 1) * vh));
 
-      if (activeFrame) {
-        const cached = frameCache.current.get(activeFrame.src);
-        if (isDrawable(cached)) {
-          ctx.drawImage(cached, 0, 0, output.width, output.height);
-          drawDateStamp(ctx, activeFrame, output.width, output.height, captureSettings);
-        } else {
-          console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
-        }
-      }
-
-      const dataUrl = output.toDataURL('image/jpeg', 0.92);
-      rememberCapture(dataUrl);
-      const blob = await canvasToBlob(output);
-      onCapture(blob, dataUrl);
-      return;
-    }
-
-    // Fallback path (no live canvas yet). Render at the artboard size so the
-    // frame lands pixel-for-pixel.
-    const outW = FRAME_W_PX;
-    const outH = FRAME_H_PX;
     const canvas = document.createElement('canvas');
     canvas.width = outW; canvas.height = outH;
     const ctx = canvas.getContext('2d')!;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // The photo goes inside the frame's cut-out; the frame wraps it.
-    const win = activeFrame?.window;
-    const dx = win ? Math.round(win.x * outW) : 0;
-    const dy = win ? Math.round(win.y * outH) : 0;
-    const dw = win ? Math.round(win.w * outW) : outW;
-    const dh = win ? Math.round(win.h * outH) : outH;
-
-    // White wherever the picture does not reach — the frame border, and the
-    // margins when the crop is zoomed out past the whole scene.
-    if (win || crop) {
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, outW, outH);
-    }
-
-    // Same source region as the live preview, or the shot would quietly come
-    // out wide whenever this fallback path ran. Straight scale, no fitting.
-    const vw = video.videoWidth  || dw;
-    const vh = video.videoHeight || dh;
-    const sx = crop ? Math.round(crop.x * vw) : 0;
-    const sy = crop ? Math.round(crop.y * vh) : 0;
-    const sw = crop ? Math.max(1, Math.round(crop.w * vw)) : vw;
-    const sh = crop ? Math.max(1, Math.round(crop.h * vh)) : vh;
-
-    ctx.save();
-    ctx.filter = filtersToCSS(filters);
-    ctx.translate(dx + dw, dy);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
-    ctx.restore();
+    // The same routine the preview loop runs, at a different size. That is the
+    // whole guarantee: crop, mirror, filters and ramp cannot disagree
+    // between what the guest saw and what they get.
+    drawPhoto(ctx, video, {
+      w: outW,
+      h: outH,
+      filters,
+      lookRamp,
+      contentRect: activeFrame?.window ?? null,
+      sourceRect: crop,
+    });
 
     if (activeFrame) {
       const cachedFrame = frameCache.current.get(activeFrame.src);
       if (isDrawable(cachedFrame)) {
         ctx.drawImage(cachedFrame, 0, 0, outW, outH);
         drawDateStamp(ctx, activeFrame, outW, outH, captureSettings);
+      } else {
+        console.warn('[DSAC] Frame not ready; capturing without it:', activeFrame.src);
       }
     }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-    rememberCapture(dataUrl);
     const blob = await canvasToBlob(canvas);
     onCapture(blob, dataUrl);
-  }, [isStreaming, canvasRef, filters, activeFrame, crop, onCapture]);
+  }, [isStreaming, filters, lookRamp, activeFrame, crop, captureSettings, onCapture]);
 
   const handleCapturePress = useCallback(() => {
     if (countdown !== null) {
@@ -508,67 +480,6 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function Card({ ref, title, actionLabel, onAction, children }: {
-  ref?: React.Ref<HTMLDivElement>;
-  title: string; actionLabel: string; onAction: () => void; children: React.ReactNode;
-}) {
-  return (
-    <div ref={ref} className="min-w-0 rounded-[18px] border border-[var(--border)] px-5 py-4">
-      <div className="mb-3.5 flex items-center justify-between">
-        <p className="text-[0.92rem] font-semibold text-[var(--ink)]">{title}</p>
-        <button type="button" onClick={onAction}
-          className="text-[0.8rem] font-semibold text-[var(--accent)] transition hover:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
-          {actionLabel}
-        </button>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Swatch({ active, label, onClick, children }: {
-  active: boolean; label: string; onClick: () => void; children: React.ReactNode;
-}) {
-  return (
-    <button type="button" onClick={onClick} title={label}
-      className="group flex shrink-0 flex-col items-center gap-1.5 focus:outline-none">
-      <span
-        className={`relative block h-[74px] w-[62px] overflow-hidden rounded-[10px] border transition-all duration-150 ${
-          active ? 'border-[var(--accent)] ring-2 ring-[color-mix(in_srgb,var(--accent)_28%,transparent)]'
-                 : 'border-[var(--border)] group-hover:border-[var(--ink-3)]'
-        }`}
-        style={{ background: '#e6e6ea' }}
-      >
-        {children}
-      </span>
-      <span className={`max-w-[64px] truncate text-[0.72rem] font-semibold ${active ? 'text-[var(--accent)]' : 'text-[var(--ink-2)]'}`}>
-        {label}
-      </span>
-    </button>
-  );
-}
-
-function Slider({ icon, label, value, min, max, unit = '', hue = false, onChange }: {
-  icon: React.ReactNode; label: string; value: number; min: number; max: number;
-  unit?: string; hue?: boolean; onChange: (v: number) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <span className="text-[var(--ink-2)]">{icon}</span>
-      <span className="w-[74px] shrink-0 text-[0.8rem] font-medium text-[var(--ink-2)]">{label}</span>
-      <input
-        type="range" min={min} max={max} value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        className={hue ? 'dsac-range dsac-range-hue' : 'dsac-range'}
-        aria-label={label}
-      />
-      <span className="w-9 shrink-0 text-right text-[0.78rem] tabular-nums text-[var(--ink-2)]">
-        {hue ? value : value - 100}{unit}
-      </span>
-    </div>
-  );
-}
-
 /**
  * How much to shrink the event name so it fits its width budget — the same
  * calculation `drawDateStamp` does, against the same artboard dimensions, so
@@ -628,6 +539,12 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
       name, nameSizeFrac, (above?.maxWidthFrac ?? slot.maxNameWidthFrac),
     );
 
+    // Ink Free ships no bold face, so `font-weight: bold` is only a synthesised
+    // one and still reads thin on the print. An outline in the caption's own
+    // colour thickens every stroke. 1/24 em is the same ratio the canvas uses
+    // for its lineWidth, so the preview and the photo weigh the same.
+    const nameStroke = { WebkitTextStroke: `0.0417em ${slot.colour}` } as React.CSSProperties;
+
     return (
       <>
         {name && (
@@ -636,6 +553,7 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
             className="pointer-events-none absolute z-20 whitespace-nowrap"
             style={above ? {
               ...common,
+              ...nameStroke,
               top: `${above.baselineFrac * 100}%`,
               fontSize: `${nameSizeFrac * nameScale * 100}cqh`,
               fontWeight: NAME_WEIGHT,
@@ -643,6 +561,7 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
               transform: 'translate(-50%, -100%)',
             } : {
               ...common,
+              ...nameStroke,
               fontSize: `${nameSizeFrac * nameScale * 100}cqh`,
               fontWeight: NAME_WEIGHT,
               right: `${(1 - slot.nameRightFrac + slot.gapFrac) * 100}%`,

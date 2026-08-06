@@ -8,8 +8,8 @@ import type { FrameConfig } from '@/types/frame';
  * Frames — the whole catalogue at a readable size, any one of which opens
  * full screen.
  *
- * Browsing only. A frame is won on the wheel, never chosen here, so nothing on
- * this page changes what ends up on a photo.
+ * Browsing only. The live frame is chosen in Settings, never here, so nothing
+ * on this page changes what ends up on a photo.
  */
 export default function FramesPage() {
   const { frames, loading } = useFrameCatalogue();

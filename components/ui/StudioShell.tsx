@@ -67,6 +67,26 @@ export default function StudioShell({ active, onNavigate, children, scroll = fal
     );
   };
 
+  /**
+   * The collapse toggle is an icon alone, tucked at the top right of the rail.
+   * Open it rides in the header beside the wordmark; shut the rail is only
+   * 76px, so it drops to its own centred row under the logo.
+   */
+  const collapseButton = (
+    <button
+      type="button"
+      onClick={() => setCollapsed(c => !c)}
+      aria-expanded={!collapsed}
+      title={collapsed ? 'Expand the menu' : 'Collapse the menu'}
+      aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}
+      className={`flex h-10 w-10 items-center justify-center rounded-xl p-2 text-[var(--ink-3)] transition-colors duration-150 hover:bg-[var(--shell-bg)] hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+        collapsed ? 'mx-auto' : 'ml-auto'
+      }`}
+    >
+      <SidebarSimple size={18} weight={collapsed ? 'fill' : 'regular'} />
+    </button>
+  );
+
   return (
     <div className="flex h-dvh w-full overflow-hidden" style={{ background: 'var(--shell-bg)' }}>
       {/* Left rail */}
@@ -75,30 +95,21 @@ export default function StudioShell({ active, onNavigate, children, scroll = fal
           collapsed ? 'w-[76px] px-3' : 'w-[272px] px-5'
         }`}
       >
-        <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-2'}`}>
+        <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3 pl-2'}`}>
           <img src="/sp-dsac-logo.png" alt="SP DSAC" className="h-9 w-auto" />
           {!collapsed && (
-            <span className="text-[0.9rem] font-semibold leading-[1.15] tracking-tight text-[var(--ink)]">
-              Photo<br />Booth
-            </span>
+            <>
+              <span className="text-[0.9rem] font-semibold leading-[1.15] tracking-tight text-[var(--ink)]">
+                Photo<br />Booth
+              </span>
+              {collapseButton}
+            </>
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setCollapsed(c => !c)}
-          aria-expanded={!collapsed}
-          title={collapsed ? 'Expand the menu' : 'Collapse the menu'}
-          aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}
-          className={`mt-6 flex items-center rounded-xl py-2.5 text-[0.8rem] font-semibold text-[var(--ink-3)] transition-colors duration-150 hover:bg-[var(--shell-bg)] hover:text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-            collapsed ? 'justify-center px-0' : 'gap-3 px-3.5'
-          }`}
-        >
-          <SidebarSimple size={18} weight={collapsed ? 'fill' : 'regular'} />
-          {!collapsed && 'Collapse'}
-        </button>
+        {collapsed && <div className="mt-3 flex">{collapseButton}</div>}
 
-        <nav className="mt-3 flex flex-col gap-1.5">
+        <nav className="mt-6 flex flex-col gap-1.5">
           {NAV.map(({ id, label, Icon }) => navButton(id, label, Icon))}
         </nav>
 

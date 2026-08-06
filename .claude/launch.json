@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "dsac-photo-booth",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "./scripts/dev.sh",
+      "runtimeArgs": [],
       "port": 5173
     }
   ]

@@ -1,4 +1,5 @@
 import cors from 'cors';
+import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { networkInterfaces } from 'node:os';
@@ -58,6 +59,18 @@ const DATA_DIR = process.env.STORAGE_DIR
   : path.join(ROOT_DIR, 'data');
 const store = openDatabase(DATA_DIR);
 const remote = createRemoteHub();
+
+/**
+ * The organiser's own copy of the event, as ordinary files.
+ *
+ * The database is the guest-facing side: rows there carry the QR link and are
+ * swept away once the TTL passes. These files are the archive and are never
+ * touched by the sweep — the whole point is that the folder still holds the
+ * event's photos after every download link has expired. Deleting them is a
+ * job for the organiser and Finder/Explorer, not for the booth.
+ */
+const PHOTOS_DIR = path.join(DATA_DIR, 'photos');
+fs.mkdirSync(PHOTOS_DIR, { recursive: true });
 // Booth password gates the interface; download password gates the photos.
 const auth = createAuth(store.kv);
 const booth = auth.requireAuth('booth');
@@ -72,6 +85,27 @@ const SERVES_FRONTEND = fs.existsSync(path.join(DIST_DIR, 'index.html'));
 
 function extForMime(mimeType) {
   return mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+}
+
+/** Local wall-clock stamp, YYYYMMDD-HHmmss — the folder sorts by time. */
+function fileStamp(date) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}`
+    + `-${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}`;
+}
+
+/**
+ * Write the archive copy. Never throws: a full disk or a locked folder must
+ * not cost the guest their QR code, which is the part they are standing there
+ * waiting for.
+ */
+function archivePhoto(token, mimeType, bytes, createdAt) {
+  const name = `dsac-${fileStamp(createdAt)}-${token.slice(0, 8)}.${extForMime(mimeType)}`;
+  try {
+    fs.writeFileSync(path.join(PHOTOS_DIR, name), bytes);
+  } catch (err) {
+    console.error(`  Could not archive ${name}: ${err.message}`);
+  }
 }
 
 function getLocalNetworkIP() {
@@ -192,6 +226,9 @@ app.post('/api/photos/composed', booth, upload.single('file'), validateImage, as
       expiresAt: expiresAt.toISOString(),
     });
 
+    // Second copy, on disk, outliving the row above.
+    archivePhoto(token, req.file.mimetype, req.file.buffer, createdAt);
+
     // Tell the organiser's phone the shot has landed, so it can offer a retake.
     remote.setState({
       phase: 'captured',
@@ -249,6 +286,34 @@ app.get('/api/photos/recent', booth, (_req, res) => {
       src: `/api/preview/${encodeURIComponent(p.token)}`,
     })),
   });
+});
+
+/**
+ * Reveal the archive folder in the desktop's own file manager.
+ *
+ * This opens a window on the machine running the server — which is the kiosk
+ * itself, sitting right in front of the organiser, so "open the folder" means
+ * what it says. Detached and unwatched: the file manager outlives the request
+ * and the booth never waits on it.
+ */
+app.post('/api/gallery/open-folder', booth, (_req, res) => {
+  fs.mkdirSync(PHOTOS_DIR, { recursive: true });
+
+  const opener = process.platform === 'darwin' ? 'open'
+    : process.platform === 'win32' ? 'explorer'
+    : 'xdg-open';
+
+  try {
+    const child = spawn(opener, [PHOTOS_DIR], { detached: true, stdio: 'ignore' });
+    // explorer.exe exits non-zero even when it worked, so errors from the
+    // child are not worth reporting; only a failure to launch at all is.
+    child.on('error', err => console.error(`  Could not open ${PHOTOS_DIR}: ${err.message}`));
+    child.unref();
+  } catch (err) {
+    return res.status(500).json({ error: `Could not open the folder: ${err.message}` });
+  }
+
+  return res.json({ ok: true, dir: PHOTOS_DIR });
 });
 
 // ── Remote control ───────────────────────────────────────────────────────────
@@ -322,11 +387,50 @@ app.put('/api/settings/capture', booth, (req, res) => {
   if (!incoming || typeof incoming !== 'object') {
     return res.status(400).json({ error: 'Expected a settings object' });
   }
-  const merged = { ...DEFAULT_CAPTURE_SETTINGS, ...incoming };
+  // Layer the stored settings between the defaults and the write. A client
+  // running an older bundle sends the fields it knows about; without this, a
+  // stale settings page (or a phone remote that has not been reloaded) would
+  // silently wipe every field added since it loaded.
+  const stored = store.kv.get('captureSettings', {});
+  const merged = { ...DEFAULT_CAPTURE_SETTINGS, ...stored, ...incoming };
   store.kv.set('captureSettings', merged);
   // Nudge the kiosk so a settings change takes effect without a reload.
   remote.command('settings-changed', { settings: merged });
   return res.json({ settings: merged });
+});
+
+/**
+ * Named capture presets — a whole camera setup saved under a name, so an
+ * operator can flip between "morning booth" and "evening booth" without
+ * rebuilding crop, look and countdown by hand.
+ *
+ * The settings blob is stored verbatim and never inspected here: whatever
+ * fields capture settings grow, a preset carries them along for free.
+ */
+const MAX_PRESETS = 20;
+const MAX_PRESET_NAME = 40;
+
+app.get('/api/settings/presets', booth, (_req, res) => {
+  res.json({ presets: store.kv.get('capturePresets', []) });
+});
+
+app.put('/api/settings/presets', booth, (req, res) => {
+  const incoming = req.body?.presets ?? req.body;
+  if (!Array.isArray(incoming)) {
+    return res.status(400).json({ error: 'Expected a presets array' });
+  }
+
+  // Replace the whole list, like frame settings — the client always holds the
+  // full set, so there is no partial update to reconcile.
+  const presets = incoming.slice(0, MAX_PRESETS).map(p => ({
+    id: String(p?.id ?? crypto.randomUUID()),
+    name: String(p?.name ?? 'Preset').slice(0, MAX_PRESET_NAME),
+    createdAt: String(p?.createdAt ?? new Date().toISOString()),
+    settings: p?.settings && typeof p.settings === 'object' ? p.settings : {},
+  }));
+
+  store.kv.set('capturePresets', presets);
+  return res.json({ presets });
 });
 
 // ── Frame catalogue ──────────────────────────────────────────────────────────
@@ -495,6 +599,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
   banner('Local', `http://localhost:${SERVES_FRONTEND ? port : frontendPort}`);
   banner('Database', store.file);
   banner('Photos stored', `${store.photos.count()}`);
+  banner('Photo folder', PHOTOS_DIR);
   banner('Retention', `${PHOTO_TTL_DAYS} day(s)`);
   banner('Frontend', SERVES_FRONTEND ? 'served from ./dist' : 'dev server (Vite)');
 

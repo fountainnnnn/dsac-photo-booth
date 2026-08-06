@@ -13,18 +13,26 @@ interface Drawn { text: string; x: number; y: number; align: string; font: strin
 /** Pixel size out of a CSS font string, which may lead with a weight. */
 const fontPx = (font: string) => Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 0);
 
+/** An outline pass, kept apart from the fills so the fill assertions still line up. */
+interface Stroked { text: string; colour: string; lineWidth: number; font: string }
+
 /** Records what was drawn. Text metrics are stubbed proportional to length. */
 function recorder() {
   const drawn: Drawn[] = [];
+  const stroked: Stroked[] = [];
   const ctx = {
-    font: '', fillStyle: '', textAlign: 'left', textBaseline: 'alphabetic',
+    font: '', fillStyle: '', strokeStyle: '', lineJoin: 'miter', lineWidth: 1,
+    textAlign: 'left', textBaseline: 'alphabetic',
     save() {}, restore() {},
     measureText: (t: string) => ({ width: t.length * 0.5 * fontPx(ctx.font) }),
     fillText(text: string, x: number, y: number) {
       drawn.push({ text, x, y, align: ctx.textAlign, font: ctx.font });
     },
+    strokeText(text: string) {
+      stroked.push({ text, colour: ctx.strokeStyle, lineWidth: ctx.lineWidth, font: ctx.font });
+    },
   };
-  return { ctx: ctx as unknown as CanvasRenderingContext2D, drawn };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, drawn, stroked };
 }
 
 const frame = (id: string) => {
@@ -88,6 +96,21 @@ describe('drawDateStamp', () => {
     const [name, date] = draw('tech');
     expect(name.font).toMatch(/^bold /);
     expect(date.font).not.toMatch(/bold/);
+  });
+
+  // Ink Free has no bold face, so the weight alone is a synthesised one and
+  // prints thin. The name is outlined in its own colour to thicken it; the
+  // date is not, or the two lines would weigh the same.
+  it('outlines only the event name, in the caption colour', () => {
+    for (const id of ['tech', 'doodle']) {
+      const slot = frame(id).captionSlot!;
+      const { ctx, stroked } = recorder();
+      drawDateStamp(ctx, frame(id), FRAME_W, FRAME_H, EVENT);
+
+      expect(stroked.map((s) => s.text)).toEqual(['AI Learning Journey']);
+      expect(stroked[0].colour).toBe(slot.colour);
+      expect(stroked[0].lineWidth).toBeCloseTo(fontPx(stroked[0].font) / 24, 5);
+    }
   });
 
   it('writes today, spelled out, with no way to pin a stale date', () => {

@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react';
 import CameraView from '@/components/features/capture-photo/CameraView';
 import QrDownloadScreen from '@/components/features/qr-download/QrDownloadScreen';
 import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
-import type { CapturedPhoto } from '@/types/capture';
 import type { ComposedUploadResponse } from '@/types/download';
 
 /**
@@ -14,14 +13,12 @@ type Step = 'camera' | 'uploading' | 'qr-download';
 
 export default function CapturePage() {
   const [step, setStep] = useState<Step>('camera');
-  const [captured, setCaptured] = useState<CapturedPhoto | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [composedDataUrl, setComposedDataUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [linkedInShareUrl, setLinkedInShareUrl] = useState<string | null>(null);
 
   const resetFlow = useCallback(() => {
-    setCaptured(null);
     setUploadError(null);
     setComposedDataUrl(null);
     setDownloadUrl(null);
@@ -31,8 +28,6 @@ export default function CapturePage() {
 
   // Straight from shutter to QR code — upload as soon as the photo exists.
   const handleCapture = useCallback(async (blob: Blob, dataUrl: string) => {
-    const createdAt = new Date().toISOString();
-    setCaptured({ dataUrl, blob, createdAt, composedDataUrl: dataUrl });
     setComposedDataUrl(dataUrl);
     setUploadError(null);
     setStep('uploading');
@@ -48,7 +43,6 @@ export default function CapturePage() {
       }
 
       const data = await uploadRes.json() as ComposedUploadResponse;
-      setCaptured(prev => prev ? { ...prev, composedId: data.token, composedUrl: data.downloadUrl } : prev);
       setDownloadUrl(data.downloadUrl);
       setLinkedInShareUrl(data.linkedInShareUrl ?? null);
       setStep('qr-download');

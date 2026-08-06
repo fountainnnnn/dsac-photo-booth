@@ -7,6 +7,7 @@ import {
   EventSettingsCard, LookSettingsCard, useCaptureSettingsControl,
 } from '@/components/features/remote/CaptureSettingsCard';
 import CameraCropCard from '@/components/features/remote/CameraCropCard';
+import PresetsCard from '@/components/features/remote/PresetsCard';
 import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 import PasswordsCard from '@/components/features/auth/PasswordsCard';
 
@@ -277,6 +278,8 @@ export default function SettingsPage() {
             {...capture}
             frame={frames.find(f => f.id === capture.settings.selectedFrameId) ?? null}
           />
+          {/* Sits under the camera cards because it saves what they set. */}
+          <PresetsCard {...capture} />
           <RemoteAccessCard />
           <PasswordsCard />
 

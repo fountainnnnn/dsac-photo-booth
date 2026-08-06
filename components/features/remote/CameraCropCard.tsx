@@ -3,7 +3,7 @@ import { ArrowsInSimple, ArrowsOut, Crop, MagnifyingGlass } from '@phosphor-icon
 import { FULL_FRAME, type CameraCrop } from './useCaptureSettings';
 import type { CaptureSettingsControl } from './CaptureSettingsCard';
 import { FRAME_W, FRAME_H, type FrameConfig } from '@/types/frame';
-import { filtersToCSS } from '@/types/editor';
+import { filtersAreNeutral, filtersToCSS, rampStartEdge, type LookRamp } from '@/types/editor';
 
 /**
  * Line up the camera inside the photo window.
@@ -49,8 +49,19 @@ export interface CameraCropCardProps extends CaptureSettingsControl {
   frame?: FrameConfig | null;
 }
 
+/** The CSS fade matching a ramp: black where the Look applies in full,
+ *  transparent where it has faded out. */
+const RAMP_FADE: Record<LookRamp, string | null> = {
+  even: null,
+  down: 'to bottom',
+  up: 'to top',
+  rightward: 'to right',
+  leftward: 'to left',
+};
+
 export default function CameraCropCard({ settings, push, frame }: CameraCropCardProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videosRef = useRef<Set<HTMLVideoElement>>(new Set());
   const streamRef = useRef<MediaStream | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
@@ -66,11 +77,22 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
    */
   const attachVideo = useCallback((el: HTMLVideoElement | null) => {
     videoRef.current = el;
-    if (el && streamRef.current && el.srcObject !== streamRef.current) {
+    attachAnyVideo(el);
+  }, []);
+
+  /**
+   * The ramp overlay is a second copy of the same stream, mounted only while a
+   * ramp is on — so every <video> this card renders registers here and gets
+   * the stream whether it mounted before the camera opened or after.
+   */
+  const attachAnyVideo = (el: HTMLVideoElement | null) => {
+    if (!el) return;
+    videosRef.current.add(el);
+    if (streamRef.current && el.srcObject !== streamRef.current) {
       el.srcObject = streamRef.current;
       void el.play().catch(() => { /* autoplay policy; the attribute retries */ });
     }
-  }, []);
+  };
 
   // Its own stream: this card is open while the capture screen is not, and
   // sharing one across pages would mean keeping the camera awake needlessly.
@@ -82,7 +104,12 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
     }).then((s) => {
       if (cancelled) { s.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = s;
-      attachVideo(videoRef.current);
+      for (const el of videosRef.current) {
+        if (el.srcObject !== s) {
+          el.srcObject = s;
+          void el.play().catch(() => { /* autoplay policy; the attribute retries */ });
+        }
+      }
       setReady(true);
     }).catch((e: Error) => setError(e.message));
 
@@ -182,6 +209,21 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
   const pct = (n: number) => `${n * 100}%`;
   const zoom = 1 / crop.w;
 
+  // The Look, as this card can express it. A CSS filter is uniform, so the
+  // ramp needs two layers: the untouched camera underneath, and a fully
+  // adjusted copy faded out by a gradient mask — the same two-layer
+  // construction the canvas draws, so this preview and the photo agree. The
+  // mask sits on an unmirrored wrapper so left and right mean what the
+  // operator sees.
+  const fade = RAMP_FADE[settings.lookRamp] ?? null;
+  const ramping = fade !== null
+    && rampStartEdge(settings.lookRamp) !== null
+    && !filtersAreNeutral(settings.filters);
+  const baseFilter = ramping ? 'none' : filtersToCSS(settings.filters);
+  const camRectStyle = {
+    left: pct(cam.x), top: pct(cam.y), width: pct(cam.w), height: pct(cam.h),
+  };
+
   return (
     <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
       <div className="flex items-center gap-2">
@@ -234,11 +276,34 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
           ref={attachVideo} autoPlay playsInline muted
           className="absolute max-w-none"
           style={{
-            left: pct(cam.x), top: pct(cam.y), width: pct(cam.w), height: pct(cam.h),
+            ...camRectStyle,
             transform: 'scaleX(-1)',
-            filter: filtersToCSS(settings.filters),
+            filter: baseFilter,
           }}
         />
+
+        {/* The Look ramp: the same feed again with the full adjustments,
+            masked so they fade across the picture. */}
+        {ramping && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute"
+            style={{
+              ...camRectStyle,
+              maskImage: `linear-gradient(${fade}, black, transparent)`,
+              WebkitMaskImage: `linear-gradient(${fade}, black, transparent)`,
+            }}
+          >
+            <video
+              ref={attachAnyVideo} autoPlay playsInline muted
+              className="h-full w-full max-w-none"
+              style={{
+                transform: 'scaleX(-1)',
+                filter: filtersToCSS(settings.filters),
+              }}
+            />
+          </div>
+        )}
 
         {!ready && (
           <p className="absolute inset-0 z-40 flex items-center justify-center px-6 text-center text-[0.78rem] text-white/70">

@@ -164,13 +164,23 @@ describe('CameraView', () => {
       drawImage: vi.fn(),
       scale: vi.fn(),
       translate: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
     };
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
       fakeCtx as unknown as CanvasRenderingContext2D
     );
+    // The shutter renders onto a canvas of its own; note its size so the test
+    // below can prove it is the camera's, not the on-screen preview's.
+    const outputSize: { w: number; h: number }[] = [];
     const toDataURLSpy = vi
       .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
-      .mockReturnValue('data:image/jpeg;base64,fake');
+      .mockImplementation(function (this: HTMLCanvasElement) {
+        outputSize.push({ w: this.width, h: this.height });
+        return 'data:image/jpeg;base64,fake';
+      });
     const toBlobSpy = vi
       .spyOn(HTMLCanvasElement.prototype, 'toBlob')
       .mockImplementation(function (
@@ -211,6 +221,11 @@ describe('CameraView', () => {
     expect(dataUrl).toContain('data:image/jpeg');
     expect(fakeCtx.drawImage).toHaveBeenCalled();
 
+    // The photo is the camera's own resolution. It used to be a copy of the
+    // preview canvas, which is sized to the stage in screen pixels — that is
+    // how a 1080p camera was producing a photo the size of the window.
+    expect(outputSize.at(-1)).toEqual({ w: 640, h: 480 });
+
     toDataURLSpy.mockRestore();
     toBlobSpy.mockRestore();
   });
@@ -225,7 +240,10 @@ describe('CameraView', () => {
 
     const fakeBlob = new Blob(['fake'], { type: 'image/jpeg' });
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-      { drawImage: vi.fn(), scale: vi.fn(), translate: vi.fn() } as unknown as CanvasRenderingContext2D,
+      {
+        drawImage: vi.fn(), scale: vi.fn(), translate: vi.fn(),
+        save: vi.fn(), restore: vi.fn(), clearRect: vi.fn(), fillRect: vi.fn(),
+      } as unknown as CanvasRenderingContext2D,
     );
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,fake');
     vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (
