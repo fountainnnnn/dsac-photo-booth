@@ -1,0 +1,58 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dsac-photo-booth",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-06",
+  // Many of the libraries this booth already uses reach for Node built-ins.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The built SPA. Vite writes it to dist/ exactly as it does for the Express
+  // build, so one `npm run build` still serves both deployments.
+  //
+  // `single-page-application` is wrong here: the booth's own routes must fall
+  // through to index.html, but /api/* must reach the Worker, so the Worker
+  // runs first and asks for an asset only when it wants one.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dsac-photo-booth",
+      "database_id": "fa2c9394-f8e5-40e0-a567-85f4fa17c285"
+    }
+  ],
+
+  // The kiosk <-> phone hub. It has to be a Durable Object: a poll held open
+  // in one isolate can never be woken by a command that lands in another, and
+  // module state is not shared between them.
+  "durable_objects": {
+    "bindings": [{ "name": "REMOTE", "class_name": "RemoteHub" }]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RemoteHub"] }
+  ],
+
+  // Sweeping expired photos was a setInterval in the Express server. There is
+  // no long-lived process here, so it becomes a scheduled trigger: hourly,
+  // which is finer than the old six-hourly sweep and costs nothing.
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+
+  // R2 is not enabled on this account yet, so there is no bucket binding.
+  // `worker/blobs.ts` falls back to storing bytes in D1 until one appears.
+  // When R2 is switched on, create the bucket and add:
+  //
+  //   "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "dsac-photo-booth" }]
+  //
+  // and the blob store picks it up with no code change.
+}
