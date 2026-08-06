@@ -12,6 +12,10 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    // The booth is reached over a Cloudflare quick tunnel, whose hostname is
+    // random and changes every run. Vite's host check would reject each new
+    // one, so trust the whole quick-tunnel suffix rather than chasing names.
+    allowedHosts: ['.trycloudflare.com'],
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
@@ -23,6 +27,10 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 5173,
+    // The booth is reached over a Cloudflare quick tunnel, whose hostname is
+    // random and changes every run. Vite's host check would reject each new
+    // one, so trust the whole quick-tunnel suffix rather than chasing names.
+    allowedHosts: ['.trycloudflare.com'],
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',

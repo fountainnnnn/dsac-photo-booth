@@ -37,6 +37,16 @@ function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 
   });
 }
 
+/**
+ * Widest photo we will write.
+ *
+ * Uncapping the camera means an 8K webcam would otherwise ask for a ~9100px
+ * artboard — past what some canvas implementations will allocate, and slow to
+ * JPEG-encode while a guest waits at the booth. No camera on a booth laptop
+ * gets near this, so in practice it is a backstop, not a limit.
+ */
+const MAX_OUTPUT_W = 8192;
+
 /** True once an <img> holds decoded pixels we can safely draw. */
 function isDrawable(img: HTMLImageElement | undefined): img is HTMLImageElement {
   return !!img && img.complete && img.naturalWidth > 0;
@@ -112,7 +122,14 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
         // cost us: webcams are 16:9, so a browser that honours it crops away
         // field of view, and one that ignores it hands back 16:9 anyway. Take
         // the camera's native shape and let the stage adapt to it.
-        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        //
+        // The size is asked for absurdly large on purpose. `ideal` is a target
+        // the browser clamps to whatever the device can actually do, so this
+        // reads "give me everything you have" — 1080p from a 1080p webcam, 4K
+        // from a 4K one. Dropping the constraint entirely would be the
+        // opposite: cameras then hand back their *default* mode, which is
+        // routinely 640x480.
+        video: { facingMode, width: { ideal: 7680 }, height: { ideal: 4320 } },
         audio: false,
       });
       streamRef.current = stream;
@@ -229,14 +246,32 @@ export default function CameraView({ facingMode = 'user', onCapture, onError, on
     // so copying it threw away most of a 1080p camera and handed the guest a
     // photo the size of the window they were standing in front of.
     //
-    // With a frame on, the output is the artboard so the PNG lands
-    // pixel-for-pixel. With no frame there is nothing to line up against, so
-    // the cropped region is written at its own native size: a straight 1:1
-    // read of the sensor, no resampling at all.
+    // With no frame there is nothing to line up against, so the cropped
+    // region is written at its own native size: a straight 1:1 read of the
+    // sensor, no resampling at all.
+    //
+    // With a frame the artboard is grown until its photo window lands on that
+    // same 1:1 read, rather than the picture being squeezed into a fixed
+    // 1921x1201 sheet — on that sheet the window is only 1614px wide, so a
+    // 1080p camera lost a sixth of its width and a 4K one most of itself. The
+    // frame PNG is interpolated up instead, which flat vector artwork survives
+    // far better than a photograph survives being shrunk.
     const vw = video.videoWidth  || FRAME_W_PX;
     const vh = video.videoHeight || FRAME_H_PX;
-    const outW = activeFrame ? FRAME_W_PX : Math.max(1, Math.round((crop?.w ?? 1) * vw));
-    const outH = activeFrame ? FRAME_H_PX : Math.max(1, Math.round((crop?.h ?? 1) * vh));
+    const srcW = Math.max(1, Math.round((crop?.w ?? 1) * vw));
+    const srcH = Math.max(1, Math.round((crop?.h ?? 1) * vh));
+
+    let outW = srcW;
+    let outH = srcH;
+    if (activeFrame) {
+      const win = activeFrame.window;
+      // Never below the artboard's own size: a hard zoom samples few pixels,
+      // and rendering the artwork smaller than it was drawn would cost more
+      // than the photo gains.
+      const wanted = win ? Math.round(srcW / win.w) : srcW;
+      outW = Math.min(MAX_OUTPUT_W, Math.max(FRAME_W_PX, wanted));
+      outH = Math.round(outW / FRAME_ASPECT);
+    }
 
     const canvas = document.createElement('canvas');
     canvas.width = outW; canvas.height = outH;

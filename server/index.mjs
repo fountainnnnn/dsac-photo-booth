@@ -48,7 +48,10 @@ const app = express();
 const port = Number.parseInt(process.env.PORT ?? '3001', 10);
 const frontendPort = Number.parseInt(process.env.FRONTEND_PORT ?? '5173', 10);
 const ACCEPTED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const MAX_BYTES = 10 * 1024 * 1024;
+// Generous, because captures are now sized from the camera rather than a
+// fixed artboard: a 4K webcam writes a ~4600px JPEG, which 10 MB would reject
+// and the guest would watch the upload fail after the shutter had already gone.
+const MAX_BYTES = 64 * 1024 * 1024;
 // How long a download link stays live before it is swept away.
 const PHOTO_TTL_DAYS = Number.parseFloat(process.env.PHOTO_TTL_DAYS ?? '7');
 const TTL_MS = PHOTO_TTL_DAYS * 24 * 60 * 60 * 1000;
