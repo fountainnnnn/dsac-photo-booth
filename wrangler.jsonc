@@ -18,6 +18,14 @@
     "run_worker_first": true
   },
 
+  // Photo, frame and QR bytes. The blob store prefers this over D1 the moment
+  // the binding exists — D1 was only ever a stopgap, and it could not hold a
+  // full-resolution capture: rows cap out around 2 MB and a 4K photo of a
+  // detailed scene clears that easily.
+  "r2_buckets": [
+    { "binding": "PHOTOS", "bucket_name": "dsac-photo-booth" }
+  ],
+
   "d1_databases": [
     {
       "binding": "DB",
@@ -47,12 +55,4 @@
     "enabled": true,
     "head_sampling_rate": 1
   }
-
-  // R2 is not enabled on this account yet, so there is no bucket binding.
-  // `worker/blobs.ts` falls back to storing bytes in D1 until one appears.
-  // When R2 is switched on, create the bucket and add:
-  //
-  //   "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "dsac-photo-booth" }]
-  //
-  // and the blob store picks it up with no code change.
 }
