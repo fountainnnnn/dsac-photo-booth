@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90">
-  <rect width="320" height="90" rx="5" fill="rgba(17,16,15,0.80)"/>
-  <rect x="0" y="0" width="5" height="90" rx="2" fill="#e1262f"/>
-  <text x="20" y="40" font-family="'Segoe UI',Arial,Helvetica,sans-serif" font-size="26" font-weight="900" fill="#e1262f">SP</text>
-  <text x="57" y="40" font-family="'Segoe UI',Arial,Helvetica,sans-serif" font-size="13" font-weight="700" fill="rgba(255,255,255,0.90)" letter-spacing="0.5">DSAC</text>
-  <text x="20" y="64" font-family="'Segoe UI',Arial,Helvetica,sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.50)">Data Science &amp; Analytics Centre</text>
-  <text x="20" y="80" font-family="'Segoe UI',Arial,Helvetica,sans-serif" font-size="10" font-weight="600" fill="rgba(225,38,47,0.80)" letter-spacing="0.5">AI LEARNING JOURNEY</text>
-</svg>
