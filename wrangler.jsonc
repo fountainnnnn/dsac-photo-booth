@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "dsac-photo-booth",
+  "name": "booth",
   "main": "worker/index.ts",
   "compatibility_date": "2026-08-06",
   // Many of the libraries this booth already uses reach for Node built-ins.
