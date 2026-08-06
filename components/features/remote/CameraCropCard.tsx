@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowsInSimple, ArrowsOut, Crop, MagnifyingGlass } from '@phosphor-icons/react';
 import { FULL_FRAME, type CameraCrop } from './useCaptureSettings';
 import { cameraConstraints, raiseToMaxResolution } from '@/components/features/capture-photo/cameras';
+import { photoOutputSize } from '@/components/features/capture-photo/outputSize';
 import type { CaptureSettingsControl } from './CaptureSettingsCard';
 import { FRAME_W, FRAME_H, type FrameConfig } from '@/types/frame';
 import { filtersAreNeutral, filtersToCSS, rampStartEdge, type LookRamp } from '@/types/editor';
@@ -68,6 +69,8 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
   const [ready, setReady] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [showFrame, setShowFrame] = useState(true);
+  // The camera's own pixel size, which is what decides how big the photo can be.
+  const [sensor, setSensor] = useState({ width: 0, height: 0 });
   const [error, setError] = useState<string | null>(null);
   const crop = settings.crop ?? FULL_FRAME;
 
@@ -276,6 +279,10 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
             is lined up against something the booth never produces. */}
         <video
           ref={attachVideo} autoPlay playsInline muted
+          onLoadedMetadata={e => setSensor({
+            width: e.currentTarget.videoWidth,
+            height: e.currentTarget.videoHeight,
+          })}
           className="absolute max-w-none"
           style={{
             ...camRectStyle,
@@ -374,6 +381,39 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
             ? `${zoom.toFixed(1)}× zoom — the window keeps ${Math.round(crop.w * 100)}% of the camera's width.`
             : `${zoom.toFixed(1)}× — the camera sits inside the photo with white margins.`}
       </p>
+
+      {/* What the shutter will actually write. Zooming throws sensor pixels
+          away, and that cost was previously invisible until someone opened the
+          file afterwards — so it is quoted here, from the same rule the
+          shutter uses. */}
+      {sensor.width > 0 && (() => {
+        const size = photoOutputSize(
+          sensor,
+          settings.cropEnabled ? settings.crop : null,
+          frame ?? null,
+        );
+        const lost = sensor.width - size.cameraWidth;
+        return (
+          <p className="mt-2 rounded-lg bg-[var(--shell-bg)] px-3.5 py-2.5 text-[0.72rem] leading-[1.6] tabular-nums text-[var(--ink-2)]">
+            Photo will be{' '}
+            <strong className="font-semibold text-[var(--ink)]">
+              {size.width} × {size.height}
+            </strong>
+            {' — '}
+            {size.cameraWidth} camera pixels wide
+            {lost > 0 && (
+              <span className="text-[var(--accent-ink)]">
+                {' '}({lost} thrown away by the zoom)
+              </span>
+            )}
+            {size.upscaled && (
+              <span className="text-[var(--accent-ink)]">
+                {' '}· zoomed in far enough that the photo is being stretched
+              </span>
+            )}
+          </p>
+        );
+      })()}
     </section>
   );
 }

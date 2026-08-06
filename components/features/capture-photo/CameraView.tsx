@@ -10,6 +10,7 @@ import {
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useLivePreview, drawPhoto } from './useLivePreview';
 import { cameraConstraints, raiseToMaxResolution } from './cameras';
+import { photoOutputSize } from './outputSize';
 import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
 import { useCaptureSettings, unmirrorCrop } from '@/components/features/remote/useCaptureSettings';
 import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
@@ -36,16 +37,6 @@ function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 
     }, type, quality);
   });
 }
-
-/**
- * Widest photo we will write.
- *
- * Uncapping the camera means an 8K webcam would otherwise ask for a ~9100px
- * artboard — past what some canvas implementations will allocate, and slow to
- * JPEG-encode while a guest waits at the booth. No camera on a booth laptop
- * gets near this, so in practice it is a backstop, not a limit.
- */
-const MAX_OUTPUT_W = 8192;
 
 /** True once an <img> holds decoded pixels we can safely draw. */
 function isDrawable(img: HTMLImageElement | undefined): img is HTMLImageElement {
@@ -256,22 +247,13 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
     // 1080p camera lost a sixth of its width and a 4K one most of itself. The
     // frame PNG is interpolated up instead, which flat vector artwork survives
     // far better than a photograph survives being shrunk.
-    const vw = video.videoWidth  || FRAME_W_PX;
-    const vh = video.videoHeight || FRAME_H_PX;
-    const srcW = Math.max(1, Math.round((crop?.w ?? 1) * vw));
-    const srcH = Math.max(1, Math.round((crop?.h ?? 1) * vh));
-
-    let outW = srcW;
-    let outH = srcH;
-    if (activeFrame) {
-      const win = activeFrame.window;
-      // Never below the artboard's own size: a hard zoom samples few pixels,
-      // and rendering the artwork smaller than it was drawn would cost more
-      // than the photo gains.
-      const wanted = win ? Math.round(srcW / win.w) : srcW;
-      outW = Math.min(MAX_OUTPUT_W, Math.max(FRAME_W_PX, wanted));
-      outH = Math.round(outW / FRAME_ASPECT);
-    }
+    const size = photoOutputSize(
+      { width: video.videoWidth || FRAME_W_PX, height: video.videoHeight || FRAME_H_PX },
+      crop,
+      activeFrame,
+    );
+    const outW = size.width;
+    const outH = size.height;
 
     const canvas = document.createElement('canvas');
     canvas.width = outW; canvas.height = outH;
