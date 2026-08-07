@@ -28,10 +28,23 @@ export interface BlobStore {
 }
 
 export function createBlobStore(env: BlobEnv): BlobStore {
-  return env.PHOTOS ? r2Store(env.PHOTOS) : d1Store(env.DB);
+  return env.PHOTOS ? r2Store(env.PHOTOS, env.DB) : d1Store(env.DB);
 }
 
-function r2Store(bucket: R2Bucket): BlobStore {
+/**
+ * R2, with D1 kept as a reading room for anything written before R2 existed.
+ *
+ * Switching backends stranded every photo taken during the D1 stopgap: the
+ * bytes were still in the table, but nothing looked there any more, so those
+ * photos read as missing. A missing photo then looked to the sweep like one
+ * with nothing left to archive, and it deleted them. Hence the fallback — and
+ * hence the copy: a legacy object found in D1 is written across to R2 on the
+ * way out, so the second read is a plain R2 hit and the migration completes
+ * itself as the old photos are used.
+ */
+function r2Store(bucket: R2Bucket, d1: D1Database): BlobStore {
+  const legacy = d1Store(d1);
+
   return {
     kind: 'r2',
 
@@ -43,17 +56,39 @@ function r2Store(bucket: R2Bucket): BlobStore {
 
     async get(key) {
       const object = await bucket.get(key);
-      if (!object) return null;
-      // Streamed rather than buffered: a 4K capture is several megabytes and
-      // there is no reason for it to pass through the isolate's heap.
-      return {
-        body: object.body,
-        contentType: object.httpMetadata?.contentType ?? 'application/octet-stream',
-      };
+      if (object) {
+        // Streamed rather than buffered: a 4K capture is several megabytes and
+        // there is no reason for it to pass through the isolate's heap.
+        return {
+          body: object.body,
+          contentType: object.httpMetadata?.contentType ?? 'application/octet-stream',
+        };
+      }
+
+      const old = await legacy.get(key);
+      if (!old) return null;
+
+      // Buffered, because it is about to be written twice: once into R2 and
+      // once into the response. Legacy rows are all small — D1 could not hold
+      // a large one, which is why R2 exists.
+      const body = old.body instanceof ArrayBuffer
+        ? old.body
+        : await new Response(old.body).arrayBuffer();
+      try {
+        await bucket.put(key, body, { httpMetadata: { contentType: old.contentType } });
+        await legacy.delete(key);
+      } catch (err) {
+        // Serving the photo matters more than tidying it away; the next read
+        // will try again.
+        console.error('Could not migrate a legacy blob into R2', { key, err });
+      }
+      return { body, contentType: old.contentType };
     },
 
     async delete(key) {
       await bucket.delete(key);
+      // A legacy copy may still be sitting in D1 under the same key.
+      await legacy.delete(key).catch(() => { /* nothing there, or already gone */ });
     },
   };
 }

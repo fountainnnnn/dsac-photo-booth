@@ -561,7 +561,41 @@ app.all('*', async (c) => {
  * configured leaves this function having touched nothing.
  */
 /**
- * Hand a photo to the Drive archive, and say whether it is safely there.
+ * A Drive access token, minted from the operator's refresh token.
+ *
+ * Access tokens last an hour and the sweep runs hourly, so caching one in the
+ * isolate would be a coin flip on whether it is still good. Minting per sweep
+ * costs one request against a job that is already uploading megabytes.
+ */
+async function driveAccessToken(env: Env): Promise<string | null> {
+  if (!env.GOOGLE_REFRESH_TOKEN || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null;
+  try {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: env.GOOGLE_CLIENT_ID,
+        client_secret: env.GOOGLE_CLIENT_SECRET,
+        refresh_token: env.GOOGLE_REFRESH_TOKEN,
+        grant_type: 'refresh_token',
+      }),
+    });
+    if (!res.ok) {
+      // A revoked or rotated token lands here. Say so loudly: from this point
+      // the sweep will hold every photo rather than delete one it cannot save.
+      console.error('Drive token refresh failed', { status: res.status });
+      return null;
+    }
+    const out = await res.json() as { access_token?: string };
+    return out.access_token ?? null;
+  } catch (err) {
+    console.error('Drive token refresh threw', { err });
+    return null;
+  }
+}
+
+/**
+ * Put a photo in the operator's Drive, and say whether it is safely there.
  *
  * Returns false only when an archive is configured and the upload did not
  * confirm. The sweep treats that as a reason to keep the photo: a Drive
@@ -569,49 +603,88 @@ app.all('*', async (c) => {
  *
  * When no archive is configured this returns true — the operator set a
  * retention window knowing there was nowhere else for the photos to go, and
- * second-guessing that would leave the gallery filling up regardless of the
- * setting.
+ * second-guessing that would leave the gallery filling up regardless.
  */
 async function archiveToDrive(
   env: Env,
   s: Pick<Services, 'blobs'>,
   photo: { token: string; mime: string; createdAt: string },
+  accessToken: string | null,
 ): Promise<boolean> {
-  const url = env.DRIVE_WEBHOOK_URL;
-  const secret = env.DRIVE_WEBHOOK_SECRET;
-  if (!url || !secret) return true; // no archive configured
+  const folder = env.GOOGLE_DRIVE_FOLDER_ID;
+  if (!folder || !env.GOOGLE_REFRESH_TOKEN) return true; // no archive configured
+  if (!accessToken) return false;                         // configured but unreachable
 
   const blob = await s.blobs.get(`photo/${photo.token}`);
-  if (!blob) return true; // nothing left to save; let the row go
+  if (!blob) {
+    // This used to read "nothing left to save, let the row go", and that cost
+    // us: when the store moved to R2 the older photos were still in D1 and
+    // read as missing, so the sweep deleted them believing there was nothing
+    // to archive. A photo we cannot find is a fault to investigate, never a
+    // photo we are free to destroy.
+    console.error('Refusing to sweep a photo whose bytes are missing', { token: photo.token });
+    return false;
+  }
 
   const bytes = blob.body instanceof ArrayBuffer
     ? new Uint8Array(blob.body)
     : new Uint8Array(await new Response(blob.body as ReadableStream).arrayBuffer());
 
-  // Chunked so a multi-megabyte photo does not blow the argument limit that
-  // spreading a whole array into String.fromCharCode would.
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 8192) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  }
+  const name = archiveName(photo.token, photo.mime, new Date(photo.createdAt));
 
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        secret,
-        name: archiveName(photo.token, photo.mime, new Date(photo.createdAt)),
-        mimeType: photo.mime,
-        dataBase64: btoa(binary),
-      }),
-    });
-    // Apps Script answers 200 with an ok flag rather than an HTTP status, so
-    // the body is the only trustworthy signal here.
-    const out = await res.json().catch(() => null) as { ok?: boolean } | null;
-    return Boolean(res.ok && out?.ok);
+    // Skip anything already there. The sweep retries whatever it could not
+    // confirm, and a retry must not leave two copies of the same photo.
+    const q = encodeURIComponent(`name='${name}' and '${folder}' in parents and trashed=false`);
+    const found = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&pageSize=1`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (found.ok) {
+      const list = await found.json() as { files?: unknown[] };
+      if (list.files?.length) return true;
+    }
+
+    // Multipart: one part of metadata, one of bytes, in a single request.
+    const boundary = 'dsac-boundary-' + crypto.randomUUID();
+    const meta = JSON.stringify({ name, parents: [folder] });
+    const enc = new TextEncoder();
+    const head = enc.encode(
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}` +
+      `\r\n--${boundary}\r\nContent-Type: ${photo.mime}\r\n\r\n`,
+    );
+    const tail = enc.encode(`\r\n--${boundary}--`);
+    const body = new Uint8Array(head.length + bytes.length + tail.length);
+    body.set(head, 0);
+    body.set(bytes, head.length);
+    body.set(tail, head.length + bytes.length);
+
+    // Drive rate-limits a burst — a sweep clearing a backlog will trip it, and
+    // it answers 403 or 429 rather than anything more specific. Backing off
+    // and retrying turns that into a slower sweep instead of a held photo.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const res = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`,
+          },
+          body,
+        },
+      );
+      if (res.ok) return true;
+      if (res.status !== 403 && res.status !== 429 && res.status < 500) {
+        console.error('Drive upload rejected', { token: photo.token, status: res.status });
+        return false;
+      }
+      await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+    }
+    console.error('Drive upload still rate-limited after retries', { token: photo.token });
+    return false;
   } catch (err) {
-    console.error('Drive archive failed', { token: photo.token, err });
+    console.error('Drive upload threw', { token: photo.token, err });
     return false;
   }
 }
@@ -637,12 +710,20 @@ async function sweepGallery(env: Env, s: Pick<Services, 'db' | 'blobs'>): Promis
   // One photo at a time, each in its own try: a single wedged blob must not
   // abandon the rest of the run, or one bad object keeps every older photo
   // alive forever.
+  // Minted once for the whole run rather than per photo.
+  const accessToken = await driveAccessToken(env);
+
   let swept = 0;
   let held = 0;
+  let first = true;
   for (const token of tokens) {
+    // A gap between uploads. The sweep is hourly and unattended, so spending a
+    // few seconds here is free; tripping Drive's rate limit is not.
+    if (!first && accessToken) await new Promise(r => setTimeout(r, 900));
+    first = false;
     try {
       const meta = await s.db.photos.get(token);
-      if (meta && !(await archiveToDrive(env, s, meta))) {
+      if (meta && !(await archiveToDrive(env, s, meta, accessToken))) {
         held += 1;
         continue; // try again next hour rather than lose it
       }
