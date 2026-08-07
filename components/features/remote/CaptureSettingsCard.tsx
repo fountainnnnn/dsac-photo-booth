@@ -4,7 +4,7 @@ import {
   CircleHalf, Drop, LinkSimple, Palette, Sun, Timer as TimerIcon, Trash,
 } from '@phosphor-icons/react';
 import { useCaptureSettings, type CaptureSettings } from './useCaptureSettings';
-import { formatEventDate, stampDate } from '@/types/frame';
+import { formatEventDate, stampDate, todayIso } from '@/types/frame';
 import { DEFAULT_FILTERS, DEFAULT_RAMP, filtersAreNeutral } from '@/types/editor';
 import type { LookRamp, ImageFilters } from '@/types/editor';
 
@@ -114,9 +114,14 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
         <label className="text-[0.78rem] font-semibold text-[var(--ink-2)]">
           Event date
           <div className="mt-2 flex items-center gap-2">
+            {/* Shows today when nothing is pinned, rather than an empty
+                dd/mm/yyyy — the operator sees the date that will actually be
+                printed. The *setting* stays empty until they pick something,
+                which is what lets it roll over to tomorrow on its own; the
+                line below says which of the two states this is. */}
             <input
               type="date"
-              value={settings.eventDate}
+              value={settings.eventDate || todayIso()}
               onChange={e => push({ ...settings, eventDate: e.target.value })}
               aria-label="Event date"
               className="min-h-11 flex-1 rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"

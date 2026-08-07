@@ -124,6 +124,18 @@ export const DEFAULT_EVENT_DETAILS: EventDetails = {
  * a bare `YYYY-MM-DD` as UTC midnight — far enough east or west of Greenwich
  * and the photo prints the day before the one that was typed.
  */
+/**
+ * Today as `YYYY-MM-DD` in local time.
+ *
+ * `toISOString()` would be UTC, which east of Greenwich hands back tomorrow
+ * for most of the evening — the same trap `stampDate` avoids on the way in.
+ */
+export function todayIso(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 export function stampDate(eventDate?: string | null): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((eventDate ?? '').trim());
   if (!m) return new Date();
