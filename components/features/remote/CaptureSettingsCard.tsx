@@ -83,6 +83,8 @@ export function useCaptureSettingsControl(): CaptureSettingsControl {
 
 /** What is printed on the photo, and how long the countdown runs. */
 export function EventSettingsCard({ settings, push, saved, loading }: CaptureSettingsControl) {
+  // The real date control, kept off-screen: the button above is what is seen.
+  const dateRef = useRef<HTMLInputElement>(null);
   return (
     <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
       <div className="flex items-center gap-2">
@@ -116,29 +118,41 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
           <div className="mt-2 flex items-center gap-2">
             {/* A native date input renders in whatever format the browser's
                 locale dictates — 07/08/2026 here — and no attribute or style
-                changes that. So the input is laid over the field transparently
-                and we draw the date ourselves: clicking anywhere still opens
-                the real picker, but what is read is "7 Aug 2026", exactly the
-                form the photo is stamped with.
+                changes that. So the date is drawn as we want it read and the
+                input is kept out of the way, holding only the value.
 
-                It shows today when nothing is pinned. The *setting* stays
-                empty until a date is chosen, which is what lets it roll over
-                on its own; the line below says which state this is. */}
-            <div className="relative flex-1">
-              <div
-                aria-hidden
-                className="pointer-events-none flex min-h-11 w-full items-center rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)]"
-              >
-                {formatEventDate(stampDate(settings.eventDate || todayIso()))}
-              </div>
-              <input
-                type="date"
-                value={settings.eventDate || todayIso()}
-                onChange={e => push({ ...settings, eventDate: e.target.value })}
-                aria-label="Event date"
-                className="absolute inset-0 h-full w-full cursor-pointer rounded-xl opacity-0"
-              />
-            </div>
+                An earlier attempt laid the input over the field at zero
+                opacity. Clicking it "worked" in the sense that it focused a
+                segment, but an invisible focused segment looks exactly like a
+                dead control, so the field read as broken. Opening the picker
+                outright is the honest version of the same idea.
+
+                Shows today when nothing is pinned. The *setting* stays empty
+                until a date is chosen, which is what lets it roll over on its
+                own; the line below says which state this is. */}
+            <button
+              type="button"
+              onClick={() => {
+                const el = dateRef.current;
+                if (!el) return;
+                // showPicker is the only way to open it programmatically, and
+                // it throws if the browser is too old or the call is not from
+                // a gesture — focusing at least puts the keyboard on it.
+                try { el.showPicker(); } catch { el.focus(); }
+              }}
+              className="flex min-h-11 flex-1 items-center rounded-xl border border-[var(--border)] px-3.5 py-3 text-left text-[0.85rem] text-[var(--ink)] transition hover:border-[var(--ink-3)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            >
+              {formatEventDate(stampDate(settings.eventDate || todayIso()))}
+            </button>
+            <input
+              ref={dateRef}
+              type="date"
+              value={settings.eventDate || todayIso()}
+              onChange={e => push({ ...settings, eventDate: e.target.value })}
+              aria-label="Event date"
+              tabIndex={-1}
+              className="sr-only"
+            />
             {settings.eventDate && (
               <button
                 type="button"
