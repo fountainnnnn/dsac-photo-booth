@@ -80,6 +80,17 @@ export default function SettingsPage() {
   const setEnabled = (id: string, enabled: boolean) =>
     setDraft(d => ({ ...d, [id]: { enabled } }));
 
+  /**
+   * Whether the frame pool has edits the server has not seen.
+   *
+   * Everything else on this page writes as it is touched, so this is the only
+   * unsaved state there is — which is why the button can honestly say so.
+   */
+  const dirty = useMemo(
+    () => frames.some(f => (draft[f.id]?.enabled ?? true) !== (f.enabled ?? true)),
+    [frames, draft],
+  );
+
   const save = useCallback(async () => {
     setBusy(true); setStatus(null);
     try {
@@ -145,19 +156,22 @@ export default function SettingsPage() {
               {status.text}
             </span>
           )}
-          {/* The only unsaved state on this page is the frame pool's draft;
-              every other card writes as it is touched. So the button travels
-              with its tab rather than implying the rest needs saving. */}
-          {tab === 'frames' && (
+          {/* Present on every tab, so the header does not jump about — but it
+              only ever has work to do on the frame pool, which is the one
+              thing here that waits to be saved. Everywhere else it reports
+              that there is nothing pending rather than implying there is. */}
           <button
             type="button"
             onClick={save}
-            disabled={busy || loading}
-            className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[var(--accent)] px-7 text-[0.9rem] font-semibold text-white shadow-[0_1px_2px_rgba(11,10,12,0.18),0_8px_24px_rgba(225,38,47,0.26)] transition-all duration-150 hover:-translate-y-px hover:bg-[var(--accent-hover)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
+            disabled={busy || loading || !dirty}
+            className={`inline-flex min-h-12 items-center justify-center rounded-xl px-7 text-[0.9rem] font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
+              dirty && !busy
+                ? 'bg-[var(--accent)] text-white shadow-[0_1px_2px_rgba(11,10,12,0.18),0_8px_24px_rgba(225,38,47,0.26)] hover:-translate-y-px hover:bg-[var(--accent-hover)] active:translate-y-px'
+                : 'cursor-default border border-[var(--border)] text-[var(--ink-3)]'
+            }`}
           >
-            {busy ? 'Saving…' : 'Save changes'}
+            {busy ? 'Saving…' : dirty ? 'Save changes' : 'All changes saved'}
           </button>
-          )}
         </div>
       </header>
 

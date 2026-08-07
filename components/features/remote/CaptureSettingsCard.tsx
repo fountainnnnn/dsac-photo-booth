@@ -114,18 +114,31 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
         <label className="text-[0.78rem] font-semibold text-[var(--ink-2)]">
           Event date
           <div className="mt-2 flex items-center gap-2">
-            {/* Shows today when nothing is pinned, rather than an empty
-                dd/mm/yyyy — the operator sees the date that will actually be
-                printed. The *setting* stays empty until they pick something,
-                which is what lets it roll over to tomorrow on its own; the
-                line below says which of the two states this is. */}
-            <input
-              type="date"
-              value={settings.eventDate || todayIso()}
-              onChange={e => push({ ...settings, eventDate: e.target.value })}
-              aria-label="Event date"
-              className="min-h-11 flex-1 rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
-            />
+            {/* A native date input renders in whatever format the browser's
+                locale dictates — 07/08/2026 here — and no attribute or style
+                changes that. So the input is laid over the field transparently
+                and we draw the date ourselves: clicking anywhere still opens
+                the real picker, but what is read is "7 Aug 2026", exactly the
+                form the photo is stamped with.
+
+                It shows today when nothing is pinned. The *setting* stays
+                empty until a date is chosen, which is what lets it roll over
+                on its own; the line below says which state this is. */}
+            <div className="relative flex-1">
+              <div
+                aria-hidden
+                className="pointer-events-none flex min-h-11 w-full items-center rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)]"
+              >
+                {formatEventDate(stampDate(settings.eventDate || todayIso()))}
+              </div>
+              <input
+                type="date"
+                value={settings.eventDate || todayIso()}
+                onChange={e => push({ ...settings, eventDate: e.target.value })}
+                aria-label="Event date"
+                className="absolute inset-0 h-full w-full cursor-pointer rounded-xl opacity-0"
+              />
+            </div>
             {settings.eventDate && (
               <button
                 type="button"
