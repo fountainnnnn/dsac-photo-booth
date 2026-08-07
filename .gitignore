@@ -58,3 +58,6 @@ yarn-error.log*
 
 # local sqlite database + wal files
 /data/
+
+# wrangler's local state and build scratch — miniflare caches, dev bundles
+.wrangler/
