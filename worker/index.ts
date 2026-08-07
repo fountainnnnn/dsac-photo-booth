@@ -36,6 +36,9 @@ const DEFAULT_CAPTURE_SETTINGS = {
   selectedFrameId: '',
   filters: { brightness: 100, contrast: 100, saturation: 100, hue: 0 },
   eventName: 'Transformation Made Possible',
+  // Empty means whatever day the photo is taken. Set it only when the
+  // booth runs on a different day from the event it is stamping.
+  eventDate: '',
   cameraDeviceId: '',
   cropEnabled: false,
   crop: { x: 0, y: 0, w: 1, h: 1 },
@@ -183,6 +186,9 @@ app.get('/api/health', (c) => c.json({
 app.get('/api/auth/status', (c) => svc(c).auth.status(c));
 app.post('/api/auth/login', (c) => svc(c).auth.login(c));
 app.put('/api/settings/passwords', booth, (c) => svc(c).auth.updatePasswords(c));
+// Same booth gate as the PUT above, on purpose: reading the passwords back is
+// no more privileged than replacing them.
+app.get('/api/settings/passwords/reveal', booth, (c) => svc(c).auth.revealPasswords(c));
 
 // ── Photos ───────────────────────────────────────────────────────────────────
 

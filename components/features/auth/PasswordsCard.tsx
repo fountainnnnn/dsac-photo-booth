@@ -1,15 +1,28 @@
-import { useCallback, useState } from 'react';
-import { LockSimple, LockSimpleOpen } from '@phosphor-icons/react';
+import { useCallback, useEffect, useState } from 'react';
+import { Check, Copy, Eye, EyeSlash, LockSimple, LockSimpleOpen } from '@phosphor-icons/react';
 import { useAuthStatus, type AuthScope, type AuthStatus } from './PasswordGate';
 
 /**
- * Set the two passwords from Settings.
+ * Set the two passwords from Settings, and show them where that is possible.
  *
  * Values from .env are the seed; anything set here overrides them and is
  * stored hashed in the database. Clearing falls back to .env, or to open.
  * Reaching this card already required the booth password when one is set, so
  * a stranger cannot simply change the locks.
+ *
+ * Only an .env password can be shown back: a password set here is a salted
+ * hash and the plain text is gone for good, which is the point of hashing it.
+ * The card says which case it is in rather than showing an empty box and
+ * leaving the operator to wonder whether it is broken.
  */
+
+interface ScopeReveal {
+  revealable: boolean;
+  password: string | null;
+  source: 'settings' | 'env' | null;
+}
+
+type RevealMap = Record<AuthScope, ScopeReveal>;
 
 const SCOPE_COPY: Record<AuthScope, { label: string; what: string; offWarning: string }> = {
   booth: {
@@ -26,8 +39,24 @@ const SCOPE_COPY: Record<AuthScope, { label: string; what: string; offWarning: s
 
 export default function PasswordsCard() {
   const { status, reload } = useAuthStatus();
+  const [reveal, setReveal] = useState<RevealMap | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The card only renders behind the booth gate, so this request is already
+  // authenticated; a 401 here means the session lapsed while Settings was
+  // open, and the rows simply fall back to saying nothing can be shown.
+  const loadReveal = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings/passwords/reveal');
+      if (!res.ok) throw new Error(String(res.status));
+      setReveal(await res.json() as RevealMap);
+    } catch {
+      setReveal(null);
+    }
+  }, []);
+
+  useEffect(() => { void loadReveal(); }, [loadReveal]);
 
   const put = useCallback(async (body: Partial<Record<AuthScope, string | null>>) => {
     setError(null);
@@ -41,11 +70,13 @@ export default function PasswordsCard() {
       setError(msg ?? `Could not save (HTTP ${res.status})`);
       return false;
     }
-    await reload();
+    // Setting or clearing a password moves the scope between sources, so what
+    // can be shown changes with it.
+    await Promise.all([reload(), loadReveal()]);
     setSaved(true);
     setTimeout(() => setSaved(false), 1600);
     return true;
-  }, [reload]);
+  }, [reload, loadReveal]);
 
   return (
     <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
@@ -70,16 +101,23 @@ export default function PasswordsCard() {
 
       <div className="mt-4 flex flex-col gap-5">
         {(Object.keys(SCOPE_COPY) as AuthScope[]).map(scope => (
-          <ScopeRow key={scope} scope={scope} status={status} onSave={put} />
+          <ScopeRow
+            key={scope}
+            scope={scope}
+            status={status}
+            reveal={reveal?.[scope] ?? null}
+            onSave={put}
+          />
         ))}
       </div>
     </section>
   );
 }
 
-function ScopeRow({ scope, status, onSave }: {
+function ScopeRow({ scope, status, reveal, onSave }: {
   scope: AuthScope;
   status: AuthStatus | null;
+  reveal: ScopeReveal | null;
   onSave: (body: Partial<Record<AuthScope, string | null>>) => Promise<boolean>;
 }) {
   const [value, setValue] = useState('');
@@ -115,6 +153,8 @@ function ScopeRow({ scope, status, onSave }: {
         {s?.required ? copy.what : copy.offWarning}
       </p>
 
+      <CurrentPassword label={copy.label} reveal={reveal} />
+
       <form
         className="mt-2 flex gap-2"
         onSubmit={e => { e.preventDefault(); if (value) void save(value); }}
@@ -146,6 +186,89 @@ function ScopeRow({ scope, status, onSave }: {
           </button>
         )}
       </form>
+    </div>
+  );
+}
+
+/**
+ * The password as it stands, in whichever of the three states applies.
+ *
+ * Hidden by default: Settings is often on a screen someone else can see, and
+ * an operator glancing at this card should not broadcast the photo password to
+ * the queue behind them. The eye is a deliberate act.
+ */
+function CurrentPassword({ label, reveal }: {
+  label: string;
+  reveal: ScopeReveal | null;
+}) {
+  const [shown, setShown] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const name = label.toLowerCase();
+
+  const copy = async () => {
+    if (!reveal?.password) return;
+    try {
+      await navigator.clipboard?.writeText(reveal.password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard access can be refused (insecure origin, denied permission).
+      // The password is on screen behind the eye either way, so there is
+      // nothing to apologise for.
+    }
+  };
+
+  // Still loading, or the request was refused: say nothing rather than guess.
+  if (!reveal) return null;
+
+  if (reveal.source === 'settings') {
+    return (
+      <p className="mt-2 rounded-xl border border-dashed border-[var(--border)] px-3.5 py-2.5 text-[0.72rem] leading-[1.5] text-[var(--ink-3)]">
+        Set in Settings, so it cannot be shown — only replaced. It is kept as a
+        salted hash, which is one-way by design.
+      </p>
+    );
+  }
+
+  if (!reveal.password) {
+    return (
+      <p className="mt-2 text-[0.72rem] leading-[1.5] text-[var(--ink-3)]">
+        No password to show — this scope is open.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex gap-2">
+      <input
+        type={shown ? 'text' : 'password'}
+        value={reveal.password}
+        readOnly
+        aria-label={`Current ${name}`}
+        className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--shell-bg)] px-3.5 py-2.5 text-[0.85rem] text-[var(--ink-2)] outline-none"
+      />
+      <button
+        type="button"
+        onClick={() => setShown(v => !v)}
+        aria-pressed={shown}
+        aria-label={shown ? `Hide the ${name}` : `Show the ${name}`}
+        title={shown ? 'Hide' : 'Show'}
+        className="shrink-0 rounded-xl border border-[var(--border)] px-3 text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+      >
+        {shown ? <EyeSlash size={16} /> : <Eye size={16} />}
+      </button>
+      <button
+        type="button"
+        onClick={() => void copy()}
+        aria-label={`Copy the ${name}`}
+        title={copied ? 'Copied' : 'Copy'}
+        className="shrink-0 rounded-xl border border-[var(--border)] px-3 text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+      >
+        {copied
+          ? <Check size={16} weight="bold" className="text-[#127a4a]" />
+          : <Copy size={16} />}
+      </button>
     </div>
   );
 }

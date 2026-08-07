@@ -216,6 +216,9 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/auth/status', auth.status);
 app.post('/api/auth/login', auth.login);
 app.put('/api/settings/passwords', booth, auth.updatePasswords);
+// Same booth gate as the PUT above, on purpose: reading the passwords back is
+// no more privileged than replacing them.
+app.get('/api/settings/passwords/reveal', booth, auth.revealPasswords);
 
 app.post('/api/photos', booth, upload.single('file'), validateImage, (_req, res) => {
   res.status(201).json({
@@ -463,6 +466,9 @@ const DEFAULT_CAPTURE_SETTINGS = {
   selectedFrameId: '',
   filters: { brightness: 100, contrast: 100, saturation: 100, hue: 0 },
   eventName: 'Transformation Made Possible',
+  // Empty means whatever day the photo is taken. Set it only when the
+  // booth runs on a different day from the event it is stamping.
+  eventDate: '',
   // Empty means the browser's default camera. A booth with an external webcam
   // should point this at it — see the Camera card in Settings.
   cameraDeviceId: '',

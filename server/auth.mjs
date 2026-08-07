@@ -51,10 +51,18 @@ function parseCookies(header) {
 }
 
 export function createAuth(kv) {
+  // The plain env values are kept as well as their hashes: they are the only
+  // passwords we ever hold in readable form, and Settings offers to show them
+  // back to the operator. See `revealPasswords` below.
+  const envPlain = {
+    booth: process.env.BOOTH_PASSWORD || null,
+    download: process.env.DOWNLOAD_PASSWORD || null,
+  };
+
   // Env passwords are hashed once at boot so verification is uniform.
   const envHash = {
-    booth: process.env.BOOTH_PASSWORD ? hashPassword(process.env.BOOTH_PASSWORD) : null,
-    download: process.env.DOWNLOAD_PASSWORD ? hashPassword(process.env.DOWNLOAD_PASSWORD) : null,
+    booth: envPlain.booth ? hashPassword(envPlain.booth) : null,
+    download: envPlain.download ? hashPassword(envPlain.download) : null,
   };
 
   const tokens = new Map(); // token -> { scope, expiresAt }
@@ -143,9 +151,35 @@ export function createAuth(kv) {
     return status(req, res);
   }
 
+  /**
+   * Show the operator the passwords currently in force.
+   *
+   * This deliberately hands a secret back to whoever asks — but only to
+   * someone who has already passed the booth gate, and it is mounted behind
+   * exactly the same check as changing the passwords. Nothing is given away by
+   * it: showing the booth password to a person already inside the booth is no
+   * new exposure, and the photo password exists to be read out loud to guests
+   * queueing for their picture. An operator who has forgotten what is in .env
+   * would otherwise have to open a file on the machine to run their own event.
+   *
+   * Only an env-sourced password can be shown. Anything set from Settings is a
+   * salted scrypt hash and is not reversible, by design — we report that fact
+   * rather than pretending, and never return the hash or its salt.
+   */
+  function revealPasswords(req, res) {
+    const out = {};
+    for (const scope of SCOPES) {
+      const { source } = resolve(scope);
+      const plain = source === 'env' ? envPlain[scope] : null;
+      out[scope] = { revealable: Boolean(plain), password: plain, source };
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(out);
+  }
+
   // `isAuthed` is exported as well as used by the middleware: routes that are
   // reachable by either scope sometimes need to know *which* one let the
   // request in. A guest holding a lapsed download link is turned away where
   // the operator, on the same URL, is not.
-  return { requireAuth, isAuthed, login, status, updatePasswords };
+  return { requireAuth, isAuthed, login, status, updatePasswords, revealPasswords };
 }

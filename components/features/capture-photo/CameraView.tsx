@@ -18,6 +18,7 @@ import type { FrameConfig, EventDetails } from '@/types/frame';
 import {
   FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
   NAME_WEIGHT, STAMP_FONT_STACK, drawDateStamp, fitFontPx, stampFontPx, stampText, formatEventDate,
+  stampDate,
 } from '@/types/frame';
 
 type PermissionStatus = 'prompt' | 'granted' | 'denied' | 'unsupported';
@@ -523,7 +524,7 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
   const stamp = frame.dateStamp;
   const slot = frame.captionSlot;
   const [shrink, setShrink] = useState(1);
-  const date = new Date();
+  const date = stampDate(event.eventDate);
 
   useEffect(() => {
     if (!stamp?.maxWidthFrac) { setShrink(1); return; }

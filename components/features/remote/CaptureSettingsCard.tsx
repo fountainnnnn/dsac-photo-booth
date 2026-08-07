@@ -4,6 +4,7 @@ import {
   CircleHalf, Drop, LinkSimple, Palette, Sun, Timer as TimerIcon, Trash,
 } from '@phosphor-icons/react';
 import { useCaptureSettings, type CaptureSettings } from './useCaptureSettings';
+import { formatEventDate, stampDate } from '@/types/frame';
 import { DEFAULT_FILTERS, DEFAULT_RAMP, filtersAreNeutral } from '@/types/editor';
 import type { LookRamp, ImageFilters } from '@/types/editor';
 
@@ -106,11 +107,36 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
             className="mt-2 w-full rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
           />
         </label>
-        <p className="rounded-lg bg-[var(--shell-bg)] px-3.5 py-3 text-[0.75rem] leading-[1.6] text-[var(--ink-2)]">
-          Photos are stamped with <strong className="font-semibold text-[var(--ink)]">today&rsquo;s date</strong>,
-          taken from this machine. There is nothing to set, and nothing to go
-          stale between events.
-        </p>
+        {/* Left empty this is the day the photo is taken, which is right for
+            almost every booth. It is settable because "almost" is not "always":
+            a booth run past midnight, or set up the evening before, or shooting
+            for a dated event on another day, needs to say so. */}
+        <label className="text-[0.78rem] font-semibold text-[var(--ink-2)]">
+          Event date
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="date"
+              value={settings.eventDate}
+              onChange={e => push({ ...settings, eventDate: e.target.value })}
+              aria-label="Event date"
+              className="min-h-11 flex-1 rounded-xl border border-[var(--border)] px-3.5 py-3 text-[0.85rem] font-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]"
+            />
+            {settings.eventDate && (
+              <button
+                type="button"
+                onClick={() => push({ ...settings, eventDate: '' })}
+                className="min-h-11 shrink-0 rounded-xl border border-[var(--border)] px-4 text-[0.78rem] font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              >
+                Use today
+              </button>
+            )}
+          </div>
+          <p className="mt-2 text-[0.72rem] font-normal leading-[1.6] text-[var(--ink-3)]">
+            {settings.eventDate
+              ? <>Every photo will be stamped <strong className="font-semibold text-[var(--ink)]">{formatEventDate(stampDate(settings.eventDate))}</strong>, whenever it is taken.</>
+              : <>Empty, so photos carry <strong className="font-semibold text-[var(--ink)]">the day they are taken</strong> — nothing to go stale between events.</>}
+          </p>
+        </label>
       </div>
 
       <div className="mt-6">

@@ -273,11 +273,38 @@ export function createAuth(db: Db, env: Env) {
       .run();
   }
 
+  /**
+   * Show the operator the passwords currently in force.
+   *
+   * This deliberately hands a secret back to whoever asks — but only to
+   * someone who has already passed the booth gate, and it is mounted behind
+   * exactly the same check as changing the passwords. Nothing is given away by
+   * it: showing the booth password to a person already inside the booth is no
+   * new exposure, and the photo password exists to be read out loud to guests
+   * queueing for their picture. An operator who has forgotten which secret was
+   * pushed with `wrangler secret put` would otherwise have no way back to it.
+   *
+   * Only an env-sourced password can be shown. Anything set from Settings is a
+   * salted PBKDF2 hash and is not reversible, by design — we report that fact
+   * rather than pretending, and never return the hash or its salt.
+   */
+  async function revealPasswords(c: Context): Promise<Response> {
+    const out: Record<string, {
+      revealable: boolean; password: string | null; source: string | null;
+    }> = {};
+    for (const scope of SCOPES) {
+      const { plain, source } = await resolve(scope);
+      out[scope] = { revealable: Boolean(plain), password: plain, source };
+    }
+    c.header('Cache-Control', 'no-store');
+    return c.json(out);
+  }
+
   // `isAuthed` is exported as well as used by the middleware: routes that are
   // reachable by either scope sometimes need to know *which* one let the
   // request in. A guest holding a lapsed download link is turned away where
   // the operator, on the same URL, is not.
-  return { requireAuth, isAuthed, login, status, updatePasswords, sweepSessions };
+  return { requireAuth, isAuthed, login, status, updatePasswords, revealPasswords, sweepSessions };
 }
 
 /** Node's `base64url` encoding, which Workers' btoa does not do on its own. */

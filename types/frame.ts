@@ -99,11 +99,38 @@ export function fitFontPx(
 /** Event details an operator can change without touching the artwork. */
 export interface EventDetails {
   eventName: string;
+  /**
+   * The date printed on the photo, as `YYYY-MM-DD`. Empty means today.
+   *
+   * Today was once the only option, on the reasoning that a booth is set up on
+   * the day it runs and a stale pinned date is wrong silently. That holds — so
+   * empty is still the default and still means "whatever day it is". But it is
+   * not the whole story: a booth shot after midnight, or set up the evening
+   * before, or run for a dated event on a different day, needs to say so.
+   * Setting it is now deliberate rather than accidental.
+   */
+  eventDate: string;
 }
 
 export const DEFAULT_EVENT_DETAILS: EventDetails = {
   eventName: 'Transformation Made Possible',
+  eventDate: '',
 };
+
+/**
+ * The date to stamp: the operator's if they set one, otherwise today.
+ *
+ * Parsed field by field rather than handed to `new Date(string)`, which reads
+ * a bare `YYYY-MM-DD` as UTC midnight — far enough east or west of Greenwich
+ * and the photo prints the day before the one that was typed.
+ */
+export function stampDate(eventDate?: string | null): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((eventDate ?? '').trim());
+  if (!m) return new Date();
+  const [, y, mo, d] = m;
+  const parsed = new Date(Number(y), Number(mo) - 1, Number(d));
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
 
 /** The transparent cut-out a photo sits inside, as fractions of the frame. */
 export interface FrameWindow {
@@ -274,9 +301,8 @@ export function drawDateStamp(
   h: number,
   event?: Partial<EventDetails> | null,
 ) {
-  // Always today. A booth is set up on the day it runs, and a stale pinned
-  // date is worse than no setting at all — it is wrong silently.
-  const date = new Date();
+  // The operator's date if they set one, today if they did not.
+  const date = stampDate(event?.eventDate);
 
   // Artwork with no caption of its own gets the whole line drawn here, so the
   // event name is ours to set. Artwork that bakes its caption into the pixels

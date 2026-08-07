@@ -59,6 +59,8 @@ export interface CaptureSettings {
   cameraDeviceId: string;
   /** Printed on frames that do not bake their own caption. */
   eventName: string;
+  /** `YYYY-MM-DD` printed on the photo. Empty means whatever day it is. */
+  eventDate: string;
   /**
    * Two framings from one camera: the whole scene, or the region set below.
    * Kept as a flag rather than "crop === FULL_FRAME" so an operator can switch
@@ -96,6 +98,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   lookRamp: DEFAULT_RAMP,
   cameraDeviceId: '',
   eventName: DEFAULT_EVENT_DETAILS.eventName,
+  eventDate: DEFAULT_EVENT_DETAILS.eventDate,
   cropEnabled: false,
   crop: FULL_FRAME,
   linkTtlHours: 168,
