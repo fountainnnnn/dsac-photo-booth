@@ -3,6 +3,7 @@ import {
   ArrowClockwise,
   Camera,
   CameraSlash,
+  Gear,
   Timer as TimerIcon,
   WifiHigh,
   WifiSlash,
@@ -54,6 +55,10 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
   const [permission, setPermission]     = useState<PermissionStatus>('prompt');
   const [isStreaming, setIsStreaming]   = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Whether Settings is the cure. A refused permission or a browser without
+  // getUserMedia is not fixed by choosing a different camera; a camera that
+  // has been unplugged, is busy, or was picked and then went away is.
+  const [pickAnother, setPickAnother] = useState(false);
 
   const { frames } = useFrameCatalogue();
 
@@ -104,6 +109,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
 
   const startCamera = useCallback(async () => {
     setErrorMessage(null);
+    setPickAnother(false);
     if (!navigator.mediaDevices?.getUserMedia) {
       setPermission('unsupported');
       setErrorMessage('Camera not supported on this browser.');
@@ -129,13 +135,34 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
       setPermission('granted');
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
+
+      // "Camera error: OverconstrainedError" told an operator standing at a
+      // booth nothing they could act on. Almost every failure here has the
+      // same remedy — go and pick a camera — so say that instead of naming
+      // the exception, and only withhold it where it genuinely would not help.
+      const chosen = Boolean(cameraDeviceId);
+
       if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
         setPermission('denied');
-        setErrorMessage('Camera access was denied. Allow camera in browser settings and refresh.');
+        setErrorMessage('Camera access was denied. Allow the camera in your browser settings, then reload this page.');
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        setPickAnother(true);
+        setErrorMessage(
+          'The camera is busy — another app is probably using it. Close that app, or choose a different camera in Settings.',
+        );
+      } else if (chosen) {
+        // A device id that no longer resolves: unplugged since it was chosen,
+        // or a browser that hands out fresh ids and no longer recognises this one.
+        setPickAnother(true);
+        setErrorMessage(
+          'The camera chosen in Settings is not available. Plug it back in, or choose a different one in Settings.',
+        );
       } else if (error.name === 'NotFoundError') {
-        setErrorMessage('No camera found. Connect a camera and try again.');
+        setPickAnother(true);
+        setErrorMessage('No camera found. Connect one, then choose it in Settings.');
       } else {
-        setErrorMessage(`Camera error: ${error.message}`);
+        setPickAnother(true);
+        setErrorMessage('The camera could not be started. Choose a camera in Settings, or try again.');
       }
       onError?.(error);
     }
@@ -451,13 +478,26 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
                   <CameraSlash size={26} />
                 </span>
                 <p className="max-w-[38ch] text-[0.95rem] font-medium leading-[1.5] text-[var(--ink)]">{errorMessage}</p>
-                {permission !== 'denied' && permission !== 'unsupported' && (
-                  <button type="button" onClick={startCamera}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-6 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
-                    <ArrowClockwise size={17} />
-                    Try again
-                  </button>
-                )}
+                <div className="flex items-center gap-2.5">
+                  {pickAnother && (
+                    <button type="button" onClick={() => { window.location.href = '/settings'; }}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-6 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
+                      <Gear size={17} />
+                      Choose a camera
+                    </button>
+                  )}
+                  {permission !== 'denied' && permission !== 'unsupported' && (
+                    <button type="button" onClick={startCamera}
+                      className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-6 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                        pickAnother
+                          ? 'border border-[var(--border)] text-[var(--ink-2)] hover:border-[var(--ink-3)]'
+                          : 'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]'
+                      }`}>
+                      <ArrowClockwise size={17} />
+                      Try again
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
