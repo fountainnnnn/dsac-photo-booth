@@ -627,6 +627,28 @@ app.get('/api/frames/:id/image', booth, (req, res) => {
 // Open to the world, because LinkedIn's crawler has no cookie to send. That
 // makes every caller a guest unless they happen to be the operator, so the
 // lapsed-link rule applies here as it does on the download itself.
+/**
+ * The photo, for a social crawler.
+ *
+ * LinkedIn fetches `og:image` with no cookie, so pointing it at the gated
+ * preview meant every shared post came out imageless — the whole point of
+ * sharing. This is the same bytes without the password gate.
+ *
+ * That is a deliberate loosening, and a small one: the share page it belongs
+ * to is already public, the token is unguessable, and a guest who presses
+ * "Post on LinkedIn" is asking for the photo to be seen. Link expiry still
+ * applies, so a lapsed link leaks nothing.
+ */
+app.get('/api/share/:token/image', (req, res) => {
+  const photo = store.photos.get(req.params.token);
+  if (!photo) return res.status(404).json({ error: 'Photo not found' });
+  if (hasExpired(photo.expiresAt)) return res.status(410).json(GONE);
+
+  res.setHeader('Content-Type', photo.mime);
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  return res.send(photo.bytes);
+});
+
 app.get('/api/share/:token', (req, res) => {
   const photo = store.photos.get(req.params.token);
   if (!photo) return res.status(404).send('Photo not found');
@@ -634,7 +656,8 @@ app.get('/api/share/:token', (req, res) => {
 
   const safeTitle = 'My AI Learning Journey at SP DSAC';
   const safeDescription = 'A photo from the Singapore Polytechnic Data Science and Analytics Centre AI Learning Journey.';
-  const imageHref = url(`/api/preview/${encodeURIComponent(req.params.token)}`);
+  // The public copy, not the gated preview: a crawler has no session.
+  const imageHref = url(`/api/share/${encodeURIComponent(req.params.token)}/image`);
   const pageHref = sharePreviewUrl(req.params.token);
   const downloadHref = downloadUrl(req.params.token);
 

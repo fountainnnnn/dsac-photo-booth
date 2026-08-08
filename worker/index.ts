@@ -503,6 +503,33 @@ app.get('/api/frames/:id/image', booth, async (c) => {
 // Open to the world, because LinkedIn's crawler has no cookie to send. That
 // makes every caller a guest unless they happen to be the operator, so the
 // lapsed-link rule applies here as it does on the download itself.
+/**
+ * The photo, for a social crawler.
+ *
+ * LinkedIn fetches `og:image` with no cookie, so pointing it at the gated
+ * preview meant every shared post came out imageless — the whole point of
+ * sharing. This is the same bytes without the password gate.
+ *
+ * That is a deliberate loosening, and a small one: the share page it belongs
+ * to is already public, the token is unguessable, and a guest who presses
+ * "Post on LinkedIn" is asking for the photo to be seen. Link expiry still
+ * applies, so a lapsed link leaks nothing.
+ */
+app.get('/api/share/:token/image', async (c) => {
+  const { db, blobs } = svc(c);
+  const token = c.req.param('token');
+  const meta = await db.photos.get(token);
+  if (!meta) return c.json({ error: 'Photo not found' }, 404);
+  if (hasExpired(meta.expiresAt)) return c.json(GONE, 410);
+
+  const blob = await blobs.get(`photo/${token}`);
+  if (!blob) return c.json({ error: 'Photo not found' }, 404);
+
+  return new Response(blob.body as BodyInit, {
+    headers: { 'Content-Type': meta.mime, 'Cache-Control': 'public, max-age=86400' },
+  });
+});
+
 app.get('/api/share/:token', async (c) => {
   const token = c.req.param('token');
   const meta = await svc(c).db.photos.get(token);
@@ -511,7 +538,8 @@ app.get('/api/share/:token', async (c) => {
 
   const title = 'My AI Learning Journey at SP DSAC';
   const description = 'A photo from the Singapore Polytechnic Data Science and Analytics Centre AI Learning Journey.';
-  const imageHref = `${origin(c)}/api/preview/${encodeURIComponent(token)}`;
+  // The public copy, not the gated preview: a crawler has no session.
+  const imageHref = `${origin(c)}/api/share/${encodeURIComponent(token)}/image`;
 
   return c.html(`<!DOCTYPE html>
 <html lang="en">

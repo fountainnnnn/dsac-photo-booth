@@ -32,6 +32,27 @@ export default function DownloadPage({ token }: DownloadPageProps) {
    */
   const [caption, setCaption] = useState(DEFAULT_LINKEDIN_TEXT);
 
+  /**
+   * On a phone, hand the post to the operating system rather than to a web
+   * page. The share sheet lists LinkedIn alongside everything else and opens
+   * the real app — and, unlike LinkedIn's public share URL, it carries the
+   * caption with it, so the guest is not left pasting.
+   *
+   * Desktop browsers mostly do not implement this, and there is no app to open
+   * there anyway, so those fall back to the web share link below.
+   */
+  const canShareNatively = typeof navigator !== 'undefined'
+    && typeof navigator.share === 'function';
+
+  const shareNatively = async () => {
+    try {
+      await navigator.share({ title: 'My AI Learning Journey at SP DSAC', text: caption, url: sharePreviewUrl });
+    } catch {
+      // The sheet was dismissed, or the browser refused. Nothing to report:
+      // the guest either changed their mind or can still use Copy text.
+    }
+  };
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(caption).catch(() => {});
     setCopied(true);
@@ -115,15 +136,26 @@ export default function DownloadPage({ token }: DownloadPageProps) {
                 {copied ? 'Copied!' : 'Copy text'}
               </button>
 
-              <a
-                href={linkedInShareUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0a66c2] px-3 text-xs font-semibold text-white transition hover:bg-[#004182]"
-              >
-                <LinkedInGlyph className="h-3.5 w-3.5" />
-                Post on LinkedIn
-              </a>
+              {canShareNatively ? (
+                <button
+                  type="button"
+                  onClick={shareNatively}
+                  className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0a66c2] px-3 text-xs font-semibold text-white transition hover:bg-[#004182]"
+                >
+                  <LinkedInGlyph className="h-3.5 w-3.5" />
+                  Share
+                </button>
+              ) : (
+                <a
+                  href={linkedInShareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0a66c2] px-3 text-xs font-semibold text-white transition hover:bg-[#004182]"
+                >
+                  <LinkedInGlyph className="h-3.5 w-3.5" />
+                  Post on LinkedIn
+                </a>
+              )}
             </div>
           </section>
         </div>
