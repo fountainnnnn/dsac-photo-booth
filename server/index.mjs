@@ -296,7 +296,13 @@ app.get('/api/download/:token', auth.requireAuth('download', 'booth'), (req, res
 
   const ext = `.${extForMime(photo.mime)}`;
   res.setHeader('Content-Type', photo.mime);
-  res.setHeader('Content-Disposition', `attachment; filename="dsac-photo${ext}"`);
+  // A timestamped name, so a guest saving several photos ends up with several
+  // files rather than "dsac-photo (3).jpg". Taken from when the photo was
+  // shot, so the download matches the name in the archive folder.
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="dsac-photo-${fileStamp(new Date(photo.createdAt))}${ext}"`,
+  );
   res.setHeader('Cache-Control', 'private, max-age=86400');
   return res.send(photo.bytes);
 });

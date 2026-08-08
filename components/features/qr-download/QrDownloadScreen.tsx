@@ -71,7 +71,7 @@ export default function QrDownloadScreen({
 
       {/* Panel */}
       <aside className="relative flex flex-col overflow-y-auto border-l border-[var(--border)] bg-[var(--background)] px-9 py-8">
-        <img src="/sp-dsac-logo.png" alt="SP DSAC" className="h-10 w-auto shrink-0 self-start" />
+        <img src="/sp-dsac-logo.png" alt="SP DSAC" className="h-16 w-auto shrink-0 self-start" />
 
         <div className="flex flex-1 flex-col items-center justify-center gap-7 py-8">
           <SectionHeader

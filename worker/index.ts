@@ -255,7 +255,13 @@ async function servePhoto(c: C, attach: boolean) {
     'Content-Type': meta.mime,
     'Cache-Control': attach ? 'private, max-age=86400' : 'public, max-age=86400',
   };
-  if (attach) headers['Content-Disposition'] = `attachment; filename="dsac-photo.${ext}"`;
+  if (attach) {
+    // A timestamped name, so a guest saving several photos ends up with
+    // several files rather than "dsac-photo (3).jpg" — or worse, an overwrite.
+    // Taken from when the photo was shot, so the name matches the archive.
+    headers['Content-Disposition'] =
+      `attachment; filename="dsac-photo-${fileStamp(new Date(meta.createdAt))}.${ext}"`;
+  }
   return new Response(blob.body as BodyInit, { headers });
 }
 
@@ -689,13 +695,17 @@ async function archiveToDrive(
   }
 }
 
+/** Local wall-clock stamp, YYYYMMDD-HHmmss — sorts by time wherever it lands. */
+function fileStamp(at: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${at.getFullYear()}${p(at.getMonth() + 1)}${p(at.getDate())}`
+    + `-${p(at.getHours())}${p(at.getMinutes())}${p(at.getSeconds())}`;
+}
+
 /** Same shape the laptop booth writes to disk, so the two archives read alike. */
 function archiveName(token: string, mime: string, at: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  const stamp = `${at.getFullYear()}${p(at.getMonth() + 1)}${p(at.getDate())}`
-    + `-${p(at.getHours())}${p(at.getMinutes())}${p(at.getSeconds())}`;
   const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
-  return `dsac-${stamp}-${token.slice(0, 8)}.${ext}`;
+  return `dsac-${fileStamp(at)}-${token.slice(0, 8)}.${ext}`;
 }
 
 async function sweepGallery(env: Env, s: Pick<Services, 'db' | 'blobs'>): Promise<void> {

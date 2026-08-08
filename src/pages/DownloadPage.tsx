@@ -7,7 +7,7 @@ interface DownloadPageProps {
   token: string;
 }
 
-const LINKEDIN_TEXT = `Just had an incredible AI Learning Journey at Singapore Polytechnic!
+const DEFAULT_LINKEDIN_TEXT = `Just had an incredible AI Learning Journey at Singapore Polytechnic!
 
 The Data Science & Analytics Centre showed me how artificial intelligence is transforming education and industry, from machine learning fundamentals to real-world applications.
 
@@ -24,9 +24,16 @@ export default function DownloadPage({ token }: DownloadPageProps) {
   const linkedInShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(sharePreviewUrl)}`;
 
   const [copied, setCopied] = useState(false);
+  /**
+   * The caption is a starting point, not a script. Guests were copying it
+   * verbatim or not at all; letting them edit it in place is the difference
+   * between a post that sounds like them and one that sounds like a form.
+   * Deliberately not persisted — it belongs to this photo and this guest.
+   */
+  const [caption, setCaption] = useState(DEFAULT_LINKEDIN_TEXT);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(LINKEDIN_TEXT).catch(() => {});
+    await navigator.clipboard.writeText(caption).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2200);
   };
@@ -60,7 +67,11 @@ export default function DownloadPage({ token }: DownloadPageProps) {
             <a
               data-testid="download-page-save-btn"
               href={downloadHref}
-              download="dsac-photo.jpg"
+              // No `download` value: a bare attribute lets the server's
+              // Content-Disposition name the file, which is where the
+              // timestamp lives. Hard-coding one here would flatten every
+              // photo back to the same name.
+              download
               className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#18181b] px-8 text-sm font-semibold text-white shadow-[0_1px_2px_rgba(24,24,27,0.16),0_8px_24px_rgba(24,24,27,0.12)] transition duration-200 hover:bg-[#e1262f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e1262f]"
             >
               <DownloadSimple className="h-4 w-4" />
@@ -73,14 +84,26 @@ export default function DownloadPage({ token }: DownloadPageProps) {
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a1a1aa]">Share on LinkedIn</p>
             <p className="mt-1 text-sm leading-6 text-[#52525b]">
-              Share your AI Learning Journey experience with your network.
+              Edit this however you like, then copy it into your post.
             </p>
 
-            <div className="mt-3 rounded-lg border border-[#e5e5e8] bg-[#fafafa] px-3 py-2.5">
-              <p className="line-clamp-5 whitespace-pre-line text-xs leading-5 text-[#52525b]">
-                {LINKEDIN_TEXT}
-              </p>
-            </div>
+            <textarea
+              value={caption}
+              onChange={(e) => { setCaption(e.target.value); setCopied(false); }}
+              rows={7}
+              aria-label="Your LinkedIn caption"
+              className="mt-3 w-full resize-y rounded-lg border border-[#e5e5e8] bg-[#fafafa] px-3 py-2.5 text-xs leading-5 text-[#3f3f46] outline-none transition focus:border-[#0a66c2] focus:bg-white"
+            />
+
+            {caption.trim() !== DEFAULT_LINKEDIN_TEXT.trim() && (
+              <button
+                type="button"
+                onClick={() => { setCaption(DEFAULT_LINKEDIN_TEXT); setCopied(false); }}
+                className="mt-1.5 text-[11px] font-semibold text-[#a1a1aa] transition hover:text-[#52525b]"
+              >
+                Reset to the suggested caption
+              </button>
+            )}
 
             <div className="mt-2.5 flex gap-2">
               <button
