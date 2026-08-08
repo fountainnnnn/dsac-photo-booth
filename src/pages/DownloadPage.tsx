@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Check, Copy, DownloadSimple } from '@phosphor-icons/react';
 import BrandMark from '@/components/ui/BrandMark';
-import LinkedInGlyph from '@/components/ui/LinkedInGlyph';
 
 interface DownloadPageProps {
   token: string;
@@ -29,31 +28,6 @@ export default function DownloadPage({ token }: DownloadPageProps) {
    * Deliberately not persisted — it belongs to this photo and this guest.
    */
   const [caption, setCaption] = useState(DEFAULT_LINKEDIN_TEXT);
-
-  /**
-   * Copy the caption, then open LinkedIn. That is the whole trick, and it is
-   * the only one that behaves the same every time.
-   *
-   * Three other routes were tried and each failed in its own way. A universal
-   * link with `shareActive=true` opens the app and then discards the query
-   * string, landing on an empty feed. The OS share sheet reaches LinkedIn but
-   * arrives in its send-to-a-person flow, so the guest is messaging someone
-   * rather than posting. `linkedin://` publishes no compose scheme, and the
-   * undocumented ones strand anyone without the app. Filling the composer
-   * programmatically needs the UGC API and an OAuth grant from every guest,
-   * which is not a thing to ask of someone at a photo booth.
-   *
-   * So: the caption is on the clipboard before LinkedIn opens, and the guest
-   * pastes. One deliberate paste beats three flows that each half-work.
-   */
-  const linkedInComposeUrl = 'https://www.linkedin.com/feed/';
-
-  const openLinkedIn = async () => {
-    await navigator.clipboard?.writeText(caption).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 6000);
-    window.open(linkedInComposeUrl, '_blank', 'noopener,noreferrer');
-  };
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(caption).catch(() => {});
@@ -105,10 +79,10 @@ export default function DownloadPage({ token }: DownloadPageProps) {
           <div className="h-px bg-[#ececee]" />
 
           <section>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a1a1aa]">Share on LinkedIn</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a1a1aa]">Caption for your post</p>
             <p className="mt-1 text-sm leading-6 text-[#52525b]">
-              Edit this however you like. Opening LinkedIn copies it, so you
-              can start a post and paste it straight in.
+              Edit this however you like, then copy it and paste it into a new
+              LinkedIn post along with your photo.
             </p>
 
             <textarea
@@ -129,25 +103,14 @@ export default function DownloadPage({ token }: DownloadPageProps) {
               </button>
             )}
 
-            <div className="mt-2.5 flex gap-2">
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e5e5e8] bg-white px-3 text-xs font-semibold text-[#52525b] transition hover:border-[#18181b] hover:text-[#18181b]"
-              >
-                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                {copied ? 'Copied!' : 'Copy text'}
-              </button>
-
-              <button
-                type="button"
-                onClick={openLinkedIn}
-                className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0a66c2] px-3 text-xs font-semibold text-white transition hover:bg-[#004182]"
-              >
-                <LinkedInGlyph className="h-3.5 w-3.5" />
-                Copy &amp; open LinkedIn
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="mt-2.5 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#18181b] px-4 text-sm font-semibold text-white transition hover:bg-[#3f3f46] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#18181b] focus-visible:ring-offset-2"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? 'Copied — now paste it into LinkedIn' : 'Copy caption'}
+            </button>
           </section>
         </div>
 

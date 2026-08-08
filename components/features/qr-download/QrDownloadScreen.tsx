@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { ArrowCounterClockwise, Scan } from '@phosphor-icons/react';
-import LinkedInGlyph from '@/components/ui/LinkedInGlyph';
 import AmbientOrb from '@/components/ui/AmbientOrb';
 import SectionHeader from '@/components/ui/SectionHeader';
 import Button from '@/components/ui/Button';
@@ -9,7 +8,6 @@ import Button from '@/components/ui/Button';
 export interface QrDownloadScreenProps {
   composedDataUrl: string;
   downloadUrl: string;
-  linkedInShareUrl?: string;
   onDone: () => void;
   onRetake: () => void;
 }
@@ -17,7 +15,6 @@ export interface QrDownloadScreenProps {
 export default function QrDownloadScreen({
   composedDataUrl,
   downloadUrl,
-  linkedInShareUrl,
   onDone,
   onRetake,
 }: QrDownloadScreenProps) {
@@ -124,17 +121,6 @@ export default function QrDownloadScreen({
             </p>
           </div>
 
-          {linkedInShareUrl && (
-            <a
-              href={linkedInShareUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0a66c2] px-5 text-sm font-semibold text-white shadow-[0_1px_2px_rgba(11,10,12,0.18),0_8px_24px_rgba(10,102,194,0.26)] transition-all duration-150 hover:-translate-y-px hover:bg-[#004182] active:translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0a66c2] focus-visible:ring-offset-2"
-            >
-              <LinkedInGlyph className="h-4 w-4" />
-              Share on LinkedIn
-            </a>
-          )}
         </div>
 
         {/* Actions */}

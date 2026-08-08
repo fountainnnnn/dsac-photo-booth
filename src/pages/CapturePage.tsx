@@ -16,13 +16,11 @@ export default function CapturePage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [composedDataUrl, setComposedDataUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [linkedInShareUrl, setLinkedInShareUrl] = useState<string | null>(null);
 
   const resetFlow = useCallback(() => {
     setUploadError(null);
     setComposedDataUrl(null);
     setDownloadUrl(null);
-    setLinkedInShareUrl(null);
     setStep('camera');
   }, []);
 
@@ -44,7 +42,6 @@ export default function CapturePage() {
 
       const data = await uploadRes.json() as ComposedUploadResponse;
       setDownloadUrl(data.downloadUrl);
-      setLinkedInShareUrl(data.linkedInShareUrl ?? null);
       setStep('qr-download');
     } catch (err) {
       // Back to the camera rather than stranding the guest on a dead screen.
@@ -109,7 +106,6 @@ export default function CapturePage() {
         <QrDownloadScreen
           composedDataUrl={composedDataUrl}
           downloadUrl={downloadUrl}
-          linkedInShareUrl={linkedInShareUrl ?? undefined}
           onDone={handleRetake}
           onRetake={handleRetake}
         />
