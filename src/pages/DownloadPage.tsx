@@ -21,7 +21,6 @@ export default function DownloadPage({ token }: DownloadPageProps) {
   const downloadHref = `/api/download/${encodeURIComponent(token)}`;
   const previewHref = `/api/preview/${encodeURIComponent(token)}`;
   const sharePreviewUrl = `${window.location.origin}/api/share/${encodeURIComponent(token)}`;
-  const linkedInShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(sharePreviewUrl)}`;
 
   const [copied, setCopied] = useState(false);
   /**
@@ -33,30 +32,28 @@ export default function DownloadPage({ token }: DownloadPageProps) {
   const [caption, setCaption] = useState(DEFAULT_LINKEDIN_TEXT);
 
   /**
-   * On a phone, hand the post to the operating system rather than to a web
-   * page. The share sheet lists LinkedIn alongside everything else and opens
-   * the real app — and, unlike LinkedIn's public share URL, it carries the
-   * caption with it, so the guest is not left pasting.
+   * Open LinkedIn's own composer, with the caption already in it.
    *
-   * Desktop browsers mostly do not implement this, and there is no app to open
-   * there anyway, so those fall back to the web share link below.
+   * `shareActive=true` puts LinkedIn's "start a post" box up and `text` fills
+   * the commentary. On a phone the https link is a LinkedIn universal link, so
+   * the app takes it over and the composer opens there rather than in a
+   * browser tab.
+   *
+   * The photo rides along as the link preview LinkedIn builds from the share
+   * page's og:image — which is why that image had to stop being password
+   * gated. It cannot be attached as an uploaded image: that is only possible
+   * through LinkedIn's UGC API, which needs each guest to OAuth into an
+   * approved app first, and no guest at a booth is going to do that.
    */
-  const canShareNatively = typeof navigator !== 'undefined'
-    && typeof navigator.share === 'function';
-
-  const shareNatively = async () => {
-    try {
-      await navigator.share({ title: 'My AI Learning Journey at SP DSAC', text: caption, url: sharePreviewUrl });
-    } catch {
-      // The sheet was dismissed, or the browser refused. Nothing to report:
-      // the guest either changed their mind or can still use Copy text.
-    }
-  };
+  const linkedInComposeUrl =
+    `https://www.linkedin.com/feed/?shareActive=true&text=${
+      encodeURIComponent(`${caption}\n\n${sharePreviewUrl}`)
+    }`;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(caption).catch(() => {});
     setCopied(true);
-    setTimeout(() => setCopied(false), 2200);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -136,26 +133,15 @@ export default function DownloadPage({ token }: DownloadPageProps) {
                 {copied ? 'Copied!' : 'Copy text'}
               </button>
 
-              {canShareNatively ? (
-                <button
-                  type="button"
-                  onClick={shareNatively}
-                  className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0a66c2] px-3 text-xs font-semibold text-white transition hover:bg-[#004182]"
-                >
-                  <LinkedInGlyph className="h-3.5 w-3.5" />
-                  Share
-                </button>
-              ) : (
-                <a
-                  href={linkedInShareUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0a66c2] px-3 text-xs font-semibold text-white transition hover:bg-[#004182]"
-                >
-                  <LinkedInGlyph className="h-3.5 w-3.5" />
-                  Post on LinkedIn
-                </a>
-              )}
+              <a
+                href={linkedInComposeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0a66c2] px-3 text-xs font-semibold text-white transition hover:bg-[#004182]"
+              >
+                <LinkedInGlyph className="h-3.5 w-3.5" />
+                Post on LinkedIn
+              </a>
             </div>
           </section>
         </div>
