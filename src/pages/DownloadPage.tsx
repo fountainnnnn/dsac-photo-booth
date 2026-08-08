@@ -53,6 +53,15 @@ export default function DownloadPage({ token }: DownloadPageProps) {
     && typeof navigator.share === 'function';
 
   const shareToApp = async () => {
+    // Belt and braces. LinkedIn's share extension is supposed to carry the
+    // text into the composer, and usually does — but it has a habit of
+    // keeping only the URL and dropping the commentary, and a guest standing
+    // at a booth is not going to come back here to fetch it. Putting the
+    // caption on the clipboard first means the worst case is one paste.
+    await navigator.clipboard?.writeText(caption).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 4000);
+
     try {
       await navigator.share({ text: `${caption}\n\n${sharePreviewUrl}` });
     } catch {
@@ -117,7 +126,8 @@ export default function DownloadPage({ token }: DownloadPageProps) {
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a1a1aa]">Share on LinkedIn</p>
             <p className="mt-1 text-sm leading-6 text-[#52525b]">
-              Edit this however you like — it comes with you to LinkedIn.
+              Edit this however you like — it comes with you to LinkedIn, and
+              is copied too in case you need to paste it.
             </p>
 
             <textarea
