@@ -16,11 +16,15 @@ export default function CapturePage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [composedDataUrl, setComposedDataUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  // Carried through so the QR screen can state this photo's own link window
+  // rather than a figure written into the copy.
+  const [expiresAt, setExpiresAt] = useState<string | undefined>(undefined);
 
   const resetFlow = useCallback(() => {
     setUploadError(null);
     setComposedDataUrl(null);
     setDownloadUrl(null);
+    setExpiresAt(undefined);
     setStep('camera');
   }, []);
 
@@ -42,6 +46,7 @@ export default function CapturePage() {
 
       const data = await uploadRes.json() as ComposedUploadResponse;
       setDownloadUrl(data.downloadUrl);
+      setExpiresAt(data.expiresAt);
       setStep('qr-download');
     } catch (err) {
       // Back to the camera rather than stranding the guest on a dead screen.
@@ -106,6 +111,7 @@ export default function CapturePage() {
         <QrDownloadScreen
           composedDataUrl={composedDataUrl}
           downloadUrl={downloadUrl}
+          expiresAt={expiresAt}
           onDone={handleRetake}
           onRetake={handleRetake}
         />
