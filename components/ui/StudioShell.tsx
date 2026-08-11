@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { CaretDown, Camera, Gear, Images, SidebarSimple } from '@phosphor-icons/react';
+import { useEffect, useRef, useState } from 'react';
+import { CaretDown, Camera, Gear, Images, SignOut, SidebarSimple } from '@phosphor-icons/react';
 
 /**
  * StudioShell — the persistent left rail and page frame.
@@ -39,6 +39,36 @@ export default function StudioShell({ active, onNavigate, children, scroll = fal
   useEffect(() => {
     try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* private mode */ }
   }, [collapsed]);
+
+  // The account menu, which today is one item. It closes on an outside click
+  // like any other popover — Escape is not wired up because there is nothing
+  // else in it yet to tab past.
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (!accountRef.current?.contains(e.target as Node)) setAccountOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [accountOpen]);
+
+  // Booth is the one scope the studio itself runs behind, so logging out just
+  // drops that cookie and reloads — the same PasswordGate that let the page
+  // through picks the lock back up.
+  const logOut = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'booth' }),
+      });
+    } finally {
+      window.location.reload();
+    }
+  };
 
   /** One row of the rail, which is a label + icon open and an icon alone shut. */
   const navButton = (id: StudioSection, label: string, Icon: NavIcon) => {
@@ -116,15 +146,42 @@ export default function StudioShell({ active, onNavigate, children, scroll = fal
         <div className="mt-auto flex flex-col gap-1.5 border-t border-[var(--border)] pt-4">
           {navButton('settings', 'Settings', Gear)}
 
-          <div className={`mt-1 flex items-center rounded-xl py-2 ${collapsed ? 'justify-center px-0' : 'gap-3 px-2.5'}`}>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--shell-bg)] text-[0.7rem] font-bold text-[var(--ink)]">
-              SP
-            </span>
-            {!collapsed && (
-              <>
-                <span className="text-[0.85rem] font-semibold text-[var(--ink)]">Studio Pro</span>
-                <CaretDown size={14} weight="bold" className="ml-auto text-[var(--ink-3)]" />
-              </>
+          <div ref={accountRef} className="relative mt-1">
+            <button
+              type="button"
+              onClick={() => setAccountOpen(o => !o)}
+              aria-expanded={accountOpen}
+              aria-label={collapsed ? 'Account menu' : undefined}
+              className={`flex w-full items-center rounded-xl py-2 transition-colors duration-150 hover:bg-[var(--shell-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                collapsed ? 'justify-center px-0' : 'gap-3 px-2.5'
+              }`}
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--shell-bg)] text-[0.7rem] font-bold text-[var(--ink)]">
+                SP
+              </span>
+              {!collapsed && (
+                <>
+                  <span className="text-[0.85rem] font-semibold text-[var(--ink)]">Studio Pro</span>
+                  <CaretDown size={14} weight="bold" className="ml-auto text-[var(--ink-3)]" />
+                </>
+              )}
+            </button>
+
+            {accountOpen && (
+              <div
+                className={`absolute bottom-full z-10 mb-1.5 w-44 rounded-xl border border-[var(--border)] bg-white py-1.5 shadow-[0_4px_16px_rgba(11,10,12,0.12)] ${
+                  collapsed ? 'left-0' : 'left-0 right-0 w-auto'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => { setAccountOpen(false); void logOut(); }}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[0.85rem] font-medium text-[var(--ink)] hover:bg-[var(--shell-bg)]"
+                >
+                  <SignOut size={16} />
+                  Log out
+                </button>
+              </div>
             )}
           </div>
         </div>

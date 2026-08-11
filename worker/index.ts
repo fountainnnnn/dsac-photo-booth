@@ -185,9 +185,11 @@ app.get('/api/health', (c) => c.json({
 
 app.get('/api/auth/status', (c) => svc(c).auth.status(c));
 app.post('/api/auth/login', (c) => svc(c).auth.login(c));
-app.put('/api/settings/passwords', booth, (c) => svc(c).auth.updatePasswords(c));
-// Same booth gate as the PUT above, on purpose: reading the passwords back is
-// no more privileged than replacing them.
+app.post('/api/auth/logout', (c) => svc(c).auth.logout(c));
+// There is no route for changing a password. They come from the deployment's
+// secrets, so changing one means having access to the deployment — which is
+// the whole point. Reading one back is booth-gated and no more privileged than
+// standing in front of the booth already is.
 app.get('/api/settings/passwords/reveal', booth, (c) => svc(c).auth.revealPasswords(c));
 
 // ── Photos ───────────────────────────────────────────────────────────────────

@@ -137,6 +137,19 @@ export function createAuth(kv) {
     return res.json({ ok: true });
   }
 
+  /** Drop the caller's token for a scope and clear its cookie. */
+  function logout(req, res) {
+    const scope = String(req.body?.scope ?? '');
+    if (!SCOPES.includes(scope)) return res.status(400).json({ error: 'Unknown scope' });
+
+    const cookies = parseCookies(req.headers.cookie);
+    const token = cookies[COOKIE[scope]];
+    if (token) tokens.delete(token);
+
+    res.setHeader('Set-Cookie', `${COOKIE[scope]}=; Path=/; Max-Age=0; SameSite=Lax`);
+    return res.json({ ok: true });
+  }
+
   function status(req, res) {
     const out = {};
     for (const scope of SCOPES) {
@@ -152,51 +165,24 @@ export function createAuth(kv) {
   }
 
   /**
-   * Change or clear a password from Settings. A string sets it, null clears
-   * the Settings override (falling back to .env, or to open), and a missing
-   * key leaves that scope alone.
-   */
-  function updatePasswords(req, res) {
-    for (const scope of SCOPES) {
-      if (!(scope in (req.body ?? {}))) continue;
-      if (isManagedByDeployment(scope)) {
-        return res.status(403).json({
-          error: `The ${scope} password is set on the deployment and cannot be changed here. Whoever administers the booth changes it there.`,
-        });
-      }
-      const value = req.body[scope];
-      if (value === null || value === '') {
-        kv.set(`password:${scope}`, null);
-      } else if (typeof value === 'string') {
-        if (value.length < 4) {
-          return res.status(400).json({ error: `The ${scope} password needs at least 4 characters` });
-        }
-        kv.set(`password:${scope}`, hashPassword(value));
-      }
-    }
-    return status(req, res);
-  }
-
-  /**
-   * Show the operator the passwords currently in force.
+   * Show the photo password, and only that one.
    *
-   * This deliberately hands a secret back to whoever asks — but only to
-   * someone who has already passed the booth gate, and it is mounted behind
-   * exactly the same check as changing the passwords. Nothing is given away by
-   * it: showing the booth password to a person already inside the booth is no
-   * new exposure, and the photo password exists to be read out loud to guests
-   * queueing for their picture. An operator who has forgotten what is in .env
-   * would otherwise have to open a file on the machine to run their own event.
+   * The booth password is deliberately never returned. Settings sits behind it,
+   * so anyone reading this is already inside — but "already inside" is a laptop
+   * left unattended at a stand, and the password is the same one that opens the
+   * booth on every other device. Showing it turns a borrowed screen into
+   * permanent access. Whoever administers the booth reads it from the
+   * deployment instead.
    *
-   * Only an env-sourced password can be shown. Anything set from Settings is a
-   * salted scrypt hash and is not reversible, by design — we report that fact
-   * rather than pretending, and never return the hash or its salt.
+   * The photo password is different in kind: it exists to be said out loud to a
+   * queue of guests, so keeping it from the operator running that queue would
+   * protect nothing.
    */
   function revealPasswords(req, res) {
     const out = {};
     for (const scope of SCOPES) {
       const { source } = resolve(scope);
-      const plain = source === 'env' ? envPlain[scope] : null;
+      const plain = scope === 'download' && source === 'env' ? envPlain[scope] : null;
       out[scope] = { revealable: Boolean(plain), password: plain, source };
     }
     res.setHeader('Cache-Control', 'no-store');
@@ -207,5 +193,5 @@ export function createAuth(kv) {
   // reachable by either scope sometimes need to know *which* one let the
   // request in. A guest holding a lapsed download link is turned away where
   // the operator, on the same URL, is not.
-  return { requireAuth, isAuthed, login, status, updatePasswords, revealPasswords };
+  return { requireAuth, isAuthed, login, logout, status, revealPasswords };
 }

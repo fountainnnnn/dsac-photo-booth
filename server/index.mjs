@@ -210,14 +210,13 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ── Passwords ────────────────────────────────────────────────────────────────
-// See server/auth.mjs for the model. Status and login are open by necessity;
-// changing passwords is itself booth-gated.
+// See server/auth.mjs for the model. Status and login are open by necessity.
+// There is no route for changing a password: they are set where the booth is
+// deployed and nowhere else.
 
 app.get('/api/auth/status', auth.status);
 app.post('/api/auth/login', auth.login);
-app.put('/api/settings/passwords', booth, auth.updatePasswords);
-// Same booth gate as the PUT above, on purpose: reading the passwords back is
-// no more privileged than replacing them.
+app.post('/api/auth/logout', auth.logout);
 app.get('/api/settings/passwords/reveal', booth, auth.revealPasswords);
 
 app.post('/api/photos', booth, upload.single('file'), validateImage, (_req, res) => {

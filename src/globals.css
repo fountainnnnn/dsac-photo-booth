@@ -89,6 +89,33 @@ a {
   }
 }
 
+/* Blob drift for the login panel's aurora. Percentages, not viewport units, so
+   the movement stays in proportion to the panel rather than the screen. */
+@keyframes dsac-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(16%, -14%, 0) scale(1.18);
+  }
+  66% {
+    transform: translate3d(-13%, 11%, 0) scale(0.9);
+  }
+}
+
+/* A slow band of light crossing the aurora, so the panel reads as lit rather
+   than merely coloured. */
+@keyframes dsac-sheen {
+  0% {
+    transform: translate3d(-140%, 0, 0) rotate(12deg);
+  }
+  55%,
+  100% {
+    transform: translate3d(260%, 0, 0) rotate(12deg);
+  }
+}
+
 @keyframes dsac-live-pulse {
   0%,
   100% {

@@ -58,12 +58,6 @@ const KEY_BYTES = 32;
 /** The delay served on a wrong password — brute force without a rate limiter. */
 const WRONG_PASSWORD_DELAY_MS = 400;
 
-function toHex(bytes: Uint8Array): string {
-  let out = '';
-  for (const b of bytes) out += b.toString(16).padStart(2, '0');
-  return out;
-}
-
 function fromHex(hex: string): Uint8Array {
   const clean = hex.length % 2 === 0 ? hex : '';
   const out = new Uint8Array(clean.length / 2);
@@ -87,12 +81,6 @@ async function derive(password: string, salt: string, iterations: number): Promi
     KEY_BYTES * 8,
   );
   return new Uint8Array(bits);
-}
-
-async function hashPassword(password: string): Promise<StoredHash> {
-  const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
-  const bytes = await derive(password, salt, PBKDF2_ITERATIONS);
-  return { salt, hash: toHex(bytes), iterations: PBKDF2_ITERATIONS };
 }
 
 /**
@@ -243,6 +231,24 @@ export function createAuth(db: Db, env: Env) {
     return c.json({ ok: true });
   }
 
+  /** Drop the caller's session row for a scope and clear its cookie. */
+  async function logout(c: Context): Promise<Response> {
+    const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+    const scope = String(body?.scope ?? '');
+    if (!isScope(scope)) return c.json({ error: 'Unknown scope' }, 400);
+
+    const cookies = parseCookies(c.req.header('Cookie'));
+    const token = cookies[COOKIE[scope]];
+    if (token) {
+      await env.DB.prepare('DELETE FROM sessions WHERE token = ?1 AND scope = ?2')
+        .bind(token, scope)
+        .run();
+    }
+
+    c.header('Set-Cookie', `${COOKIE[scope]}=; Path=/; Max-Age=0; SameSite=Lax; Secure`);
+    return c.json({ ok: true });
+  }
+
   async function statusBody(c: Context) {
     const out: Record<string, {
       required: boolean; authed: boolean; source: string | null; managed: boolean;
@@ -268,31 +274,6 @@ export function createAuth(db: Db, env: Env) {
    * the Settings override (falling back to the environment, or to open), and a
    * missing key leaves that scope alone.
    */
-  async function updatePasswords(c: Context): Promise<Response> {
-    const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
-    for (const scope of SCOPES) {
-      if (!(scope in (body ?? {}))) continue;
-      // A deployment-supplied password outranks anything stored here, so
-      // accepting the write would save a hash that never takes effect — the
-      // operator would think they had changed the lock and had not.
-      if (isManagedByDeployment(scope)) {
-        return c.json({
-          error: `The ${scope} password is set on the deployment and cannot be changed here. Whoever administers the booth changes it there.`,
-        }, 403);
-      }
-      const value = body[scope];
-      if (value === null || value === '') {
-        await db.kv.set(`password:${scope}`, null);
-      } else if (typeof value === 'string') {
-        if (value.length < 4) {
-          return c.json({ error: `The ${scope} password needs at least 4 characters` }, 400);
-        }
-        await db.kv.set(`password:${scope}`, await hashPassword(value));
-      }
-    }
-    return status(c);
-  }
-
   /**
    * Expired rows are already refused by `tokenValid`, so this is housekeeping
    * rather than enforcement — it stops a long-running event's table growing
@@ -306,19 +287,18 @@ export function createAuth(db: Db, env: Env) {
   }
 
   /**
-   * Show the operator the passwords currently in force.
+   * Show the photo password, and only that one.
    *
-   * This deliberately hands a secret back to whoever asks — but only to
-   * someone who has already passed the booth gate, and it is mounted behind
-   * exactly the same check as changing the passwords. Nothing is given away by
-   * it: showing the booth password to a person already inside the booth is no
-   * new exposure, and the photo password exists to be read out loud to guests
-   * queueing for their picture. An operator who has forgotten which secret was
-   * pushed with `wrangler secret put` would otherwise have no way back to it.
+   * The booth password is deliberately never returned. Settings sits behind it,
+   * so anyone reading this is already inside — but "already inside" is a laptop
+   * left unattended at a stand, and the password is the same one that opens the
+   * booth on every other device. Showing it turns a borrowed screen into
+   * permanent access. Whoever administers the booth reads it from the
+   * deployment instead.
    *
-   * Only an env-sourced password can be shown. Anything set from Settings is a
-   * salted PBKDF2 hash and is not reversible, by design — we report that fact
-   * rather than pretending, and never return the hash or its salt.
+   * The photo password is different in kind: it exists to be said out loud to a
+   * queue of guests, so keeping it from the operator running that queue would
+   * protect nothing.
    */
   async function revealPasswords(c: Context): Promise<Response> {
     const out: Record<string, {
@@ -326,7 +306,8 @@ export function createAuth(db: Db, env: Env) {
     }> = {};
     for (const scope of SCOPES) {
       const { plain, source } = await resolve(scope);
-      out[scope] = { revealable: Boolean(plain), password: plain, source };
+      const shown = scope === 'download' ? plain : null;
+      out[scope] = { revealable: Boolean(shown), password: shown, source };
     }
     c.header('Cache-Control', 'no-store');
     return c.json(out);
@@ -336,7 +317,7 @@ export function createAuth(db: Db, env: Env) {
   // reachable by either scope sometimes need to know *which* one let the
   // request in. A guest holding a lapsed download link is turned away where
   // the operator, on the same URL, is not.
-  return { requireAuth, isAuthed, login, status, updatePasswords, revealPasswords, sweepSessions };
+  return { requireAuth, isAuthed, login, logout, status, revealPasswords, sweepSessions };
 }
 
 /** Node's `base64url` encoding, which Workers' btoa does not do on its own. */

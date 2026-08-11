@@ -394,8 +394,8 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
         className="hidden" />
 
       {/* Header */}
-      <header className="flex shrink-0 items-center gap-4">
-        <h1 className="text-[1.6rem] font-semibold tracking-[-0.02em] text-[var(--ink)]">
+      <header className="relative flex shrink-0 items-center gap-4">
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-[1.6rem] font-semibold tracking-[-0.02em] text-[var(--ink)]">
           Say cheese<span className="text-[var(--accent)]">.</span>
         </h1>
 
