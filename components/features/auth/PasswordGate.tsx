@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Eye, EyeSlash, LockSimple } from '@phosphor-icons/react';
+import { Camera, Eye, EyeSlash, Image as ImageIcon } from '@phosphor-icons/react';
 
 /**
  * A full-screen password card in front of a page.
@@ -65,6 +65,15 @@ const PITCH: Record<AuthScope, { eyebrow: string; line: string }> = {
   },
 };
 
+/** A camera for the booth itself, a photo for the picture waiting on the other side. */
+const ICON: Record<AuthScope, typeof Camera> = { booth: Camera, download: ImageIcon };
+
+/** What the submit button says, so it reads as opening a booth or a photo rather than a generic form. */
+const UNLOCK_LABEL: Record<AuthScope, string> = {
+  booth: 'Unlock the booth',
+  download: 'Unlock my photo',
+};
+
 /**
  * The left half of the card: a photo of an actual photo booth — flash lit,
  * curtain drawn, filmstrip curling off the camera — so the lock screen reads
@@ -115,6 +124,7 @@ export default function PasswordGate({ scope, title, hint, children }: {
   const [busy, setBusy] = useState(false);
   const [wrong, setWrong] = useState(false);
   const [show, setShow] = useState(false);
+  const ScopeIcon = ICON[scope];
 
   const submit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,7 +165,7 @@ export default function PasswordGate({ scope, title, hint, children }: {
           <img src="/sp-dsac-logo.png" alt="SP DSAC" className="h-9 w-auto self-start" />
 
           <span className="mt-7 flex h-11 w-11 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent)]">
-            <LockSimple size={21} weight="fill" />
+            <ScopeIcon size={21} weight="fill" />
           </span>
           <h1 className="mt-4 text-[1.5rem] font-semibold tracking-[-0.015em] text-[var(--ink)]">
             {title}<span className="text-[var(--accent)]">.</span>
@@ -203,7 +213,7 @@ export default function PasswordGate({ scope, title, hint, children }: {
             disabled={busy || !password}
             className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--accent)] text-[0.95rem] font-semibold text-white shadow-[0_8px_24px_rgba(225,38,47,0.26)] transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
           >
-            {busy ? 'Checking…' : 'Unlock'}
+            {busy ? 'Checking…' : UNLOCK_LABEL[scope]}
           </button>
         </form>
       </div>

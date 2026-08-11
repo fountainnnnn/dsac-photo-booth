@@ -206,6 +206,9 @@ app.get('/api/health', (_req, res) => {
     // no filesystem — the gallery reads this rather than offering a button
     // that can only apologise.
     localArchive: true,
+    // The local archive is not a safety net for the sweep: deleting a photo
+    // removes the file beside the row. Nothing survives cleanup here.
+    archive: 'none',
   });
 });
 

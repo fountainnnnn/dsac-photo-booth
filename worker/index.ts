@@ -179,6 +179,12 @@ app.get('/api/health', (c) => c.json({
   // No filesystem and no desktop, so there is no folder to open. The gallery
   // hides its Open folder button when it sees this.
   localArchive: false,
+  // Where a swept photo goes. Settings words the cleanup warning from this:
+  // "deleted for good" and "archived to Drive first" are different promises
+  // to make to an operator about to set a retention window.
+  archive: c.env.GOOGLE_DRIVE_FOLDER_ID && c.env.GOOGLE_REFRESH_TOKEN
+    ? 'drive' as const
+    : 'none' as const,
 }));
 
 // ── Passwords ────────────────────────────────────────────────────────────────

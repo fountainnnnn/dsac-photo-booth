@@ -162,14 +162,22 @@ export default function StudioShell({ active, onNavigate, children, scroll = fal
               {!collapsed && (
                 <>
                   <span className="text-[0.85rem] font-semibold text-[var(--ink)]">Studio Pro</span>
-                  <CaretDown size={14} weight="bold" className="ml-auto text-[var(--ink-3)]" />
+                  {/* Points at the menu: down when it is closed, up once it
+                      has opened above the button. */}
+                  <CaretDown
+                    size={14}
+                    weight="bold"
+                    className={`ml-auto text-[var(--ink-3)] transition-transform duration-200 ease-out ${
+                      accountOpen ? '-rotate-180' : 'rotate-0'
+                    }`}
+                  />
                 </>
               )}
             </button>
 
             {accountOpen && (
               <div
-                className={`absolute bottom-full z-10 mb-1.5 w-44 rounded-xl border border-[var(--border)] bg-white py-1.5 shadow-[0_4px_16px_rgba(11,10,12,0.12)] ${
+                className={`dsac-pop-up absolute bottom-full z-10 mb-1.5 w-44 rounded-xl border border-[var(--border)] bg-white py-1.5 shadow-[0_4px_16px_rgba(11,10,12,0.12)] ${
                   collapsed ? 'left-0' : 'left-0 right-0 w-auto'
                 }`}
               >

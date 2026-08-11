@@ -81,10 +81,27 @@ export function useCaptureSettingsControl(): CaptureSettingsControl {
   return { settings, push, saved, loading };
 }
 
+/**
+ * Where a swept photo ends up, which decides how the cleanup warning is worded.
+ * Assume the harsher of the two until the answer arrives: promising an archive
+ * that is not there is the mistake that costs someone their photos.
+ */
+function useArchiveKind(): 'drive' | 'none' {
+  const [kind, setKind] = useState<'drive' | 'none'>('none');
+  useEffect(() => {
+    void fetch('/api/health')
+      .then(r => r.json() as Promise<{ archive?: string }>)
+      .then(h => setKind(h.archive === 'drive' ? 'drive' : 'none'))
+      .catch(() => { /* the warning stays on its cautious wording */ });
+  }, []);
+  return kind;
+}
+
 /** What is printed on the photo, and how long the countdown runs. */
 export function EventSettingsCard({ settings, push, saved, loading }: CaptureSettingsControl) {
   // The real date control, kept off-screen: the button above is what is seen.
   const dateRef = useRef<HTMLInputElement>(null);
+  const archive = useArchiveKind();
   return (
     <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
       <div className="flex items-center gap-2">
@@ -225,12 +242,23 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
         <p className="mb-1.5 flex items-center gap-1.5 text-[0.78rem] font-semibold text-[var(--ink-2)]">
           <Trash size={15} /> Gallery cleanup
         </p>
-        <p className="mb-3 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
-          How long a photo is kept after it is taken. When the time is up the
-          booth <strong className="font-semibold text-[var(--ink)]">deletes the photo
-          itself</strong> — out of the gallery and out of storage, permanently, with
-          no way back. Never keeps every photo until you delete it by hand.
-        </p>
+        {archive === 'drive' ? (
+          <p className="mb-3 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+            How long a photo stays in the booth after it is taken. When the time
+            is up the booth <strong className="font-semibold text-[var(--ink)]">copies
+            it to Google Drive and then removes it here</strong> — out of the gallery
+            and out of booth storage, with the Drive copy the only one left. If
+            Drive cannot be reached the photo is kept until it can. Never keeps
+            every photo in the booth until you delete it by hand.
+          </p>
+        ) : (
+          <p className="mb-3 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+            How long a photo is kept after it is taken. When the time is up the
+            booth <strong className="font-semibold text-[var(--ink)]">deletes the photo
+            itself</strong> — out of the gallery and out of storage, permanently, with
+            no way back. Never keeps every photo until you delete it by hand.
+          </p>
+        )}
         <TtlPicks
           options={GALLERY_TTL_OPTIONS} value={settings.galleryTtlHours} loading={loading}
           onPick={h => push({ ...settings, galleryTtlHours: h })}
@@ -249,7 +277,9 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
           && (settings.linkTtlHours === 0 || settings.galleryTtlHours < settings.linkTtlHours) && (
           <p className="mt-2 text-[0.72rem] leading-[1.6] font-medium text-[var(--accent-ink)]">
             Download links outlive the photos here, so a guest could scan a QR
-            code and find the picture already deleted.
+            code and find the picture {archive === 'drive'
+              ? 'already moved out of the booth'
+              : 'already deleted'}.
           </p>
         )}
       </div>

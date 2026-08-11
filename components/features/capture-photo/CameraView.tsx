@@ -395,7 +395,10 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
 
       {/* Header */}
       <header className="relative flex shrink-0 items-center gap-4">
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-[1.6rem] font-semibold tracking-[-0.02em] text-[var(--ink)]">
+        {/* Centred over the frame, not the row. The capture rail takes 180px
+            off the right with a 20px gap, so the stage's midpoint sits 100px
+            left of the panel's. */}
+        <h1 className="absolute left-[calc(50%-100px)] -translate-x-1/2 text-[1.6rem] font-semibold tracking-[-0.02em] text-[var(--ink)]">
           Say cheese<span className="text-[var(--accent)]">.</span>
         </h1>
 
