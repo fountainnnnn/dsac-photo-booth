@@ -147,14 +147,31 @@ export function createAuth(db: Db, env: Env) {
   }
 
   /** Where a scope's password comes from, and what to check against. */
+  /**
+   * A password from the environment wins, and nothing in the app can move it.
+   *
+   * The order used to be the other way round, which quietly handed the booth
+   * away: anyone already inside could set their own password from Settings and
+   * shadow the one the administrator had deployed. Putting the environment
+   * first means the deployment owns that scope — on the hosted booth that is
+   * whoever holds the Cloudflare account, and no one else.
+   *
+   * A scope with no environment password behaves as before, editable from
+   * Settings, which is what an unattended laptop booth wants.
+   */
   async function resolve(scope: Scope): Promise<{
     hash: StoredHash | null; plain: string | null; source: string | null;
   }> {
-    const stored = await db.kv.get<StoredHash | null>(`password:${scope}`, null);
-    if (stored?.hash) return { hash: stored, plain: null, source: 'settings' };
     const plain = envPassword(scope);
     if (plain) return { hash: null, plain, source: 'env' };
+    const stored = await db.kv.get<StoredHash | null>(`password:${scope}`, null);
+    if (stored?.hash) return { hash: stored, plain: null, source: 'settings' };
     return { hash: null, plain: null, source: null };
+  }
+
+  /** Scopes the deployment owns, which Settings must not touch. */
+  function isManagedByDeployment(scope: Scope): boolean {
+    return Boolean(envPassword(scope));
   }
 
   /** True when this scope has a password at all, whatever its provenance. */
@@ -227,10 +244,17 @@ export function createAuth(db: Db, env: Env) {
   }
 
   async function statusBody(c: Context) {
-    const out: Record<string, { required: boolean; authed: boolean; source: string | null }> = {};
+    const out: Record<string, {
+      required: boolean; authed: boolean; source: string | null; managed: boolean;
+    }> = {};
     for (const scope of SCOPES) {
       const { hash, plain, source } = await resolve(scope);
-      out[scope] = { required: Boolean(hash || plain), authed: await isAuthed(c, scope), source };
+      out[scope] = {
+        required: Boolean(hash || plain),
+        authed: await isAuthed(c, scope),
+        source,
+        managed: isManagedByDeployment(scope),
+      };
     }
     return out;
   }
@@ -248,6 +272,14 @@ export function createAuth(db: Db, env: Env) {
     const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
     for (const scope of SCOPES) {
       if (!(scope in (body ?? {}))) continue;
+      // A deployment-supplied password outranks anything stored here, so
+      // accepting the write would save a hash that never takes effect — the
+      // operator would think they had changed the lock and had not.
+      if (isManagedByDeployment(scope)) {
+        return c.json({
+          error: `The ${scope} password is set on the deployment and cannot be changed here. Whoever administers the booth changes it there.`,
+        }, 403);
+      }
       const value = body[scope];
       if (value === null || value === '') {
         await db.kv.set(`password:${scope}`, null);

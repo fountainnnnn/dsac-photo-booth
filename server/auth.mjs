@@ -74,11 +74,27 @@ export function createAuth(kv) {
   setInterval(sweep, 60 * 60 * 1000).unref?.();
 
   /** The active hash for a scope, and where it came from. */
+  /**
+   * A password from the environment wins, and nothing in the app can move it.
+   *
+   * The order used to be the other way round, which quietly handed the booth
+   * away: anyone already inside could set their own password from Settings and
+   * shadow the one the administrator had deployed. Putting the environment
+   * first means the deployment owns that scope.
+   *
+   * A scope with no environment password behaves as before, editable from
+   * Settings, which is what an unattended laptop booth wants.
+   */
   function resolve(scope) {
+    if (envPlain[scope]) return { hash: envHash[scope], plain: envPlain[scope], source: 'env' };
     const stored = kv.get(`password:${scope}`, null);
-    if (stored?.hash) return { hash: stored, source: 'settings' };
-    if (envHash[scope]) return { hash: envHash[scope], source: 'env' };
-    return { hash: null, source: null };
+    if (stored?.hash) return { hash: stored, plain: null, source: 'settings' };
+    return { hash: null, plain: null, source: null };
+  }
+
+  /** Scopes the deployment owns, which Settings must not touch. */
+  function isManagedByDeployment(scope) {
+    return Boolean(envPlain[scope]);
   }
 
   function isAuthed(req, scope) {
@@ -124,8 +140,13 @@ export function createAuth(kv) {
   function status(req, res) {
     const out = {};
     for (const scope of SCOPES) {
-      const { hash, source } = resolve(scope);
-      out[scope] = { required: Boolean(hash), authed: isAuthed(req, scope), source };
+      const { hash, plain, source } = resolve(scope);
+      out[scope] = {
+        required: Boolean(hash || plain),
+        authed: isAuthed(req, scope),
+        source,
+        managed: isManagedByDeployment(scope),
+      };
     }
     res.json(out);
   }
@@ -138,6 +159,11 @@ export function createAuth(kv) {
   function updatePasswords(req, res) {
     for (const scope of SCOPES) {
       if (!(scope in (req.body ?? {}))) continue;
+      if (isManagedByDeployment(scope)) {
+        return res.status(403).json({
+          error: `The ${scope} password is set on the deployment and cannot be changed here. Whoever administers the booth changes it there.`,
+        });
+      }
       const value = req.body[scope];
       if (value === null || value === '') {
         kv.set(`password:${scope}`, null);

@@ -26,9 +26,9 @@ import PasswordsCard from '@/components/features/auth/PasswordsCard';
 type TabId = 'frames' | 'camera' | 'event' | 'access';
 
 const TABS: { id: TabId; label: string; Icon: typeof Camera }[] = [
+  { id: 'event',  label: 'Event',   Icon: CalendarBlank },
   { id: 'frames', label: 'Frames',  Icon: Images },
   { id: 'camera', label: 'Camera',  Icon: Camera },
-  { id: 'event',  label: 'Event',   Icon: CalendarBlank },
   { id: 'access', label: 'Access',  Icon: LockSimple },
 ];
 

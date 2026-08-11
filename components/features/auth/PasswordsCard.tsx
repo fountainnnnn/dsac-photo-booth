@@ -20,6 +20,8 @@ interface ScopeReveal {
   revealable: boolean;
   password: string | null;
   source: 'settings' | 'env' | null;
+  /** Set on the deployment, so this card can show it but never change it. */
+  managed?: boolean;
 }
 
 type RevealMap = Record<AuthScope, ScopeReveal>;
@@ -143,7 +145,7 @@ function ScopeRow({ scope, status, reveal, onSave }: {
         {copy.label}
         {s?.source === 'env' && (
           <span className="rounded bg-[var(--shell-bg)] px-1.5 py-0.5 text-[0.62rem] font-semibold text-[var(--ink-3)]">
-            from .env
+            {s.managed ? 'set on the deployment' : 'from .env'}
           </span>
         )}
       </p>
@@ -155,37 +157,47 @@ function ScopeRow({ scope, status, reveal, onSave }: {
 
       <CurrentPassword label={copy.label} reveal={reveal} />
 
-      <form
-        className="mt-2 flex gap-2"
-        onSubmit={e => { e.preventDefault(); if (value) void save(value); }}
-      >
-        <input
-          type="password"
-          value={value}
-          onChange={e => setValue(e.target.value)}
-          placeholder={s?.required ? 'Change password' : 'Set a password'}
-          aria-label={copy.label}
-          className="min-w-0 flex-1 rounded-xl border border-[var(--border)] px-3.5 py-2.5 text-[0.85rem] outline-none transition focus:border-[var(--accent)]"
-        />
-        <button
-          type="submit"
-          disabled={busy || !value}
-          className="shrink-0 rounded-xl bg-[var(--accent)] px-4 text-[0.8rem] font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+      {/* A scope the deployment owns has no form at all. Showing one that
+          always fails would read as a bug; saying who can change it, and
+          where, is the actual answer to "why can I not edit this". */}
+      {s?.managed ? (
+        <p className="mt-2 rounded-lg border border-dashed border-[var(--border)] px-3.5 py-2.5 text-[0.72rem] leading-[1.6] text-[var(--ink-2)]">
+          Set on the deployment, so it cannot be changed from here — only by
+          whoever administers the booth.
+        </p>
+      ) : (
+        <form
+          className="mt-2 flex gap-2"
+          onSubmit={e => { e.preventDefault(); if (value) void save(value); }}
         >
-          Set
-        </button>
-        {s?.source === 'settings' && (
+          <input
+            type="password"
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            placeholder={s?.required ? 'Change password' : 'Set a password'}
+            aria-label={copy.label}
+            className="min-w-0 flex-1 rounded-xl border border-[var(--border)] px-3.5 py-2.5 text-[0.85rem] outline-none transition focus:border-[var(--accent)]"
+          />
           <button
-            type="button"
-            disabled={busy}
-            onClick={() => void save(null)}
-            title="Remove this password (falls back to .env if one is set there)"
-            className="shrink-0 rounded-xl border border-[var(--border)] px-3 text-[0.8rem] font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40"
+            type="submit"
+            disabled={busy || !value}
+            className="shrink-0 rounded-xl bg-[var(--accent)] px-4 text-[0.8rem] font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Remove
+            Set
           </button>
-        )}
-      </form>
+          {s?.source === 'settings' && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void save(null)}
+              title="Remove this password (falls back to .env if one is set there)"
+              className="shrink-0 rounded-xl border border-[var(--border)] px-3 text-[0.8rem] font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40"
+            >
+              Remove
+            </button>
+          )}
+        </form>
+      )}
     </div>
   );
 }

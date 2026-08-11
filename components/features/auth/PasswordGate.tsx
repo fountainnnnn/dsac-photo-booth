@@ -19,6 +19,11 @@ interface ScopeStatus {
   required: boolean;
   authed: boolean;
   source: 'settings' | 'env' | null;
+  /**
+   * The deployment supplies this password, so Settings may show it but not
+   * change it — only whoever can set the deployment's secrets can do that.
+   */
+  managed?: boolean;
 }
 
 export type AuthStatus = Record<AuthScope, ScopeStatus>;
