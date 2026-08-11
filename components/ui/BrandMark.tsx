@@ -9,7 +9,9 @@ export default function BrandMark({ compact = false, inverted = false }: BrandMa
       <img
         src="/sp-dsac-logo.png"
         alt="SP Data Science and Analytics Centre"
-        className={compact ? 'h-14 w-auto' : 'h-20 w-auto md:h-24'}
+        // The source is a wordmark cropped to its ink, so these heights are
+        // the mark itself rather than a square of mostly-empty canvas.
+        className={compact ? 'h-9 w-auto' : 'h-12 w-auto md:h-14'}
       />
       {!compact && (
         <span
