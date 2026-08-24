@@ -13,7 +13,10 @@ import { useLivePreview, drawPhoto } from './useLivePreview';
 import { cameraConstraints, raiseToMaxResolution } from './cameras';
 import { photoOutputSize } from './outputSize';
 import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
-import { useCaptureSettings, unmirrorCrop } from '@/components/features/remote/useCaptureSettings';
+import {
+  useCaptureSettings, unmirrorCrop, FULL_FRAME, type CameraCrop,
+} from '@/components/features/remote/useCaptureSettings';
+import { clampZoom } from '@/components/features/remote/CameraCropCard';
 import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
 import type { FrameConfig, EventDetails } from '@/types/frame';
 import {
@@ -74,6 +77,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
 
   const {
     settings: captureSettings,
+    setSettings: setCaptureSettings,
     save: saveCaptureSettings,
     reload: reloadSettings,
   } = useCaptureSettings();
@@ -90,6 +94,86 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
   const updateCaptureSettings = useCallback((patch: Partial<typeof captureSettings>) => {
     void saveCaptureSettings({ ...captureSettings, ...patch }).catch(() => {});
   }, [captureSettings, saveCaptureSettings]);
+
+  // ── Pinch / scroll zoom ──────────────────────────────────────────────────────
+  // Gesture zoom on the stage itself, so a finger (or a trackpad) does the same
+  // thing the operator's remote-panel slider does: crop the camera tighter,
+  // never a CSS scale on the video. Kept as its own debounced writer, not
+  // `updateCaptureSettings`, because a pinch fires far too often for a raw PUT
+  // per event — the same 350ms coalescing `useCaptureSettingsControl` already
+  // uses for drags, reimplemented here since this screen loads the settings
+  // hook directly rather than through that control.
+  const captureSettingsRef = useRef(captureSettings);
+  captureSettingsRef.current = captureSettings;
+  const zoomSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyZoom = useCallback((nextCrop: CameraCrop) => {
+    const next = { ...captureSettingsRef.current, crop: nextCrop, cropEnabled: true };
+    setCaptureSettings(next);
+    if (zoomSaveTimerRef.current) clearTimeout(zoomSaveTimerRef.current);
+    zoomSaveTimerRef.current = setTimeout(() => {
+      void saveCaptureSettings(next).catch(() => {});
+    }, 350);
+  }, [setCaptureSettings, saveCaptureSettings]);
+
+  const applyZoomRef = useRef(applyZoom);
+  applyZoomRef.current = applyZoom;
+
+  useEffect(() => () => { if (zoomSaveTimerRef.current) clearTimeout(zoomSaveTimerRef.current); }, []);
+
+  useEffect(() => {
+    const el = canvasAreaRef.current;
+    if (!el) return;
+
+    let pinchStartDist: number | null = null;
+    let pinchStartCrop: CameraCrop | null = null;
+
+    const touchDist = (touches: TouchList) => {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.hypot(dx, dy);
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      pinchStartDist = touchDist(e.touches);
+      pinchStartCrop = captureSettingsRef.current.crop ?? FULL_FRAME;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || pinchStartDist === null || !pinchStartCrop) return;
+      e.preventDefault(); // stops the browser page itself from pinch-zooming
+      const scale = touchDist(e.touches) / pinchStartDist;
+      if (!Number.isFinite(scale) || scale <= 0) return;
+      applyZoomRef.current(clampZoom(pinchStartCrop, pinchStartCrop.w / scale));
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) { pinchStartDist = null; pinchStartCrop = null; }
+    };
+
+    // Trackpad/mouse wheel, for the laptop this booth usually runs on.
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const current = captureSettingsRef.current.crop ?? FULL_FRAME;
+      const factor = Math.exp(e.deltaY * 0.0015);
+      applyZoomRef.current(clampZoom(current, current.w * factor));
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    el.addEventListener('wheel', onWheel, { passive: false });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, []);
 
   // The frame is chosen in Settings, so this screen mirrors that choice rather
   // than holding one of its own. Resolving it every time also covers a frame
@@ -447,6 +531,9 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
               width: stageSize.w || undefined,
               height: stageSize.h || undefined,
               containerType: 'size',
+              // Otherwise iOS treats a two-finger pinch here as a page zoom
+              // instead of handing the touches to the listener above.
+              touchAction: 'none',
               // A hairline plus a soft drop shadow. Without these, a frame with
               // a white border (or a blown-out feed) runs straight into the
               // light panel behind it and the photo loses its edge.
