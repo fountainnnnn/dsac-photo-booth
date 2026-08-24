@@ -23,6 +23,13 @@ export interface LivePreviewOptions {
    * from, fading to the untouched camera at the other end.
    */
   lookRamp?: LookRamp | null;
+  /**
+   * Degrees to turn the picture, positive clockwise as it appears on screen.
+   * Turns the already-cropped image about the destination window's own
+   * centre — the crop rectangle itself never rotates, only the pixels it
+   * selected. Null, undefined or 0 draws straight, as before this existed.
+   */
+  rotationDeg?: number | null;
 }
 
 /** Everything `drawPhoto` needs, plus the size of the canvas it draws onto. */
@@ -48,7 +55,7 @@ export interface UseLivePreviewResult {
 export function drawPhoto(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
-  { w, h, filters, contentRect, sourceRect, lookRamp }: DrawPhotoOptions,
+  { w, h, filters, contentRect, sourceRect, lookRamp, rotationDeg }: DrawPhotoOptions,
 ) {
   // Destination: the frame's cut-out, or the whole canvas when bare.
   const dx = contentRect ? Math.round(contentRect.x * w) : 0;
@@ -56,11 +63,17 @@ export function drawPhoto(
   const dw = contentRect ? Math.round(contentRect.w * w) : w;
   const dh = contentRect ? Math.round(contentRect.h * h) : h;
 
+  // A CSS-style clockwise-positive angle, in canvas's own (counterclockwise
+  // positive-radians-negated) terms: see the note on the rotate below for why
+  // it is negated.
+  const rotationRad = ((rotationDeg ?? 0) * Math.PI) / 180;
+
   // Anywhere the picture does not reach must be white, not transparent: a
   // captured JPEG has no alpha and would turn it black. That is the border
-  // around a frame's cut-out, and the margins when the crop is zoomed out
-  // past the whole scene so the camera sits inside the photo.
-  if (contentRect || sourceRect) {
+  // around a frame's cut-out, the margins when the crop is zoomed out past
+  // the whole scene so the camera sits inside the photo, and the corners a
+  // rotated picture swings clear of.
+  if (contentRect || sourceRect || rotationRad) {
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, w, h);
@@ -92,11 +105,21 @@ export function drawPhoto(
   // wherever it has been placed.
   ctx.translate(dx + dw, dy);
   ctx.scale(-1, 1);
+  // Rotate about that same centre, after the mirror. Canvas rotation is
+  // clockwise-positive on an unflipped axis, but this axis is already
+  // mirrored — on a mirrored axis the same positive angle turns
+  // anticlockwise as anyone looking at the result would call it, so the
+  // angle is negated to keep the setting's own clockwise-positive promise.
+  if (rotationRad) {
+    ctx.translate(dw / 2, dh / 2);
+    ctx.rotate(-rotationRad);
+    ctx.translate(-dw / 2, -dh / 2);
+  }
   ctx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
   ctx.restore();
 
   if (ramping) {
-    drawLookRamp(ctx, video, startEdge, filters, { sx, sy, sw, sh, dx, dy, dw, dh });
+    drawLookRamp(ctx, video, startEdge, filters, { sx, sy, sw, sh, dx, dy, dw, dh, rotationRad });
   }
 }
 
@@ -122,7 +145,11 @@ function drawLookRamp(
   video: HTMLVideoElement,
   startEdge: 'top' | 'bottom' | 'left' | 'right',
   filters: ImageFilters,
-  g: { sx: number; sy: number; sw: number; sh: number; dx: number; dy: number; dw: number; dh: number },
+  g: {
+    sx: number; sy: number; sw: number; sh: number;
+    dx: number; dy: number; dw: number; dh: number;
+    rotationRad: number;
+  },
 ) {
   // jsdom's stub context has no filter support; the ramp is a no-op there.
   if (typeof ctx.drawImage !== 'function' || ctx.filter === undefined) return;
@@ -134,12 +161,17 @@ function drawLookRamp(
   const layer = rampLayer.getContext('2d');
   if (!layer || typeof layer.createLinearGradient !== 'function') return;
 
-  // The adjusted picture, mirrored exactly as the base was.
+  // The adjusted picture, mirrored and rotated exactly as the base was.
   layer.save();
   layer.clearRect(0, 0, g.dw, g.dh);
   layer.filter = filtersToCSS(filters);
   layer.translate(g.dw, 0);
   layer.scale(-1, 1);
+  if (g.rotationRad) {
+    layer.translate(g.dw / 2, g.dh / 2);
+    layer.rotate(-g.rotationRad);
+    layer.translate(-g.dw / 2, -g.dh / 2);
+  }
   layer.drawImage(video, g.sx, g.sy, g.sw, g.sh, 0, 0, g.dw, g.dh);
   layer.restore();
 

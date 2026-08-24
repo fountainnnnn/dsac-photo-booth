@@ -69,6 +69,15 @@ export interface CaptureSettings {
   cropEnabled: boolean;
   crop: CameraCrop;
   /**
+   * How far the finished photo is turned, in degrees — positive clockwise,
+   * negative anticlockwise, as seen in the photo itself (which is always
+   * mirrored, so this is defined in that same mirrored space rather than the
+   * raw sensor's). Independent of the crop: it turns the picture that crop
+   * already selected, about the photo window's own centre, rather than
+   * touching the crop rectangle's geometry.
+   */
+  rotationDeg: number;
+  /**
    * How long a guest's download link keeps working, with 0 meaning never
    * expires. Hours rather than days because the shortest useful setting is
    * shorter than a day — a company that wants the links dead by the time the
@@ -101,6 +110,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   eventDate: DEFAULT_EVENT_DETAILS.eventDate,
   cropEnabled: false,
   crop: FULL_FRAME,
+  rotationDeg: 0,
   linkTtlHours: 168,
   galleryTtlHours: 0,
 };

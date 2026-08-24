@@ -84,6 +84,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
   const filters = captureSettings.filters;
   const cameraDeviceId = captureSettings.cameraDeviceId;
   const lookRamp = captureSettings.lookRamp;
+  const rotationDeg = captureSettings.rotationDeg;
   const timerSecs = captureSettings.timerSecs;
   // The region of the camera actually used, flipped back into the camera's own
   // coordinates: it was drawn on a mirrored preview. Null means all of it.
@@ -281,6 +282,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
     lookRamp,
     contentRect: displayFrame?.window ?? null,
     sourceRect: crop,
+    rotationDeg,
   });
 
   // Size the stage in JS rather than with aspect-ratio + max-height. Those two
@@ -383,6 +385,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
       lookRamp,
       contentRect: activeFrame?.window ?? null,
       sourceRect: crop,
+      rotationDeg,
     });
 
     if (activeFrame) {
@@ -398,7 +401,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
     const blob = await canvasToBlob(canvas);
     onCapture(blob, dataUrl);
-  }, [isStreaming, filters, lookRamp, activeFrame, crop, captureSettings, onCapture]);
+  }, [isStreaming, filters, lookRamp, rotationDeg, activeFrame, crop, captureSettings, onCapture]);
 
   const handleCapturePress = useCallback(() => {
     if (countdown !== null) {

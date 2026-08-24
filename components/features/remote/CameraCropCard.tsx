@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowsInSimple, ArrowsOut, Crop, MagnifyingGlass } from '@phosphor-icons/react';
+import { ArrowsClockwise, ArrowsInSimple, ArrowsOut, Crop, MagnifyingGlass } from '@phosphor-icons/react';
 import { FULL_FRAME, type CameraCrop } from './useCaptureSettings';
 import { cameraConstraints, raiseToMaxResolution } from '@/components/features/capture-photo/cameras';
 import { photoOutputSize } from '@/components/features/capture-photo/outputSize';
@@ -145,6 +145,11 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
     push({ ...settings, crop: next, cropEnabled: true });
   }, [push, settings]);
 
+  const rotationDeg = settings.rotationDeg ?? 0;
+  const setRotation = useCallback((deg: number) => {
+    push({ ...settings, rotationDeg: normalizeRotation(deg) });
+  }, [push, settings]);
+
   const winRect: Rect | null = frame?.window ?? null;
   const framed = Boolean(frame && showFrame && winRect);
 
@@ -241,8 +246,16 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
     && rampStartEdge(settings.lookRamp) !== null
     && !filtersAreNeutral(settings.filters);
   const baseFilter = ramping ? 'none' : filtersToCSS(settings.filters);
-  const camRectStyle = {
-    left: pct(cam.x), top: pct(cam.y), width: pct(cam.w), height: pct(cam.h),
+
+  // The camera, expressed relative to the window instead of the preview —
+  // what the rotation wrapper below needs, since it is itself sized to the
+  // window and everything inside it has to be placed in that local space.
+  const localCam: Rect = {
+    x: (cam.x - win.x) / win.w, y: (cam.y - win.y) / win.h,
+    w: cam.w / win.w, h: cam.h / win.h,
+  };
+  const localCamStyle = {
+    left: pct(localCam.x), top: pct(localCam.y), width: pct(localCam.w), height: pct(localCam.h),
   };
 
   return (
@@ -283,52 +296,69 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
           background: 'var(--stage)',
         }}
       >
-        {/* The photo's paper. A camera smaller than the window leaves margins,
-            and they are white in the JPEG, so they are white here too. */}
+        {/* The photo's paper, static and unrotated — exactly what the canvas
+            does, filling the whole window white before the (possibly
+            rotated) camera is drawn over it. A camera smaller than the
+            window leaves margins, and a rotated one leaves corners; both are
+            white in the JPEG, so both are white here too. */}
         <div
           className="absolute bg-white"
           style={{ left: pct(win.x), top: pct(win.y), width: pct(win.w), height: pct(win.h) }}
         />
 
-        {/* The camera, wherever its box is. Mirrored to match the booth, and
-            carrying the Look — a shot lined up against an unfiltered picture
-            is lined up against something the booth never produces. */}
-        <video
-          ref={attachVideo} autoPlay playsInline muted
-          onLoadedMetadata={e => setSensor({
-            width: e.currentTarget.videoWidth,
-            height: e.currentTarget.videoHeight,
-          })}
-          className="absolute max-w-none"
+        {/* The camera feed and its Look ramp — the only things that actually
+            turn. Sized to the window and clipped there, so it turns about
+            the window's own centre — the same point the canvas rotates the
+            capture around — and a spun corner never spills past the frame,
+            just uncovers the white paper behind it. */}
+        <div
+          className="absolute overflow-hidden"
           style={{
-            ...camRectStyle,
-            transform: 'scaleX(-1)',
-            filter: baseFilter,
+            left: pct(win.x), top: pct(win.y), width: pct(win.w), height: pct(win.h),
+            transform: rotationDeg ? `rotate(${-rotationDeg}deg)` : undefined,
           }}
-        />
-
-        {/* The Look ramp: the same feed again with the full adjustments,
-            masked so they fade across the picture. */}
-        {ramping && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute"
+        >
+          {/* The camera, wherever its box is. Mirrored to match the booth,
+              and carrying the Look — a shot lined up against an unfiltered
+              picture is lined up against something the booth never
+              produces. */}
+          <video
+            ref={attachVideo} autoPlay playsInline muted
+            onLoadedMetadata={e => setSensor({
+              width: e.currentTarget.videoWidth,
+              height: e.currentTarget.videoHeight,
+            })}
+            className="absolute max-w-none"
             style={{
-              ...camRectStyle,
-              maskImage: `linear-gradient(${fade}, black, transparent)`,
-              WebkitMaskImage: `linear-gradient(${fade}, black, transparent)`,
+              ...localCamStyle,
+              transform: 'scaleX(-1)',
+              filter: baseFilter,
             }}
-          >
-            <video
-              ref={attachAnyVideo} autoPlay playsInline muted
-              className="h-full w-full max-w-none"
+          />
+
+          {/* The Look ramp: the same feed again with the full adjustments,
+              masked so they fade across the picture. */}
+          {ramping && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute"
               style={{
-                transform: 'scaleX(-1)',
-                filter: filtersToCSS(settings.filters),
+                ...localCamStyle,
+                maskImage: `linear-gradient(${fade}, black, transparent)`,
+                WebkitMaskImage: `linear-gradient(${fade}, black, transparent)`,
               }}
-            />
-          </div>
-        )}
+            >
+              <video
+                ref={attachAnyVideo} autoPlay playsInline muted
+                className="h-full w-full max-w-none"
+                style={{
+                  transform: 'scaleX(-1)',
+                  filter: filtersToCSS(settings.filters),
+                }}
+              />
+            </div>
+          )}
+        </div>
 
         {!ready && (
           <p className="absolute inset-0 z-40 flex items-center justify-center px-6 text-center text-[0.78rem] text-white/70">
@@ -398,6 +428,37 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
             : `${zoom.toFixed(1)}× — the camera sits inside the photo with white margins.`}
       </p>
 
+      {/* Rotation: turns the finished photo about the window's own centre,
+          independent of the crop above it. Positive is clockwise, negative
+          anticlockwise, wrapping through the full circle either way rather
+          than stopping at ±180 — typing past an end comes back round. */}
+      <label className="mt-4 flex items-center gap-3 text-[0.75rem] font-semibold text-[var(--ink-2)]">
+        <ArrowsClockwise size={15} className="shrink-0" />
+        <input
+          type="range"
+          min={-180} max={180} step={1}
+          value={rotationDeg}
+          onChange={e => setRotation(Number(e.target.value))}
+          aria-label="Rotation"
+          className="dsac-range"
+        />
+        <input
+          type="number"
+          min={-180} max={180} step={1}
+          value={Math.round(rotationDeg)}
+          onChange={e => setRotation(Number(e.target.value))}
+          aria-label="Rotation, in degrees"
+          className="w-16 shrink-0 rounded-lg border border-[var(--border)] px-2 py-1 text-right text-[0.78rem] tabular-nums text-[var(--ink)]"
+        />
+        <span className="shrink-0 text-[var(--ink-3)]">&deg;</span>
+      </label>
+
+      {rotationDeg !== 0 && (
+        <p className="mt-2 text-[0.72rem] tabular-nums text-[var(--ink-3)]">
+          Turned {Math.abs(rotationDeg)}&deg; {rotationDeg > 0 ? 'clockwise' : 'anticlockwise'} — the corners it swings clear of are white, same as an underfilled zoom.
+        </p>
+      )}
+
       {/* What the shutter will actually write. Zooming throws sensor pixels
           away, and that cost was previously invisible until someone opened the
           file afterwards — so it is quoted here, from the same rule the
@@ -466,4 +527,15 @@ export function clampZoom(from: CameraCrop, w: number): CameraCrop {
   const cx = from.x + from.w / 2;
   const cy = from.y + from.h / 2;
   return clampCropRect({ w, h: w, x: cx - w / 2, y: cy - w / 2 });
+}
+
+/**
+ * Keep a rotation within (-180, 180]: past either end it comes back round
+ * rather than jamming at the limit, since a turn has no natural stopping
+ * point the way a zoom does.
+ */
+export function normalizeRotation(deg: number): number {
+  if (!Number.isFinite(deg)) return 0;
+  const wrapped = ((deg + 180) % 360 + 360) % 360 - 180;
+  return wrapped === -180 ? 180 : wrapped;
 }
