@@ -254,8 +254,20 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
     x: (cam.x - win.x) / win.w, y: (cam.y - win.y) / win.h,
     w: cam.w / win.w, h: cam.h / win.h,
   };
+  /**
+   * Where the camera sits, and how it fills that box.
+   *
+   * `cover` is not a style choice: it is what the canvas does. `drawPhoto`
+   * trims the source to the window's shape and fills it (see `coverAspect`),
+   * so a camera that is not 16:9 loses its overhang rather than shrinking
+   * inside the window. A <video> left alone letterboxes instead — the
+   * browser's default is `contain` — which put white bars down the sides of
+   * this preview that never appear in the photo, and made the framing here
+   * disagree with the framing an operator saw on the capture screen.
+   */
   const localCamStyle = {
     left: pct(localCam.x), top: pct(localCam.y), width: pct(localCam.w), height: pct(localCam.h),
+    objectFit: 'cover' as const,
   };
 
   return (
@@ -352,6 +364,9 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
                 ref={attachAnyVideo} autoPlay playsInline muted
                 className="h-full w-full max-w-none"
                 style={{
+                  // Same fill as the layer underneath, or the ramp would sit a
+                  // letterboxed copy over a filled one and fringe the edges.
+                  objectFit: 'cover',
                   transform: 'scaleX(-1)',
                   filter: filtersToCSS(settings.filters),
                 }}
