@@ -61,3 +61,6 @@ yarn-error.log*
 
 # wrangler's local state and build scratch — miniflare caches, dev bundles
 .wrangler/
+
+# Fetched at package time by scripts/fetch-cloudflared-win.mjs (52 MB).
+build/cloudflared.exe

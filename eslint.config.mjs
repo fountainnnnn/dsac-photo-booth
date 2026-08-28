@@ -26,8 +26,9 @@ export default tseslint.config(
     },
   },
   {
-    // The server and the Electron main process both run in Node, not a browser.
-    files: ['server/**/*.mjs', 'electron/**/*.cjs'],
+    // The server, the build scripts and the Electron main process all run in
+    // Node, not a browser.
+    files: ['server/**/*.mjs', 'scripts/**/*.mjs', 'electron/**/*.cjs'],
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.node,

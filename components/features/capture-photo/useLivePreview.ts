@@ -32,6 +32,40 @@ export interface LivePreviewOptions {
   rotationDeg?: number | null;
 }
 
+/**
+ * The largest centred part of a source rectangle that has `aspect`.
+ *
+ * The draw below is a plain scale, which is only honest if what it samples is
+ * already the shape of where it is going. Frame windows are 16:9 by
+ * construction, but the camera is whatever the laptop happened to open —
+ * `cameraConstraints` asks for no aspect ratio on purpose, so a 4:3 webcam or
+ * an iPhone over Continuity hands back 1.333 and every face in a frame came
+ * out a third too wide. With no frame on, the stage takes the camera's own
+ * shape and nothing was ever wrong, which is what made this look like the
+ * frames' fault.
+ *
+ * So trim rather than stretch: sample a little less of the picture and keep
+ * everyone the shape they are. It is the same rule the frame windows already
+ * follow for their own cut-outs — cover, never reshape.
+ */
+export function coverAspect(
+  rect: { sx: number; sy: number; sw: number; sh: number },
+  aspect: number,
+) {
+  const have = rect.sw / rect.sh;
+  if (!Number.isFinite(aspect) || aspect <= 0 || !Number.isFinite(have)) return rect;
+  // A rounding-width difference is not worth a crop, and re-cropping every
+  // frame by a pixel would shimmer.
+  if (Math.abs(have - aspect) < 1e-6) return rect;
+
+  if (have > aspect) {
+    const sw = Math.max(1, Math.round(rect.sh * aspect));
+    return { ...rect, sx: rect.sx + Math.round((rect.sw - sw) / 2), sw };
+  }
+  const sh = Math.max(1, Math.round(rect.sw / aspect));
+  return { ...rect, sy: rect.sy + Math.round((rect.sh - sh) / 2), sh };
+}
+
 /** Everything `drawPhoto` needs, plus the size of the canvas it draws onto. */
 export interface DrawPhotoOptions extends LivePreviewOptions {
   /** Canvas dimensions in device pixels. */
@@ -79,19 +113,22 @@ export function drawPhoto(
     ctx.fillRect(0, 0, w, h);
   }
 
-  // Source: the operator's crop region, or the whole picture.
+  // Source: the operator's crop region, or the whole picture, narrowed to the
+  // shape of where it is going.
   //
-  // Nothing is fitted, stretched or letterboxed here. Both the source and
-  // the destination window are 16:9 by construction — the crop is locked to
-  // it, and every frame window is the 16:9 rect covering its cut-out — so
-  // this is a plain scale. The old fill-to-window behaviour existed to paper
-  // over windows that were not 16:9, and reshaped people to do it.
+  // Nothing is fitted, stretched or letterboxed here — the draw below is a
+  // plain scale. That used to rest on the camera being 16:9 like the window,
+  // which nothing guarantees: a 4:3 webcam stretched every face by a third,
+  // but only with a frame on, because a bare stage takes the camera's own
+  // shape. `coverAspect` trims the overhang instead.
   const vw = video.videoWidth  || dw;
   const vh = video.videoHeight || dh;
-  const sx = sourceRect ? Math.round(sourceRect.x * vw) : 0;
-  const sy = sourceRect ? Math.round(sourceRect.y * vh) : 0;
-  const sw = sourceRect ? Math.max(1, Math.round(sourceRect.w * vw)) : vw;
-  const sh = sourceRect ? Math.max(1, Math.round(sourceRect.h * vh)) : vh;
+  const { sx, sy, sw, sh } = coverAspect({
+    sx: sourceRect ? Math.round(sourceRect.x * vw) : 0,
+    sy: sourceRect ? Math.round(sourceRect.y * vh) : 0,
+    sw: sourceRect ? Math.max(1, Math.round(sourceRect.w * vw)) : vw,
+    sh: sourceRect ? Math.max(1, Math.round(sourceRect.h * vh)) : vh,
+  }, dw / dh);
 
   // With a ramp on, the untouched camera is drawn first and the fully
   // adjusted picture is laid over it through a gradient mask — the whole

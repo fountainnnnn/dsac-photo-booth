@@ -36,16 +36,32 @@ export function photoOutputSize(
   /** The frame in use, if any — its window is what the photo is drawn into. */
   frame: { window?: FrameWindow | null } | null,
 ): PhotoSize {
-  const cameraWidth = Math.max(1, Math.round((crop?.w ?? 1) * video.width));
-  const cameraHeight = Math.max(1, Math.round((crop?.h ?? 1) * video.height));
+  const croppedWidth = Math.max(1, Math.round((crop?.w ?? 1) * video.width));
+  const croppedHeight = Math.max(1, Math.round((crop?.h ?? 1) * video.height));
 
   if (!frame) {
-    return { width: cameraWidth, height: cameraHeight, cameraWidth, cameraHeight, upscaled: false };
+    return {
+      width: croppedWidth, height: croppedHeight,
+      cameraWidth: croppedWidth, cameraHeight: croppedHeight,
+      upscaled: false,
+    };
   }
+
+  const win = frame.window;
+
+  // Only the part of the camera shaped like the window is drawn — see
+  // `coverAspect` in useLivePreview. Counting the trimmed overhang here would
+  // quote the operator detail the photo does not contain, and size the
+  // artboard for pixels that never arrive.
+  const windowAspect = win ? (win.w / win.h) * FRAME_ASPECT : croppedWidth / croppedHeight;
+  const sampled = croppedWidth / croppedHeight > windowAspect
+    ? { w: Math.max(1, Math.round(croppedHeight * windowAspect)), h: croppedHeight }
+    : { w: croppedWidth, h: Math.max(1, Math.round(croppedWidth / windowAspect)) };
+  const cameraWidth = sampled.w;
+  const cameraHeight = sampled.h;
 
   // Grow the artboard until its window lands on the camera's own pixels, so
   // the photo is never resampled — the frame artwork is stretched instead.
-  const win = frame.window;
   const wanted = win ? Math.round(cameraWidth / win.w) : cameraWidth;
   const width = Math.min(MAX_OUTPUT_W, Math.max(FRAME_W, wanted));
   const height = Math.round(width / FRAME_ASPECT);

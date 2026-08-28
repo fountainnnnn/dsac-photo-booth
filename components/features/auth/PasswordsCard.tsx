@@ -5,11 +5,10 @@ import { useAuthStatus, type AuthScope, type AuthStatus } from './PasswordGate';
 /**
  * Show the photo password, and say where both of them are set. Read-only.
  *
- * They used to be editable here, which meant anyone who got as far as Settings
- * could change the locks on a booth someone else had deployed. Now they come
- * from the deployment alone — Cloudflare secrets on the hosted booth, .env on a
- * laptop — so changing one requires access to the deployment, and this card
- * only reads them back.
+ * They are read-only here and set on the Environment tab, which writes the
+ * .env the booth reads. This card only reads them back: the booth password is
+ * withheld even from an operator who is already inside, because it is the same
+ * password on every device and Settings is often on a borrowed screen.
  *
  * The booth password is not shown either — Settings sits behind it, but a
  * booth left unattended is exactly the case that matters, and it is the same
@@ -113,16 +112,20 @@ function ScopeRow({ scope, status, reveal }: {
 /**
  * The booth password is never shown, so this stands in its place: the one
  * question an operator staring at this row actually has is where it lives.
+ *
+ * It used to send them to the Cloudflare dashboard, which was right while the
+ * booth was hosted there and is now simply a wrong instruction — the booth
+ * runs on the laptop and the password is set on the Environment tab. Pointing
+ * an operator at a dashboard they cannot reach, for a booth in front of them,
+ * is worse than saying nothing.
  */
 function WhereToChange() {
   return (
     <p className="mt-2 rounded-xl border border-dashed border-[var(--border)] px-3.5 py-2.5 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
-      Not shown here, and not changed here. It lives with the deployment —
-      on Cloudflare, under{' '}
-      <span className="font-semibold text-[var(--ink-2)]">
-        Workers &amp; Pages → booth → Settings → Variables and secrets
-      </span>
-      , as <span className="font-semibold text-[var(--ink-2)]">BOOTH_PASSWORD</span>.
+      Not shown here — it is the same password on every device, and this screen
+      is often one someone else can see. Change it on the{' '}
+      <span className="font-semibold text-[var(--ink-2)]">Environment</span> tab,
+      as <span className="font-semibold text-[var(--ink-2)]">BOOTH_PASSWORD</span>.
     </p>
   );
 }

@@ -54,16 +54,26 @@ export function createAuth(kv) {
   // The plain env values are kept as well as their hashes: they are the only
   // passwords we ever hold in readable form, and Settings offers to show them
   // back to the operator. See `revealPasswords` below.
-  const envPlain = {
-    booth: process.env.BOOTH_PASSWORD || null,
-    download: process.env.DOWNLOAD_PASSWORD || null,
-  };
+  const envPlain = { booth: null, download: null };
 
-  // Env passwords are hashed once at boot so verification is uniform.
-  const envHash = {
-    booth: envPlain.booth ? hashPassword(envPlain.booth) : null,
-    download: envPlain.download ? hashPassword(envPlain.download) : null,
-  };
+  // Env passwords are hashed when they are read, so verification is uniform.
+  const envHash = { booth: null, download: null };
+
+  /**
+   * Re-read both passwords from the environment.
+   *
+   * Called once on the way up, and again whenever Settings saves — the booth
+   * is a laptop app now, so the person changing the password is standing at
+   * the machine and should not have to restart it to be let back in.
+   */
+  function reloadFromEnv() {
+    envPlain.booth = process.env.BOOTH_PASSWORD || null;
+    envPlain.download = process.env.DOWNLOAD_PASSWORD || null;
+    envHash.booth = envPlain.booth ? hashPassword(envPlain.booth) : null;
+    envHash.download = envPlain.download ? hashPassword(envPlain.download) : null;
+  }
+
+  reloadFromEnv();
 
   const tokens = new Map(); // token -> { scope, expiresAt }
 
@@ -193,5 +203,5 @@ export function createAuth(kv) {
   // reachable by either scope sometimes need to know *which* one let the
   // request in. A guest holding a lapsed download link is turned away where
   // the operator, on the same URL, is not.
-  return { requireAuth, isAuthed, login, logout, status, revealPasswords };
+  return { requireAuth, isAuthed, login, logout, status, revealPasswords, reloadFromEnv };
 }

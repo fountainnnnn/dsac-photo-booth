@@ -21,8 +21,8 @@ Wi-Fi, so a LAN address is no use to them. If the tunnel cannot start the booth
 still runs and falls back to the LAN address — taking photos matters more than
 handing them out.
 
-Two optional passwords guard the booth, set in Settings (or seeded from
-`BOOTH_PASSWORD` / `DOWNLOAD_PASSWORD` in `.env`): one locks the interface —
+Two optional passwords guard the booth, set on the Environment tab in Settings:
+one locks the interface —
 capture, gallery, settings and the phone remote — and one is typed by guests
 after scanning the QR, before their photo is shown. A password left unset
 leaves that gate open. The photo routes are enforced on the server, not just
@@ -33,6 +33,44 @@ QR code for it.
 
 If something misbehaves at an event, the startup log — including the public URL
 and any tunnel error — is at `%APPDATA%\dsac-photo-booth\booth.log`.
+
+## Settings the app keeps for itself
+
+Passwords, the public URL, the port and the storage folder used to live in a
+`.env` beside the source. A packaged booth has neither a source tree nor a
+deployment holding secrets, so it keeps its own file — `.env` in the data
+folder — and the **Environment** tab in Settings edits it. Passwords and the
+public URL take effect the moment they are saved; ports and folders are read
+while the server starts, so those rows say "restart to apply" and the card
+warns until the booth has been reopened.
+
+A checkout still reads the repository's own `.env` as before. Where both exist
+the data-folder one wins, because it is the one the person at the booth can
+change.
+
+## Updates
+
+The installed app asks GitHub whether a newer release exists, once when it
+opens, and shows the answer on the Environment tab. Nothing downloads or
+installs on its own — a booth is live in front of a queue, and an update that
+restarted the app mid-event would be worse than the bug it fixed. The operator
+presses Download, then Install and restart, between events.
+
+Only the installer build updates itself. The portable .exe has no install
+location to write back to, so whoever runs it from a USB stick replaces it by
+hand.
+
+Publishing a new version, from this machine:
+
+```bash
+npm version patch
+GH_TOKEN=<a token with repo scope> npm run package -- --publish always
+```
+
+That uploads the installer, the portable build and `latest.yml` to a GitHub
+release. `latest.yml` is what the booths read; a release without it is
+invisible to them. Both artefacts keep the same filename in every release, so
+the booth laptop's install path and desktop shortcut never move.
 
 ## Building the .exe
 

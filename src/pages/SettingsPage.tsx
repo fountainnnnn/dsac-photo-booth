@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle, Camera, Images, LockSimple, Trash, UploadSimple, Warning,
-  CalendarBlank,
+  CalendarBlank, Sliders,
 } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useFrameCatalogue, type FrameSetting } from '@/components/features/frames/useFrameCatalogue';
@@ -14,6 +14,8 @@ import CameraPickerCard from '@/components/features/remote/CameraPickerCard';
 import PresetsCard from '@/components/features/remote/PresetsCard';
 import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 import PasswordsCard from '@/components/features/auth/PasswordsCard';
+import EnvironmentCard from '@/components/features/settings/EnvironmentCard';
+import UpdateCard from '@/components/features/settings/UpdateCard';
 
 /**
  * Settings — everything an operator changes, so the capture screen can be
@@ -23,13 +25,16 @@ import PasswordsCard from '@/components/features/auth/PasswordsCard';
  * and should not be able to change the frame, the look, or the countdown by
  * leaning on the screen.
  */
-type TabId = 'frames' | 'camera' | 'event' | 'access';
+type TabId = 'frames' | 'camera' | 'event' | 'access' | 'environment';
 
 const TABS: { id: TabId; label: string; Icon: typeof Camera }[] = [
   { id: 'event',  label: 'Event',   Icon: CalendarBlank },
   { id: 'frames', label: 'Frames',  Icon: Images },
   { id: 'camera', label: 'Camera',  Icon: Camera },
   { id: 'access', label: 'Access',  Icon: LockSimple },
+  // Last, and deliberately dullest: ports, folders and passwords are set once
+  // when the booth is built and never touched during an event.
+  { id: 'environment', label: 'Environment', Icon: Sliders },
 ];
 
 /** Remembered per device: an operator setting a booth up returns to the same
@@ -371,6 +376,15 @@ export default function SettingsPage() {
       {tab === 'event' && (
         <div className="mt-8 max-w-[46rem]">
           <EventSettingsCard {...capture} />
+        </div>
+      )}
+
+      {tab === 'environment' && (
+        <div className="mt-8 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-8">
+          <EnvironmentCard />
+          <aside className="flex flex-col gap-8">
+            <UpdateCard />
+          </aside>
         </div>
       )}
 

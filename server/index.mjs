@@ -12,6 +12,10 @@ import { openDatabase } from './db.mjs';
 import { createAuth } from './auth.mjs';
 import { createRemoteHub } from './remote.mjs';
 import { startTunnel } from './tunnel.mjs';
+import {
+  ENV_FIELDS, applyToProcessEnv, parseEnv, pickEditable, readEnvFile, writeEnvFile,
+} from './env-file.mjs';
+import { getUpdateState, runUpdateAction } from './updates.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.join(__dirname, '..');
@@ -20,29 +24,42 @@ function loadLocalEnv() {
   const envPath = path.join(ROOT_DIR, '.env');
   if (!fs.existsSync(envPath)) return;
 
-  const lines = fs.readFileSync(envPath, 'utf-8').split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    const equalsAt = trimmed.indexOf('=');
-    if (equalsAt <= 0) continue;
-
-    const key = trimmed.slice(0, equalsAt).trim();
-    let value = trimmed.slice(equalsAt + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
+  for (const [key, value] of Object.entries(parseEnv(fs.readFileSync(envPath, 'utf-8')))) {
     if (!(key in process.env)) process.env[key] = value;
   }
 }
 
 loadLocalEnv();
+
+/**
+ * The operator's own settings file, and where it lives.
+ *
+ * A packaged booth has no source tree to edit, so Settings writes this one
+ * instead. It sits in the data folder as it stands *before* anything in it is
+ * read — otherwise editing `STORAGE_DIR` would move the file that defines
+ * `STORAGE_DIR`, and the next launch would not find its own settings.
+ *
+ * Present, it wins outright, including over the source-tree `.env`: clearing a
+ * password in Settings has to actually clear it, not fall back to whatever the
+ * repository shipped. Absent, nothing is touched, so a checkout keeps behaving
+ * exactly as it did before this file existed.
+ */
+const SETTINGS_ENV_FILE = path.join(
+  process.env.STORAGE_DIR ? path.resolve(process.env.STORAGE_DIR) : path.join(ROOT_DIR, 'data'),
+  '.env',
+);
+if (fs.existsSync(SETTINGS_ENV_FILE)) applyToProcessEnv(readEnvFile(SETTINGS_ENV_FILE));
+
+/**
+ * What the boot-time settings were when this process started.
+ *
+ * Ports and paths are read once, on the way up. Keeping the values they were
+ * read at is what lets Settings say "restart to apply" only when it is true,
+ * rather than warning about a restart after every save.
+ */
+const BOOT_ENV = Object.fromEntries(
+  ENV_FIELDS.filter(f => f.restart).map(f => [f.key, process.env[f.key] ?? '']),
+);
 
 const app = express();
 const port = Number.parseInt(process.env.PORT ?? '3001', 10);
@@ -221,6 +238,88 @@ app.get('/api/auth/status', auth.status);
 app.post('/api/auth/login', auth.login);
 app.post('/api/auth/logout', auth.logout);
 app.get('/api/settings/passwords/reveal', booth, auth.revealPasswords);
+
+// ── Settings file ────────────────────────────────────────────────────────────
+// The booth runs as an app on a laptop, so the operator *is* the deployment.
+// Everything that used to require editing a file beside the source is editable
+// here instead; see server/env-file.mjs for where it is written and why.
+
+/** The file's current contents, plus what the interface needs to draw it. */
+function envPayload() {
+  const saved = readEnvFile(SETTINGS_ENV_FILE);
+  const values = Object.fromEntries(
+    ENV_FIELDS.map(f => [f.key, saved[f.key] ?? process.env[f.key] ?? '']),
+  );
+
+  return {
+    file: SETTINGS_ENV_FILE,
+    fields: ENV_FIELDS,
+    values,
+    // Which boot-time values no longer match the ones this process started
+    // with. Compared against the effective value rather than the file's, or a
+    // booth with no file yet would report every default as a pending change
+    // and warn about a restart that would do nothing.
+    pendingRestart: ENV_FIELDS
+      .filter(f => f.restart && values[f.key] !== (BOOT_ENV[f.key] ?? ''))
+      .map(f => f.key),
+  };
+}
+
+// ── Updates ──────────────────────────────────────────────────────────────────
+// Reports only; the operator presses the buttons. See server/updates.mjs.
+
+app.get('/api/update', booth, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(getUpdateState());
+});
+
+app.post('/api/update/:action', booth, async (req, res) => {
+  const action = String(req.params.action);
+  if (!['check', 'download', 'install'].includes(action)) {
+    return res.status(400).json({ error: `Unknown update action: ${action}` });
+  }
+
+  const result = await runUpdateAction(action);
+  if (!result.ok) return res.status(400).json({ error: result.error, ...getUpdateState() });
+  return res.json(getUpdateState());
+});
+
+app.get('/api/settings/env', booth, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(envPayload());
+});
+
+app.put('/api/settings/env', booth, (req, res) => {
+  const values = pickEditable(req.body?.values);
+
+  const ttl = values.PHOTO_TTL_DAYS;
+  if (ttl && !(Number.parseFloat(ttl) > 0)) {
+    return res.status(400).json({ error: 'Link validity must be a positive number of days.' });
+  }
+
+  const portValue = values.PORT;
+  if (portValue && !(Number.isInteger(Number(portValue)) && Number(portValue) > 0 && Number(portValue) < 65536)) {
+    return res.status(400).json({ error: 'Port must be a whole number between 1 and 65535.' });
+  }
+
+  if (values.PUBLIC_URL && !/^https?:\/\//i.test(values.PUBLIC_URL)) {
+    return res.status(400).json({ error: 'Public URL must start with http:// or https://' });
+  }
+
+  try {
+    writeEnvFile(SETTINGS_ENV_FILE, values);
+  } catch (err) {
+    return res.status(500).json({ error: `Could not write ${SETTINGS_ENV_FILE}: ${err.message}` });
+  }
+
+  // The live half: the public origin is read per request, and the passwords
+  // are re-hashed here rather than at the next launch. Ports and paths cannot
+  // follow, which is what `pendingRestart` in the payload tells the operator.
+  applyToProcessEnv(values);
+  auth.reloadFromEnv();
+
+  return res.json(envPayload());
+});
 
 app.post('/api/photos', booth, upload.single('file'), validateImage, (_req, res) => {
   res.status(201).json({
