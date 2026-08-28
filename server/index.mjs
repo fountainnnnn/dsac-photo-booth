@@ -16,6 +16,7 @@ import {
   ENV_FIELDS, applyToProcessEnv, parseEnv, pickEditable, readEnvFile, writeEnvFile,
 } from './env-file.mjs';
 import { getUpdateState, runUpdateAction } from './updates.mjs';
+import { archiveToDrive, driveAccessToken, driveConfigured } from './drive.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.join(__dirname, '..');
@@ -132,8 +133,17 @@ function fileStamp(date) {
  * not cost the guest their QR code, which is the part they are standing there
  * waiting for.
  */
+/**
+ * The archive name for a photo, used by the folder on this laptop and by the
+ * Drive copy alike — one definition, so a photo cannot be filed under two
+ * names and uploaded twice.
+ */
+function archiveFileName(token, mimeType, createdAt) {
+  return `dsac-${fileStamp(createdAt)}-${token.slice(0, 8)}.${extForMime(mimeType)}`;
+}
+
 function archivePhoto(token, mimeType, bytes, createdAt) {
-  const name = `dsac-${fileStamp(createdAt)}-${token.slice(0, 8)}.${extForMime(mimeType)}`;
+  const name = archiveFileName(token, mimeType, createdAt);
   try {
     fs.writeFileSync(path.join(PHOTOS_DIR, name), bytes);
   } catch (err) {
@@ -223,9 +233,13 @@ app.get('/api/health', (_req, res) => {
     // no filesystem — the gallery reads this rather than offering a button
     // that can only apologise.
     localArchive: true,
-    // The local archive is not a safety net for the sweep: deleting a photo
-    // removes the file beside the row. Nothing survives cleanup here.
-    archive: 'none',
+    // What cleanup does with a photo it retires. The capture settings card
+    // branches on this, so configuring Drive changes what the operator is
+    // promised as well as what happens.
+    //
+    // The local photo folder is not a safety net either way: deleting a photo
+    // removes the file beside the row.
+    archive: driveConfigured() ? 'drive' : 'none',
   });
 });
 
@@ -290,7 +304,17 @@ app.get('/api/settings/env', booth, (_req, res) => {
 });
 
 app.put('/api/settings/env', booth, (req, res) => {
-  const values = pickEditable(req.body?.values);
+  /**
+   * Merged over what is already saved, never straight from the request.
+   *
+   * The card sends every field, so a plain replace looked equivalent — but it
+   * makes a short request destructive: a save carrying only the Drive keys
+   * dropped BOOTH_PASSWORD from the file and from the environment, and the
+   * booth came back with no gate at all. An omitted key now means "leave it
+   * alone", while a key sent empty still clears it, which is what the card
+   * does when an operator empties a box.
+   */
+  const values = { ...readEnvFile(SETTINGS_ENV_FILE), ...pickEditable(req.body?.values) };
 
   const ttl = values.PHOTO_TTL_DAYS;
   if (ttl && !(Number.parseFloat(ttl) > 0)) {
@@ -838,7 +862,7 @@ app.use((err, _req, res, next) => {
  * The setting is read on every run rather than at boot, so shortening the span
  * mid-event takes effect within the hour and not at the next restart.
  */
-function sweepGallery() {
+async function sweepGallery() {
   const stored = store.kv.get('captureSettings', {});
   const hours = Number(stored?.galleryTtlHours ?? 0);
   if (!Number.isFinite(hours) || hours <= 0) return;
@@ -847,24 +871,50 @@ function sweepGallery() {
   const tokens = store.photos.olderThan(cutoff);
   if (!tokens.length) return;
 
+  // One token for the whole run: they last an hour and so does the interval.
+  const archiving = driveConfigured();
+  const accessToken = archiving ? await driveAccessToken() : null;
+
   // One photo at a time, each guarded: a single unreadable file must not
   // abandon the rest of the run, or one bad photo keeps every older one alive.
   let swept = 0;
+  let held = 0;
   for (const token of tokens) {
     try {
+      // Archive first, and let Drive's answer decide. A photo that could not
+      // be saved is kept and tried again next hour — an outage delays a
+      // deletion, it never turns into one.
+      if (archiving) {
+        const photo = store.photos.get(token);
+        if (!photo) {
+          console.error(`  Refusing to sweep ${token}: its bytes are missing.`);
+          held += 1;
+          continue;
+        }
+        const name = archiveFileName(token, photo.mime, new Date(photo.createdAt));
+        if (!await archiveToDrive({ name, mime: photo.mime, bytes: photo.bytes }, accessToken)) {
+          held += 1;
+          continue;
+        }
+      }
       deletePhoto(token);
       swept += 1;
     } catch (err) {
       console.error(`  Gallery sweep could not delete ${token}: ${err.message}`);
     }
   }
-  console.log(`  Gallery sweep removed ${swept} of ${tokens.length} photo(s) older than ${hours}h`);
+  console.log(
+    `  Gallery sweep removed ${swept} of ${tokens.length} photo(s) older than ${hours}h`
+    + (held ? `; kept ${held} that Drive did not confirm` : ''),
+  );
 }
 
 // Hourly, matching the Worker's cron so the two booths forget at the same rate.
 // Unrefed: housekeeping should never be the reason the process stays alive.
 const GALLERY_SWEEP_MS = 60 * 60 * 1000;
-setInterval(sweepGallery, GALLERY_SWEEP_MS).unref();
+setInterval(() => {
+  void sweepGallery().catch(err => console.error(`  Gallery sweep failed: ${err.message}`));
+}, GALLERY_SWEEP_MS).unref();
 
 const banner = (label, value) => console.log(`  ${label.padEnd(20)} ${value}`);
 

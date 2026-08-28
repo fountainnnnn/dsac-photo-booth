@@ -133,6 +133,34 @@ export const ENV_FIELDS = [
     restart: true,
   },
   {
+    key: 'GOOGLE_DRIVE_FOLDER_ID',
+    label: 'Drive folder ID',
+    help: 'Swept photos are uploaded here before they are deleted. From the folder\u2019s URL: '
+      + 'drive.google.com/drive/folders/THIS-PART. All four Drive values are needed, or cleanup just deletes.',
+    restart: false,
+  },
+  {
+    key: 'GOOGLE_CLIENT_ID',
+    label: 'Google client ID',
+    help: 'From the OAuth client you create in Google Cloud. Ends in .apps.googleusercontent.com.',
+    restart: false,
+  },
+  {
+    key: 'GOOGLE_CLIENT_SECRET',
+    label: 'Google client secret',
+    help: 'From the same OAuth client.',
+    secret: true,
+    restart: false,
+  },
+  {
+    key: 'GOOGLE_REFRESH_TOKEN',
+    label: 'Google refresh token',
+    help: 'Minted once by approving that client against your own account. Uploads happen as you, '
+      + 'into your Drive, on your quota.',
+    secret: true,
+    restart: false,
+  },
+  {
     key: 'CLOUDFLARED_PROTOCOL',
     label: 'Tunnel protocol',
     help: 'http2 gets through school and corporate networks that block QUIC. Change only if the tunnel will not start.',
