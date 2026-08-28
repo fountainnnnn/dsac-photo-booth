@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowClockwise, Eye, EyeSlash, Warning } from '@phosphor-icons/react';
+import { ArrowClockwise, Eye, EyeSlash, GoogleDriveLogo, Warning } from '@phosphor-icons/react';
 import Button from '@/components/ui/Button';
 
 /**
@@ -40,6 +40,7 @@ export default function EnvironmentCard() {
   const [shown, setShown] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [connecting, setConnecting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -54,6 +55,44 @@ export default function EnvironmentCard() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  /**
+   * Hand the operator to Google, and wait for the booth to catch the redirect.
+   *
+   * The consent page is opened in their ordinary browser rather than in the
+   * kiosk window: signing in to Google inside a frameless kiosk with no
+   * address bar is the kind of thing people are rightly taught not to do, and
+   * Google blocks embedded webviews for sign-in regardless.
+   */
+  const connect = useCallback(async () => {
+    setConnecting(true);
+    setStatus(null);
+    try {
+      const res = await fetch('/api/drive/connect');
+      const data = await res.json() as { url?: string; error?: string };
+      if (!res.ok || !data.url) throw new Error(data.error ?? 'Could not start the connection.');
+      window.open(data.url, '_blank', 'noopener');
+      setStatus({ kind: 'ok', text: 'Approve in your browser, then come back.' });
+    } catch (err) {
+      setStatus({ kind: 'err', text: err instanceof Error ? err.message : 'Could not connect.' });
+      setConnecting(false);
+    }
+  }, []);
+
+  // While a consent is out, watch for the token to land. The callback writes
+  // it from a different browser entirely, so nothing else would tell this card.
+  useEffect(() => {
+    if (!connecting) return;
+    const id = setInterval(() => { void load(); }, 2000);
+    return () => clearInterval(id);
+  }, [connecting, load]);
+
+  useEffect(() => {
+    if (connecting && payload?.values.GOOGLE_REFRESH_TOKEN) {
+      setConnecting(false);
+      setStatus({ kind: 'ok', text: 'Google Drive connected.' });
+    }
+  }, [connecting, payload]);
 
   const save = useCallback(async () => {
     setBusy(true);
@@ -88,6 +127,12 @@ export default function EnvironmentCard() {
   }
 
   const dirty = payload.fields.some(f => (draft[f.key] ?? '') !== (payload.values[f.key] ?? ''));
+
+  // Drive is set up as a pair: two values pasted from Google Cloud, and a
+  // refresh token the booth fetches for itself. The button only makes sense
+  // once the first pair is saved, because the consent link is built from them.
+  const hasClient = Boolean(payload.values.GOOGLE_CLIENT_ID && payload.values.GOOGLE_CLIENT_SECRET);
+  const connected = Boolean(payload.values.GOOGLE_REFRESH_TOKEN);
 
   return (
     <section className="rounded-[18px] border border-[var(--border)] px-6 py-5">
@@ -151,6 +196,40 @@ export default function EnvironmentCard() {
             </span>
           </label>
         ))}
+      </div>
+
+      {/* Drive's third value is not pasted like the others: Google shows a
+          refresh token once, at consent, and never again — so the booth goes
+          and gets it rather than asking an operator to catch it. */}
+      <div className="mt-6 rounded-xl border border-dashed border-[var(--border)] px-4 py-3.5">
+        <p className="flex items-center gap-2 text-[0.8rem] font-semibold text-[var(--ink)]">
+          <GoogleDriveLogo size={16} /> Google Drive
+          {connected && (
+            <span className="ml-auto text-[0.72rem] font-semibold text-[#127a4a]">Connected</span>
+          )}
+        </p>
+        <p className="mt-1.5 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+          {!hasClient
+            ? 'Save the client ID and secret above first, then connect. The refresh token is filled in for you.'
+            : connected
+              ? 'The booth holds a refresh token. Connect again to replace it — for a different account, or if uploads start failing.'
+              : 'Opens Google in your browser. Approve once and the booth fills in the refresh token itself.'}
+        </p>
+        <div className="mt-3">
+          <Button
+            size="sm" variant={connected ? 'ghost' : undefined}
+            onClick={() => void connect()}
+            disabled={!hasClient || connecting || dirty}
+          >
+            <GoogleDriveLogo size={15} />
+            {connecting ? 'Waiting for Google…' : connected ? 'Reconnect' : 'Connect Google Drive'}
+          </Button>
+        </div>
+        {dirty && hasClient && (
+          <p className="mt-2 text-[0.7rem] text-[var(--ink-3)]">
+            Save your changes first — the consent link is built from the saved client ID.
+          </p>
+        )}
       </div>
 
       <div className="mt-6 flex items-center gap-3">

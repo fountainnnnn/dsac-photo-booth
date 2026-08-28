@@ -136,3 +136,108 @@ export async function archiveToDrive({ name, mime, bytes }, accessToken) {
     return false;
   }
 }
+
+// ── Connecting ───────────────────────────────────────────────────────────────
+//
+// Google shows a refresh token exactly once, at the moment consent is granted,
+// and never again — not in the console, not through any API. That is why one
+// cannot be recovered from an old deployment, and why an operator asked to
+// "just paste the token" has to go and mint one first.
+//
+// So the booth mints it. It sends the operator to Google, catches the redirect
+// on its own port, and writes the token straight into the settings file. The
+// token is never shown, copied or retyped, which removes the step most likely
+// to go wrong.
+
+/**
+ * Full Drive access, not the narrower `drive.file`.
+ *
+ * `drive.file` only reaches files the app itself created, and the archive
+ * uploads into a folder the operator made by hand — the API answers "File not
+ * found" for a parent it cannot see. The hosted booth uploaded into exactly
+ * such a folder, so this is the scope that matches what already worked.
+ */
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
+
+/** Single-use nonces, so only a redirect this booth started is honoured. */
+const pending = new Set();
+
+export function driveRedirectUri(port) {
+  return `http://localhost:${port}/api/drive/callback`;
+}
+
+/**
+ * Where to send the operator to approve the booth.
+ *
+ * `access_type=offline` with `prompt=consent` is what asks for a refresh token
+ * at all, and asks again even for an account that has approved this client
+ * before — without it a second connect returns an access token only, and the
+ * booth would come back from a successful-looking consent with nothing to save.
+ */
+export function driveAuthUrl(port) {
+  const { clientId } = config();
+  if (!clientId) return null;
+
+  const state = crypto.randomUUID();
+  pending.add(state);
+  // A stale nonce must not accumulate if the operator abandons the consent.
+  setTimeout(() => pending.delete(state), 10 * 60 * 1000).unref?.();
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: driveRedirectUri(port),
+    response_type: 'code',
+    scope: DRIVE_SCOPE,
+    access_type: 'offline',
+    prompt: 'consent',
+    state,
+  });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+}
+
+/** Whether a redirect carries a nonce this booth issued, and burn it. */
+export function claimState(state) {
+  if (!state || !pending.has(state)) return false;
+  pending.delete(state);
+  return true;
+}
+
+/**
+ * Trade the one-time code for a refresh token.
+ *
+ * Returns the token, or an error string fit to show an operator — this runs in
+ * a browser tab they are watching, so "invalid_client" alone would leave them
+ * with nowhere to go.
+ */
+export async function exchangeCode(code, port) {
+  const { clientId, clientSecret } = config();
+  if (!clientId || !clientSecret) return { error: 'Client ID and secret must be saved first.' };
+
+  try {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: driveRedirectUri(port),
+        grant_type: 'authorization_code',
+      }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { error: `Google refused the exchange: ${out?.error_description ?? out?.error ?? res.status}` };
+    }
+    if (!out?.refresh_token) {
+      // Consent succeeded but Google withheld the durable half.
+      return {
+        error: 'Google returned no refresh token. Remove the booth at '
+          + 'myaccount.google.com/permissions and connect again.',
+      };
+    }
+    return { refreshToken: out.refresh_token };
+  } catch (err) {
+    return { error: `Could not reach Google: ${err.message}` };
+  }
+}

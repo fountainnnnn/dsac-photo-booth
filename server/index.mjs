@@ -16,7 +16,10 @@ import {
   ENV_FIELDS, applyToProcessEnv, parseEnv, pickEditable, readEnvFile, writeEnvFile,
 } from './env-file.mjs';
 import { getUpdateState, runUpdateAction } from './updates.mjs';
-import { archiveToDrive, driveAccessToken, driveConfigured } from './drive.mjs';
+import {
+  archiveToDrive, claimState, driveAccessToken, driveAuthUrl, driveConfigured,
+  driveRedirectUri, exchangeCode,
+} from './drive.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.join(__dirname, '..');
@@ -343,6 +346,78 @@ app.put('/api/settings/env', booth, (req, res) => {
   auth.reloadFromEnv();
 
   return res.json(envPayload());
+});
+
+// ── Connecting Google Drive ──────────────────────────────────────────────────
+// The operator approves the booth in their own browser and the booth catches
+// the redirect itself, so the refresh token is never shown or retyped.
+
+/** A page for the browser tab the operator is left looking at. */
+function connectPage(title, body) {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+<style>
+  body { font: 16px/1.6 system-ui, sans-serif; margin: 0; display: grid;
+         place-items: center; min-height: 100vh; background: #101014; color: #f2f2f5; }
+  main { max-width: 32rem; padding: 2rem; text-align: center; }
+  h1 { font-size: 1.25rem; margin: 0 0 .75rem; }
+  p { margin: 0; color: #b9b9c4; }
+</style></head>
+<body><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(body)}</p></main></body></html>`;
+}
+
+app.get('/api/drive/connect', booth, (_req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.status(400).json({
+      error: 'Save the Google client ID and secret first, then connect.',
+    });
+  }
+  const url = driveAuthUrl(port);
+  if (!url) return res.status(400).json({ error: 'Could not build the consent link.' });
+  return res.json({ url, redirectUri: driveRedirectUri(port) });
+});
+
+/**
+ * Google's redirect lands here, in the operator's ordinary browser — which
+ * carries no booth cookie, so this route cannot sit behind the gate. The
+ * single-use `state` issued at connect time is what makes it safe: a redirect
+ * this booth did not start is refused before any code is exchanged.
+ */
+app.get('/api/drive/callback', async (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+
+  if (req.query.error) {
+    return res.status(400).send(connectPage(
+      'Not connected',
+      `Google reported: ${req.query.error}. Nothing was saved; you can close this tab and try again.`,
+    ));
+  }
+  if (!claimState(String(req.query.state ?? ''))) {
+    return res.status(400).send(connectPage(
+      'Not connected',
+      'This link did not come from the booth, or it has already been used. Press Connect again.',
+    ));
+  }
+
+  const { refreshToken, error } = await exchangeCode(String(req.query.code ?? ''), port);
+  if (error) return res.status(400).send(connectPage('Not connected', error));
+
+  try {
+    const values = { ...readEnvFile(SETTINGS_ENV_FILE), GOOGLE_REFRESH_TOKEN: refreshToken };
+    writeEnvFile(SETTINGS_ENV_FILE, values);
+    applyToProcessEnv(values);
+  } catch (err) {
+    return res.status(500).send(connectPage(
+      'Not connected',
+      `Google approved the booth but the token could not be saved: ${err.message}`,
+    ));
+  }
+
+  console.log('  Google Drive connected; refresh token saved.');
+  return res.send(connectPage(
+    'Connected',
+    'The booth can now archive photos to your Drive. You can close this tab.',
+  ));
 });
 
 app.post('/api/photos', booth, upload.single('file'), validateImage, (_req, res) => {
