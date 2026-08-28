@@ -984,12 +984,31 @@ async function sweepGallery() {
   );
 }
 
-// Hourly, matching the Worker's cron so the two booths forget at the same rate.
-// Unrefed: housekeeping should never be the reason the process stays alive.
-const GALLERY_SWEEP_MS = 60 * 60 * 1000;
-setInterval(() => {
+const runSweep = () => {
   void sweepGallery().catch(err => console.error(`  Gallery sweep failed: ${err.message}`));
-}, GALLERY_SWEEP_MS).unref();
+};
+
+/**
+ * Once on the way up, then hourly.
+ *
+ * The hourly timer came from the Worker, where an always-on cron made "the
+ * hour will come around" true. On a laptop it is not: a booth is opened for an
+ * event and shut afterwards, and `setInterval` does not fire on start — so a
+ * session shorter than an hour swept nothing at all, and photos that came due
+ * while the app was closed were never noticed. With a week-long lifetime that
+ * is most of them.
+ *
+ * Starting up is therefore the sweep's real trigger, and the interval is only
+ * for a booth left running through a long event.
+ *
+ * The short delay is not timing anything — it just keeps a backlog of Drive
+ * uploads off the moment an operator is opening the app and waiting for a
+ * camera and a tunnel.
+ */
+const GALLERY_SWEEP_MS = 60 * 60 * 1000;
+const SWEEP_ON_START_MS = 15 * 1000;
+setTimeout(runSweep, SWEEP_ON_START_MS).unref();
+setInterval(runSweep, GALLERY_SWEEP_MS).unref();
 
 const banner = (label, value) => console.log(`  ${label.padEnd(20)} ${value}`);
 
