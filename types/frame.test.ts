@@ -99,7 +99,7 @@ describe('drawDateStamp', () => {
   });
 
   // The name used to be outlined in its own colour, to thicken a bold that
-  // Ink Free could only synthesise. It is set in Aeonik now — which has a real
+  // Ink Free could only synthesise. It is set in Roboto now — which has a real
   // bold, as does every fallback behind it — so the outline would over-ink a
   // face already at the weight it was asked for. Nothing is stroked any more.
   it('strokes nothing: the name carries its own weight', () => {
@@ -110,10 +110,10 @@ describe('drawDateStamp', () => {
     }
   });
 
-  it('sets the event name in Aeonik and leaves the date handwritten', () => {
+  it('sets the event name in the sans and leaves the date handwritten', () => {
     const [name, date] = draw('tech');
-    expect(name.font).toContain('Aeonik');
-    expect(date.font).not.toContain('Aeonik');
+    expect(name.font).toContain('Roboto');
+    expect(date.font).not.toContain('Roboto');
     expect(date.font).toContain('Ink Free');
   });
 

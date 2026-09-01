@@ -4,12 +4,12 @@ import App from './App';
 import './globals.css';
 
 /**
- * Pull Aeonik in before anyone takes a photo.
+ * Pull the caption face in before anyone takes a photo.
  *
- * A canvas will not wait for a webfont. `ctx.font = '... Aeonik'` silently
+ * A canvas will not wait for a webfont. `ctx.font = '... Roboto'` silently
  * falls through to the next family in the stack if the face has not loaded
  * yet, and the shutter would bake that fallback into the photo — while the
- * live preview, being ordinary CSS, shows Aeonik correctly. The two would
+ * live preview, being ordinary CSS, shows it correctly. The two would
  * disagree, and only the JPEG would be wrong.
  *
  * Both weights, because the event name is set bold and the fallback is per
@@ -19,8 +19,8 @@ import './globals.css';
 function loadCaptionFont() {
   if (typeof document === 'undefined' || !document.fonts?.load) return;
   void Promise.all([
-    document.fonts.load('400 100px Aeonik'),
-    document.fonts.load('700 100px Aeonik'),
+    document.fonts.load('400 100px Roboto'),
+    document.fonts.load('700 100px Roboto'),
   ]).catch(() => { /* the stack falls back on its own */ });
 }
 

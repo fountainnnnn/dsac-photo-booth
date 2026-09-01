@@ -185,20 +185,19 @@ export const STAMP_FONT_STACK =
   "'Ink Free','Segoe Script','Bradley Hand','Comic Sans MS',cursive";
 
 /**
- * The event name is set in Aeonik, the DSAC brand face, while the date below
- * it stays in the handwriting above.
+ * The event name is set in Roboto, while the date beneath it stays in the
+ * handwriting above.
  *
- * "Aeonik" is declared in globals.css against the files in public/fonts, so
- * it resolves with nothing installed on the booth laptop. The names behind it
- * are for a machine carrying a licensed copy — an installed family wins over
- * a bundled trial cut, which is the right way round.
+ * It ships with the app, so nothing need be installed on the booth laptop. It
+ * stands in for Aeonik, which is a retail font whose trial cut forbids
+ * distribution outside the organisation — and this app is a public download.
  *
  * The fallbacks are deliberately plain sans faces rather than the handwriting
- * stack: if none of the Aeoniks resolve, a neutral sans is a near miss,
+ * stack: if Roboto somehow fails to load, a neutral sans is a near miss,
  * whereas Comic Sans is a different design decision made by accident.
  */
 export const EVENT_NAME_FONT_STACK =
-  "'Aeonik','Aeonik TRIAL','Aeonik Pro','Segoe UI',system-ui,sans-serif";
+  "'Roboto','Segoe UI',system-ui,sans-serif";
 
 /**
  * The event name is set bold, the date is not, so the name reads as the
