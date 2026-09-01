@@ -1,6 +1,38 @@
 @import "tailwindcss";
 
 /*
+ * Aeonik, for the event name printed on the frame.
+ *
+ * Declared as "Aeonik" so the font stack in types/frame.ts resolves to these
+ * files whether or not anything is installed on the booth laptop — the files
+ * themselves are the trial cut, whose own family name is "Aeonik TRIAL" and
+ * would otherwise never match.
+ *
+ * The trial carries letters, digits, space, comma, hyphen and full stop, and
+ * nothing else. Fallback is per character, so an ampersand or an apostrophe in
+ * an event name still prints — in the sans behind this, not in Aeonik.
+ *
+ * The canvas cannot use a face the document has not loaded, and it does not
+ * wait: see loadCaptionFont() in main.tsx.
+ */
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/fonts/AeonikTRIAL-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/fonts/AeonikTRIAL-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}
+
+
+/*
  * DSAC Photo Booth — glow-card design system.
  * SP red is the single accent; amber and iris exist only to rotate card glows.
  * Tuned for a kiosk read at TV distance: heavier ink contrast, larger hit areas.

@@ -21,7 +21,8 @@ import { useRemote, type RemoteCommand } from '@/components/features/remote/useR
 import type { FrameConfig, EventDetails } from '@/types/frame';
 import {
   FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
-  NAME_WEIGHT, STAMP_FONT_STACK, drawDateStamp, fitFontPx, stampFontPx, stampText, formatEventDate,
+  NAME_WEIGHT, STAMP_FONT_STACK, EVENT_NAME_FONT_STACK, drawDateStamp, fitFontPx, stampFontPx,
+  stampText, formatEventDate,
   stampDate,
 } from '@/types/frame';
 
@@ -645,7 +646,9 @@ function nameFitScale(name: string | undefined, sizeFrac: number, maxWidthFrac: 
   if (!ctx) return 1;
   const nominal = Math.round(sizeFrac * FRAME_H_PX);
   if (nominal <= 0) return 1;
-  return fitFontPx(ctx, name, nominal, maxWidthFrac * FRAME_W_PX, NAME_WEIGHT) / nominal;
+  return fitFontPx(
+    ctx, name, nominal, maxWidthFrac * FRAME_W_PX, NAME_WEIGHT, EVENT_NAME_FONT_STACK,
+  ) / nominal;
 }
 
 /**
@@ -690,11 +693,10 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
       name, nameSizeFrac, (above?.maxWidthFrac ?? slot.maxNameWidthFrac),
     );
 
-    // Ink Free ships no bold face, so `font-weight: bold` is only a synthesised
-    // one and still reads thin on the print. An outline in the caption's own
-    // colour thickens every stroke. 1/24 em is the same ratio the canvas uses
-    // for its lineWidth, so the preview and the photo weigh the same.
-    const nameStroke = { WebkitTextStroke: `0.0417em ${slot.colour}` } as React.CSSProperties;
+    // No outline: the canvas dropped its matching one when the name moved to
+    // Aeonik, which has a real bold. Keeping it here would make the preview
+    // heavier than the photo it is previewing.
+    const nameStroke = {} as React.CSSProperties;
 
     return (
       <>
@@ -705,6 +707,7 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
             style={above ? {
               ...common,
               ...nameStroke,
+              fontFamily: EVENT_NAME_FONT_STACK,
               top: `${above.baselineFrac * 100}%`,
               fontSize: `${nameSizeFrac * nameScale * 100}cqh`,
               fontWeight: NAME_WEIGHT,
@@ -713,6 +716,7 @@ function LiveDateStamp({ frame, event }: { frame: FrameConfig; event: EventDetai
             } : {
               ...common,
               ...nameStroke,
+              fontFamily: EVENT_NAME_FONT_STACK,
               fontSize: `${nameSizeFrac * nameScale * 100}cqh`,
               fontWeight: NAME_WEIGHT,
               right: `${(1 - slot.nameRightFrac + slot.gapFrac) * 100}%`,

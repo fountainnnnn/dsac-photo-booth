@@ -84,12 +84,14 @@ export function fitFontPx(
   size: number,
   budget: number,
   weight = '',
+  font = STAMP_FONT_STACK,
 ): number {
   if (!text || typeof ctx?.measureText !== 'function' || budget <= 0) return size;
   ctx.save();
-  // Measure at the weight it will be drawn at — bold is wider, and measuring
-  // regular would let a bold name overrun the budget it was fitted to.
-  ctx.font = `${weight} ${size}px ${STAMP_FONT_STACK}`.trim();
+  // Measure at the weight *and face* it will be drawn in. Bold is wider, and
+  // so is one family against another — measuring the handwriting and drawing
+  // Aeonik would fit the name to a width it never occupies.
+  ctx.font = `${weight} ${size}px ${font}`.trim();
   const width = ctx.measureText(text).width;
   ctx.restore();
   if (!Number.isFinite(width) || width <= budget) return size;
@@ -181,6 +183,22 @@ export interface FrameConfig {
  */
 export const STAMP_FONT_STACK =
   "'Ink Free','Segoe Script','Bradley Hand','Comic Sans MS',cursive";
+
+/**
+ * The event name is set in Aeonik, the DSAC brand face, while the date below
+ * it stays in the handwriting above.
+ *
+ * "Aeonik" is declared in globals.css against the files in public/fonts, so
+ * it resolves with nothing installed on the booth laptop. The names behind it
+ * are for a machine carrying a licensed copy — an installed family wins over
+ * a bundled trial cut, which is the right way round.
+ *
+ * The fallbacks are deliberately plain sans faces rather than the handwriting
+ * stack: if none of the Aeoniks resolve, a neutral sans is a near miss,
+ * whereas Comic Sans is a different design decision made by accident.
+ */
+export const EVENT_NAME_FONT_STACK =
+  "'Aeonik','Aeonik TRIAL','Aeonik Pro','Segoe UI',system-ui,sans-serif";
 
 /**
  * The event name is set bold, the date is not, so the name reads as the
@@ -387,24 +405,36 @@ export function drawDateStamp(
      * evenly; a round join keeps the corners from spiking. Only the name gets
      * this — the date is meant to read as the lighter of the two lines.
      */
+    /**
+     * No outline under the fill any more.
+     *
+     * The stroke was there to thicken a synthesised bold: Ink Free ships no
+     * bold face, so `NAME_WEIGHT` only slanted the rasteriser at it and the
+     * name still read thin on the print. Aeonik has a real bold, and so does
+     * every fallback behind it, so the same outline now simply over-inks a
+     * face that is already the weight it was asked for.
+     */
     const drawName = (size: number, x: number, y: number) => {
-      ctx.strokeStyle = slot.colour;
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = size / 24;
-      ctx.strokeText(name, x, y);
+      void size;
       ctx.fillText(name, x, y);
     };
 
     if (name && above) {
       // Its own centred line, set larger than the date below it.
-      const size = fitFontPx(ctx, name, Math.round(above.sizeFrac * h), above.maxWidthFrac * w, NAME_WEIGHT);
-      ctx.font = `${NAME_WEIGHT} ${size}px ${STAMP_FONT_STACK}`;
+      const size = fitFontPx(
+        ctx, name, Math.round(above.sizeFrac * h), above.maxWidthFrac * w,
+        NAME_WEIGHT, EVENT_NAME_FONT_STACK,
+      );
+      ctx.font = `${NAME_WEIGHT} ${size}px ${EVENT_NAME_FONT_STACK}`;
       ctx.textAlign = 'center';
       drawName(size, above.centreFrac * w, above.baselineFrac * h);
     } else if (name) {
       // Inline, shrunk only if it would collide with the surrounding artwork.
-      const size = fitFontPx(ctx, name, Math.round(slot.sizeFrac * h), slot.maxNameWidthFrac * w, NAME_WEIGHT);
-      ctx.font = `${NAME_WEIGHT} ${size}px ${STAMP_FONT_STACK}`;
+      const size = fitFontPx(
+        ctx, name, Math.round(slot.sizeFrac * h), slot.maxNameWidthFrac * w,
+        NAME_WEIGHT, EVENT_NAME_FONT_STACK,
+      );
+      ctx.font = `${NAME_WEIGHT} ${size}px ${EVENT_NAME_FONT_STACK}`;
       ctx.textAlign = 'right';
       drawName(size, slot.nameRightFrac * w - gap, baseline);
     }

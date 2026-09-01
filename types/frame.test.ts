@@ -98,19 +98,23 @@ describe('drawDateStamp', () => {
     expect(date.font).not.toMatch(/bold/);
   });
 
-  // Ink Free has no bold face, so the weight alone is a synthesised one and
-  // prints thin. The name is outlined in its own colour to thicken it; the
-  // date is not, or the two lines would weigh the same.
-  it('outlines only the event name, in the caption colour', () => {
+  // The name used to be outlined in its own colour, to thicken a bold that
+  // Ink Free could only synthesise. It is set in Aeonik now — which has a real
+  // bold, as does every fallback behind it — so the outline would over-ink a
+  // face already at the weight it was asked for. Nothing is stroked any more.
+  it('strokes nothing: the name carries its own weight', () => {
     for (const id of ['tech', 'doodle']) {
-      const slot = frame(id).captionSlot!;
       const { ctx, stroked } = recorder();
       drawDateStamp(ctx, frame(id), FRAME_W, FRAME_H, EVENT);
-
-      expect(stroked.map((s) => s.text)).toEqual(['AI Learning Journey']);
-      expect(stroked[0].colour).toBe(slot.colour);
-      expect(stroked[0].lineWidth).toBeCloseTo(fontPx(stroked[0].font) / 24, 5);
+      expect(stroked).toEqual([]);
     }
+  });
+
+  it('sets the event name in Aeonik and leaves the date handwritten', () => {
+    const [name, date] = draw('tech');
+    expect(name.font).toContain('Aeonik');
+    expect(date.font).not.toContain('Aeonik');
+    expect(date.font).toContain('Ink Free');
   });
 
   it('writes today, spelled out, with no way to pin a stale date', () => {
