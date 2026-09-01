@@ -178,33 +178,26 @@ export interface FrameConfig {
 }
 
 /**
- * The caption font is a casual handwriting face. We cannot embed the original,
- * so approximate it with what a Windows kiosk ships; Ink Free is the closest.
+ * One face for the whole caption: the event name and the date beneath it.
+ *
+ * It was a handwriting stack, chosen to match artwork that no longer sets the
+ * tone — the stage frames print their own type, and a note-paper hand beside
+ * it read as a different booth. Roboto ships with the app (see globals.css),
+ * so the booth laptop needs nothing installed, and it stands in for Aeonik,
+ * whose trial licence forbids distribution outside the organisation.
+ *
+ * The fallbacks are plain sans faces: if Roboto somehow fails to load, a
+ * neutral sans is a near miss.
  */
-export const STAMP_FONT_STACK =
-  "'Ink Free','Segoe Script','Bradley Hand','Comic Sans MS',cursive";
+export const STAMP_FONT_STACK = "'Roboto','Segoe UI',system-ui,sans-serif";
 
 /**
- * The event name is set in Roboto, while the date beneath it stays in the
- * handwriting above.
- *
- * It ships with the app, so nothing need be installed on the booth laptop. It
- * stands in for Aeonik, which is a retail font whose trial cut forbids
- * distribution outside the organisation — and this app is a public download.
- *
- * The fallbacks are deliberately plain sans faces rather than the handwriting
- * stack: if Roboto somehow fails to load, a neutral sans is a near miss,
- * whereas Comic Sans is a different design decision made by accident.
+ * The event name, which is the same face — kept as its own name because the
+ * two are set differently: the name is bold and fitted to a width budget, the
+ * date is regular and never shrunk.
  */
-export const EVENT_NAME_FONT_STACK =
-  "'Roboto','Segoe UI',system-ui,sans-serif";
+export const EVENT_NAME_FONT_STACK = STAMP_FONT_STACK;
 
-/**
- * The event name is set bold, the date is not, so the name reads as the
- * heading of the two-line block. Ink Free ships no bold face, so this is a
- * synthesised bold — heavier and slightly wider, which is why `fitFontPx`
- * has to measure at the same weight.
- */
 export const NAME_WEIGHT = 'bold';
 
 /** Ships with the app. Geometry is measured off the artboards, so it lives here
@@ -396,22 +389,13 @@ export function drawDateStamp(
     ctx.textBaseline = 'alphabetic';
 
     /**
-     * The name, drawn heavier than a synthesised bold manages on its own.
+     * Just a fill — no outline under it.
      *
-     * Ink Free has no bold face, so `NAME_WEIGHT` only asks the rasteriser to
-     * fake one and the result still looks light against the artwork. Stroking
-     * the same text in the same colour before filling it thickens every stroke
-     * evenly; a round join keeps the corners from spiking. Only the name gets
-     * this — the date is meant to read as the lighter of the two lines.
-     */
-    /**
-     * No outline under the fill any more.
-     *
-     * The stroke was there to thicken a synthesised bold: Ink Free ships no
-     * bold face, so `NAME_WEIGHT` only slanted the rasteriser at it and the
-     * name still read thin on the print. Aeonik has a real bold, and so does
-     * every fallback behind it, so the same outline now simply over-inks a
-     * face that is already the weight it was asked for.
+     * The name used to be stroked in its own colour before filling, to thicken
+     * a bold that Ink Free could only synthesise. Roboto has a real bold, and
+     * so does every fallback behind it, so the same outline would over-ink a
+     * face already at the weight it was asked for. The name still reads as the
+     * heavier of the two lines because it genuinely is bold, and larger.
      */
     const drawName = (size: number, x: number, y: number) => {
       void size;

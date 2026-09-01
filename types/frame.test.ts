@@ -110,11 +110,13 @@ describe('drawDateStamp', () => {
     }
   });
 
-  it('sets the event name in the sans and leaves the date handwritten', () => {
+  it('sets both caption lines in the same face, the name bold', () => {
     const [name, date] = draw('tech');
     expect(name.font).toContain('Roboto');
-    expect(date.font).not.toContain('Roboto');
-    expect(date.font).toContain('Ink Free');
+    expect(date.font).toContain('Roboto');
+    // Weight is what separates them now, not family.
+    expect(name.font).toMatch(/^bold /);
+    expect(date.font).not.toMatch(/bold/);
   });
 
   it('writes today, spelled out, with no way to pin a stale date', () => {
