@@ -224,7 +224,7 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
       nameAbove: {
         centreFrac: 0.5,
         baselineFrac: 0.91,
-        sizeFrac: 0.038,
+        sizeFrac: 0.038833,   // 46.6px on the artboard; a pixel up from 0.038
         maxWidthFrac: 0.5,
       },
     },
@@ -250,7 +250,7 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
       nameAbove: {
         centreFrac: 0.5,
         baselineFrac: 0.935,
-        sizeFrac: 0.034,
+        sizeFrac: 0.034833,   // 41.8px on the artboard; a pixel up from 0.034
         maxWidthFrac: 0.48,
       },
     },
@@ -283,7 +283,9 @@ const STAGE_CAPTION: CaptionSlot = {
   nameAbove: {
     centreFrac: 0.66,
     baselineFrac: 0.915,
-    sizeFrac: 0.032,
+    // 39.4px on the 1201px artboard — a pixel up from 0.032, and a pixel that
+    // scales: a 3754px-wide photo gets the same nudge in proportion.
+    sizeFrac: 0.032833,
     maxWidthFrac: 0.34,
   },
 };
