@@ -32,6 +32,16 @@ interface EnvPayload {
   fields: EnvField[];
   values: Record<string, string>;
   pendingRestart: string[];
+  /**
+   * Whether this booth owns its settings. False on the hosted one, whose
+   * values are Cloudflare secrets — write-once, never readable, and changed
+   * only by whoever can deploy. Both booths serve this same bundle, so the
+   * card has to be told which it is rather than assume.
+   */
+  editable?: boolean;
+  managedBy?: string | null;
+  /** Read-only booths report which keys are set, never what they are. */
+  configured?: string[];
 }
 
 export default function EnvironmentCard() {
@@ -131,6 +141,7 @@ export default function EnvironmentCard() {
   // Drive is set up as a pair: two values pasted from Google Cloud, and a
   // refresh token the booth fetches for itself. The button only makes sense
   // once the first pair is saved, because the consent link is built from them.
+  const readOnly = payload.editable === false;
   const hasClient = Boolean(payload.values.GOOGLE_CLIENT_ID && payload.values.GOOGLE_CLIENT_SECRET);
   const connected = Boolean(payload.values.GOOGLE_REFRESH_TOKEN);
 
@@ -145,8 +156,11 @@ export default function EnvironmentCard() {
         )}
       </div>
       <p className="mt-1.5 text-[0.75rem] leading-[1.6] text-[var(--ink-3)]">
-        Settings the booth reads from its own file, rather than from this screen.
-        Passwords and the public URL apply as soon as you save.
+        {readOnly
+          ? `Set where this booth is deployed, not here — ${payload.managedBy ?? 'the deployment'} `
+            + 'holds them and never hands a secret back. This lists which are configured.'
+          : 'Settings the booth reads from its own file, rather than from this screen. '
+            + 'Passwords and the public URL apply as soon as you save.'}
       </p>
 
       {payload.pendingRestart.length > 0 && (
@@ -159,6 +173,23 @@ export default function EnvironmentCard() {
         </p>
       )}
 
+      {readOnly && (
+        <div className="mt-5 flex flex-col gap-3">
+          {payload.fields.map(field => {
+            const set = payload.configured?.includes(field.key);
+            return (
+              <div key={field.key} className="flex items-baseline gap-3">
+                <span className="text-[0.8rem] font-semibold text-[var(--ink)]">{field.label}</span>
+                <span className={`ml-auto text-[0.75rem] font-semibold ${
+                  set ? 'text-[#127a4a]' : 'text-[var(--ink-3)]'
+                }`}>{set ? 'Set' : 'Not set'}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!readOnly && (
       <div className="mt-5 flex flex-col gap-5">
         {payload.fields.map(field => (
           <label key={field.key} className="block">
@@ -197,7 +228,10 @@ export default function EnvironmentCard() {
           </label>
         ))}
       </div>
+      )}
 
+      {!readOnly && (
+      <>
       {/* Drive's third value is not pasted like the others: Google shows a
           refresh token once, at consent, and never again — so the booth goes
           and gets it rather than asking an operator to catch it. */}
@@ -244,9 +278,11 @@ export default function EnvironmentCard() {
           <ArrowClockwise size={15} /> Discard
         </Button>
       </div>
+      </>
+      )}
 
       <p className="mt-5 break-all text-[0.68rem] leading-[1.6] text-[var(--ink-3)]">
-        Written to <code>{payload.file}</code>
+        {readOnly ? 'Changed in ' : 'Written to '}<code>{payload.file}</code>
       </p>
     </section>
   );

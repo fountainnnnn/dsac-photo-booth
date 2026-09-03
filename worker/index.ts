@@ -403,6 +403,81 @@ app.post('/api/remote/command', booth, async (c) => {
   return remoteFetch(c, 'POST', '/command', body);
 });
 
+// ── Environment ──────────────────────────────────────────────────────────────
+//
+// The same tab the local booth shows, answering the same shape — but read
+// only. This booth has no filesystem to write a dotenv into, and its values
+// are Cloudflare secrets: write-once, never readable back, and changeable
+// only by whoever can deploy. Reporting `editable: false` is what makes the
+// card explain that instead of failing to load, since both booths serve the
+// very same frontend bundle.
+//
+// Values are never returned. `configured` says which are set, which is the
+// only part an operator standing at a booth actually needs to know.
+
+const WORKER_ENV_FIELDS = [
+  {
+    key: 'BOOTH_PASSWORD',
+    label: 'Booth password',
+    help: 'Locks capture, gallery, settings and the phone remote. Empty leaves the booth open.',
+    secret: true,
+    restart: false,
+  },
+  {
+    key: 'DOWNLOAD_PASSWORD',
+    label: 'Photo password',
+    help: 'Guests type this after scanning the QR, before their photo is shown. Empty means no gate.',
+    secret: true,
+    restart: false,
+  },
+  {
+    key: 'GOOGLE_DRIVE_FOLDER_ID',
+    label: 'Drive folder ID',
+    help: 'Swept photos are uploaded here before they are deleted.',
+    restart: false,
+  },
+  {
+    key: 'GOOGLE_CLIENT_ID',
+    label: 'Google client ID',
+    help: 'From the OAuth client in Google Cloud.',
+    restart: false,
+  },
+  {
+    key: 'GOOGLE_CLIENT_SECRET',
+    label: 'Google client secret',
+    help: 'From the same OAuth client.',
+    secret: true,
+    restart: false,
+  },
+  {
+    key: 'GOOGLE_REFRESH_TOKEN',
+    label: 'Google refresh token',
+    help: 'Minted once by approving that client. Uploads happen as the account that approved it.',
+    secret: true,
+    restart: false,
+  },
+] as const;
+
+app.get('/api/settings/env', booth, (c) => {
+  const env = c.env as unknown as Record<string, string | undefined>;
+  return c.json({
+    file: 'Cloudflare — Workers & Pages → booth → Settings → Variables and secrets',
+    fields: WORKER_ENV_FIELDS,
+    // Never the values themselves: a Cloudflare secret is write-once by
+    // design, and handing one back through the booth would undo that.
+    values: Object.fromEntries(WORKER_ENV_FIELDS.map(f => [f.key, ''])),
+    configured: WORKER_ENV_FIELDS.filter(f => env[f.key]).map(f => f.key),
+    pendingRestart: [],
+    editable: false,
+    managedBy: 'Cloudflare',
+  });
+});
+
+app.put('/api/settings/env', booth, (c) => c.json({
+  error: 'These are Cloudflare secrets. Change them in the dashboard, under '
+    + 'Workers & Pages → booth → Settings → Variables and secrets.',
+}, 403));
+
 // ── Capture settings ─────────────────────────────────────────────────────────
 
 app.get('/api/settings/capture', booth, async (c) =>

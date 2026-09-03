@@ -272,6 +272,12 @@ function envPayload() {
     file: SETTINGS_ENV_FILE,
     fields: ENV_FIELDS,
     values,
+    // This booth owns its own settings file, so the tab is a real editor. The
+    // hosted booth answers the same shape with `editable: false`: it has no
+    // filesystem, and its values are Cloudflare secrets that only the
+    // deployment can change.
+    editable: true,
+    managedBy: null,
     // Which boot-time values no longer match the ones this process started
     // with. Compared against the effective value rather than the file's, or a
     // booth with no file yet would report every default as a pending change
