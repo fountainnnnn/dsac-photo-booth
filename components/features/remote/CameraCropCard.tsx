@@ -77,7 +77,7 @@ const RAMP_FADE: Record<LookRamp, string | null> = {
   leftward: 'to left',
 };
 
-export default function CameraCropCard({ settings, push, frame }: CameraCropCardProps) {
+export default function CameraCropCard({ settings, push, frame, loading }: CameraCropCardProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const videosRef = useRef<Set<HTMLVideoElement>>(new Set());
   const streamRef = useRef<MediaStream | null>(null);
@@ -114,9 +114,21 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
     }
   };
 
-  // Its own stream: this card is open while the capture screen is not, and
-  // sharing one across pages would mean keeping the camera awake needlessly.
+  /**
+   * Its own stream: this card is open while the capture screen is not, and
+   * sharing one across pages would mean keeping the camera awake needlessly.
+   *
+   * Nothing opens until the saved settings have arrived. They start at the
+   * defaults, where `cameraDeviceId` is empty — and an empty id is not "the
+   * chosen camera not yet known", it is a different request entirely:
+   * `cameraConstraints` asks for `facingMode: 'user'`, which hands back
+   * whichever camera the browser considers default. Opening on that and
+   * swapping later meant this card and the capture screen could sit on two
+   * different cameras, because 'user' need not resolve the same way twice
+   * when one of them is busy being released.
+   */
   useEffect(() => {
+    if (loading) return;
     let cancelled = false;
     navigator.mediaDevices?.getUserMedia({
       video: cameraConstraints(settings.cameraDeviceId),
@@ -139,7 +151,7 @@ export default function CameraCropCard({ settings, push, frame }: CameraCropCard
       streamRef.current?.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     };
-  }, [attachVideo, settings.cameraDeviceId]);
+  }, [attachVideo, settings.cameraDeviceId, loading]);
 
   const set = useCallback((next: CameraCrop) => {
     push({ ...settings, crop: next, cropEnabled: true });

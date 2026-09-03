@@ -81,6 +81,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
     setSettings: setCaptureSettings,
     save: saveCaptureSettings,
     reload: reloadSettings,
+    loading: settingsLoading,
   } = useCaptureSettings();
   const filters = captureSettings.filters;
   const cameraDeviceId = captureSettings.cameraDeviceId;
@@ -254,10 +255,15 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
     }
   }, [cameraDeviceId, onError]);
 
+  // Wait for the saved settings, for the reason spelled out in
+  // CameraCropCard: opening on the default empty `cameraDeviceId` asks for
+  // `facingMode: 'user'` and can land on a different camera than the one the
+  // operator chose — and than the one Settings is showing.
   useEffect(() => {
+    if (settingsLoading) return;
     queueMicrotask(() => { void startCamera(); });
     return () => stopStream();
-  }, [startCamera, stopStream]);
+  }, [startCamera, stopStream, settingsLoading]);
 
   // ── Frame preloading ─────────────────────────────────────────────────────────
   // The shutter must never await a network image: a slow or failed PNG would
