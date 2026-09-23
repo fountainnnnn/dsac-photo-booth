@@ -64,3 +64,8 @@ yarn-error.log*
 
 # Fetched at package time by scripts/fetch-cloudflared-win.mjs (52 MB).
 build/cloudflared.exe
+
+# MediaPipe's runtime, copied from node_modules at build time by
+# scripts/vendor-vision.mjs (~12 MB). The face model beside it is committed.
+/public/vision/vision_bundle.mjs
+/public/vision/wasm/

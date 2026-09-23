@@ -3,6 +3,7 @@ import CameraView from '@/components/features/capture-photo/CameraView';
 import QrDownloadScreen from '@/components/features/qr-download/QrDownloadScreen';
 import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
 import type { ComposedUploadResponse } from '@/types/download';
+import { detectFacesIn } from '@/components/features/crop-card/detectFaces';
 
 /**
  * There is no confirmation step. A guest is standing at the booth and the
@@ -48,6 +49,28 @@ export default function CapturePage() {
       setDownloadUrl(data.downloadUrl);
       setExpiresAt(data.expiresAt);
       setStep('qr-download');
+
+      // Find the faces, so the guest's crop can be sized to a person rather
+      // than to the photograph — only while the card beta is on. Off, the
+      // detector is never even loaded, and capture is exactly as it was. Deliberately after the QR is on screen and
+      // deliberately not awaited: the runtime is twelve megabytes and a guest
+      // is standing here. If it is slow, or fails, or this laptop cannot run
+      // it, the guest simply gets the tap-and-drag crop instead.
+      //
+      // It runs here rather than on the guest's phone because paying for that
+      // runtime once, on a booth open all day, is free — and paying for it
+      // three hundred times over mobile data is not.
+      void fetch('/api/derivatives/config')
+        .then(r => (r.ok ? r.json() : null))
+        .then(cfg => (cfg?.cardEnabled === true ? detectFacesIn(dataUrl) : []))
+        .then(faces => (faces.length
+          ? fetch(`/api/photos/${encodeURIComponent(data.token)}/faces`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ faces }),
+          })
+          : null))
+        .catch(() => {});
     } catch (err) {
       // Back to the camera rather than stranding the guest on a dead screen.
       setUploadError(err instanceof Error ? err.message : 'Upload failed');

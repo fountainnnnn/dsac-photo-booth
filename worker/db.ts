@@ -289,7 +289,76 @@ export function createDb(d1: D1Database) {
     },
   };
 
-  return { photos, frames, kv };
+  /**
+   * Beta: cards a guest crops from their photo, and the faces that guide the
+   * crop. Only reached while the card beta is on.
+   */
+  const cards = {
+    async add(id: string, token: string, mime: string, createdAt: string): Promise<void> {
+      await d1
+        .prepare('INSERT INTO derivatives (id, token, kind, mime, created_at) VALUES (?, ?, ?, ?, ?)')
+        .bind(id, token, 'card', mime, createdAt)
+        .run();
+    },
+
+    async get(id: string): Promise<{ id: string; token: string; mime: string; createdAt: string } | null> {
+      const row = await d1
+        .prepare("SELECT id, token, mime, created_at FROM derivatives WHERE id = ? AND kind = 'card'")
+        .bind(id)
+        .first<{ id: string; token: string; mime: string; created_at: string }>();
+      return row ? { id: row.id, token: row.token, mime: row.mime, createdAt: row.created_at } : null;
+    },
+
+    /** The newest card for a photo, if any. */
+    async latest(token: string): Promise<{ id: string; mime: string; createdAt: string } | null> {
+      const row = await d1
+        .prepare(`SELECT id, mime, created_at FROM derivatives
+                  WHERE token = ? AND kind = 'card' ORDER BY created_at DESC LIMIT 1`)
+        .bind(token)
+        .first<{ id: string; mime: string; created_at: string }>();
+      return row ? { id: row.id, mime: row.mime, createdAt: row.created_at } : null;
+    },
+
+    /** Every card id for a photo, so deleting the photo can delete their bytes. */
+    async idsFor(token: string): Promise<string[]> {
+      const { results } = await d1
+        .prepare('SELECT id FROM derivatives WHERE token = ?')
+        .bind(token)
+        .all<{ id: string }>();
+      return (results ?? []).map(r => r.id);
+    },
+
+    async deleteFor(token: string): Promise<void> {
+      await d1.batch([
+        d1.prepare('DELETE FROM derivatives WHERE token = ?').bind(token),
+        d1.prepare('DELETE FROM photo_faces WHERE token = ?').bind(token),
+      ]);
+    },
+
+    async faces(token: string): Promise<{ x: number; y: number; w: number; h: number }[]> {
+      const row = await d1
+        .prepare('SELECT faces FROM photo_faces WHERE token = ?')
+        .bind(token)
+        .first<{ faces: string }>();
+      if (!row) return [];
+      try {
+        const parsed = JSON.parse(row.faces);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    },
+
+    async setFaces(token: string, faces: unknown[]): Promise<void> {
+      await d1
+        .prepare(`INSERT INTO photo_faces (token, faces) VALUES (?, ?)
+                  ON CONFLICT(token) DO UPDATE SET faces = excluded.faces`)
+        .bind(token, JSON.stringify(faces))
+        .run();
+    },
+  };
+
+  return { photos, frames, kv, cards };
 }
 
 export type Db = ReturnType<typeof createDb>;

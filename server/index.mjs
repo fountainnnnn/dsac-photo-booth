@@ -535,6 +535,123 @@ app.get('/api/qr/:token', booth, (req, res) => {
   return res.send(photo.qr);
 });
 
+// ── The card a guest crops of themselves ────────────────────────────────────
+//
+// The browser does all the pixel work — the crop, the frame drawn around it —
+// and posts the finished card here, the same split `/api/photos/composed`
+// already uses. The server only stores it.
+
+/** The guest's own photo, or a 404/410. Every derivative route starts here. */
+function photoForGuest(req, res) {
+  const photo = store.photos.get(req.params.token);
+  if (!photo) {
+    res.status(404).json({ error: 'Photo not found' });
+    return null;
+  }
+  if (expiredForGuest(req, photo)) {
+    res.status(410).json(GONE);
+    return null;
+  }
+  return photo;
+}
+
+const guestOrBooth = auth.requireAuth('download', 'booth');
+
+/**
+ * Whether the card is offered, and what to print on it.
+ *
+ * The page asks before it shows anything, so with the beta off a guest sees
+ * the download page exactly as it has always been. The event name and date
+ * come along because the card prints them and the capture settings they live
+ * in are booth-gated; only these fields cross over, not the whole object.
+ */
+app.get('/api/derivatives/config', guestOrBooth, (_req, res) => {
+  const settings = store.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS);
+  res.json({
+    cardEnabled: settings.betaCardCrop === true,
+    event: {
+      eventName: settings.eventName ?? DEFAULT_CAPTURE_SETTINGS.eventName,
+      eventDate: settings.eventDate ?? '',
+    },
+  });
+});
+
+/**
+ * The face boxes the kiosk detected on a photo it has just taken.
+ *
+ * Booth-gated, because only the kiosk writes these — a guest must not be able
+ * to tell the booth where the faces are. Sent after the upload rather than with
+ * it, so detection can never delay the shutter or fail a capture.
+ */
+app.post('/api/photos/:token/faces', booth, (req, res) => {
+  if (!cardEnabled()) return res.status(403).json({ error: 'The card beta is switched off.' });
+  const photo = store.photos.get(req.params.token);
+  if (!photo) return res.status(404).json({ error: 'Photo not found' });
+
+  const incoming = Array.isArray(req.body?.faces) ? req.body.faces : null;
+  if (!incoming) return res.status(400).json({ error: 'Expected { faces: [] }' });
+
+  // Keep only well-formed boxes, and cap the count: this is written from a page
+  // and should not be able to put unbounded JSON in the row.
+  const clean = incoming
+    .filter(f => ['x', 'y', 'w', 'h'].every(k => Number.isFinite(f?.[k])))
+    .slice(0, 50)
+    .map(f => ({ x: f.x, y: f.y, w: f.w, h: f.h }));
+
+  store.photos.setFaces(req.params.token, clean);
+  return res.json({ faces: clean.length });
+});
+
+/** The newest card for a photo, and where the faces in it are. */
+app.get('/api/derivatives/:token', guestOrBooth, (req, res) => {
+  if (!cardEnabled()) return res.status(403).json({ error: 'The card beta is switched off.' });
+  if (!photoForGuest(req, res)) return undefined;
+  return res.json({
+    derivatives: store.derivatives.latest(req.params.token),
+    // Where the people are, so the guest's crop can be sized to one of them
+    // rather than to the photograph. Empty for photos taken before the booth
+    // detected faces, which simply means the old tap-and-drag behaviour.
+    faces: store.photos.faces(req.params.token),
+  });
+});
+
+/** The bytes of one card — an <img> src, or a save link. */
+app.get('/api/derivatives/item/:id', guestOrBooth, (req, res) => {
+  if (!cardEnabled()) return res.status(403).json({ error: 'The card beta is switched off.' });
+  const row = store.derivatives.get(req.params.id);
+  if (!row || row.status !== 'ready' || !row.bytes) {
+    return res.status(404).json({ error: 'Not ready' });
+  }
+
+  const photo = store.photos.get(row.token);
+  if (photo && expiredForGuest(req, photo)) return res.status(410).json(GONE);
+
+  res.setHeader('Content-Type', row.mime);
+  res.setHeader('Cache-Control', 'private, max-age=86400');
+
+  // `?save=1` turns the same URL into a download, so the page needs one route
+  // for the <img> and the Save button both.
+  if (req.query.save) {
+    const ext = extForMime(row.mime);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="dsac-${row.kind}-${fileStamp(new Date(row.createdAt))}.${ext}"`,
+    );
+  }
+  return res.send(row.bytes);
+});
+
+/** The card the guest cropped of themselves, already framed in the browser. */
+app.post('/api/derivatives/:token/card',
+  guestOrBooth, upload.single('file'), validateImage, (req, res) => {
+    if (!cardEnabled()) return res.status(403).json({ error: 'The card beta is switched off.' });
+    if (!photoForGuest(req, res)) return undefined;
+
+    const id = store.derivatives.start(req.params.token, 'card');
+    store.derivatives.finish(id, { mime: req.file.mimetype, bytes: req.file.buffer });
+    return res.status(201).json({ id, kind: 'card', status: 'ready' });
+  });
+
 /**
  * The whole event, newest first — lapsed links included.
  *
@@ -696,7 +813,20 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // lose an event to an upgrade. Deliberately unrelated to the link's life: a
   // link may die in an hour while the photo lives a month.
   galleryTtlHours: 0,
+  // Beta: the tap-yourself card on the download page. Off means the booth is
+  // exactly as it was before the feature existed.
+  betaCardCrop: false,
 };
+
+/**
+ * Whether the card beta is switched on right now.
+ *
+ * Read live on every request, so the Settings toggle takes effect on the next
+ * guest without a restart — and can be turned off mid-event if it misbehaves.
+ */
+function cardEnabled() {
+  return store.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS)?.betaCardCrop === true;
+}
 
 /**
  * When a link handed out right now should stop working, read from the setting

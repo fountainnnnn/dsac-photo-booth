@@ -6,7 +6,13 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'public/models/**', 'release/**', '.wrangler/**'],
+    // The vendored halves of `public/vision` — MediaPipe's own bundle and the
+    // wasm glue it ships with. Not ours to lint, and linting them buries real
+    // findings under a thousand from minified code. Named file by file rather
+    // than by directory, because `tiledFaces.mjs` sits beside them and is ours.
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'public/models/**',
+      'release/**', '.wrangler/**',
+      'public/vision/vision_bundle.mjs', 'public/vision/wasm/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -23,6 +29,15 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
+  },
+  {
+    // Our own module in `public/`: plain browser ESM, served as-is rather than
+    // bundled, so it is not covered by the TypeScript block above.
+    files: ['public/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.browser,
     },
   },
   {

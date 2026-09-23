@@ -41,6 +41,30 @@ const SCHEMA = `
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  /*
+   * What a guest makes from their photo after the shutter — today, the card
+   * they crop of themselves. A general table rather than a card table, so the
+   * next thing made from a photo needs no new schema.
+   *
+   * Keyed by photo token with ON DELETE CASCADE, so a photo deleted from the
+   * gallery takes its derivatives with it and the sweep needs no new code. A
+   * guest may crop more than one card from a group shot, so the key is an id
+   * of its own rather than (token, kind) — but only the newest of each kind is
+   * shown, which is what the "latest" accessor below is for.
+   */
+  CREATE TABLE IF NOT EXISTS derivatives (
+    id         TEXT PRIMARY KEY,
+    token      TEXT NOT NULL REFERENCES photos(token) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,
+    status     TEXT NOT NULL,
+    mime       TEXT,
+    bytes      BLOB,
+    error      TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS derivatives_token ON derivatives (token, kind, created_at);
 `;
 
 export function openDatabase(dir) {
@@ -48,6 +72,22 @@ export function openDatabase(dir) {
   const file = path.join(dir, 'photo-booth.db');
   const db = new DatabaseSync(file);
   db.exec(SCHEMA);
+
+  /*
+   * Face boxes, detected by the kiosk just after the shutter and stored as
+   * JSON. A column rather than a table: there is exactly one set per photo and
+   * it is always read with the photo.
+   *
+   * Added here instead of in SCHEMA because booths in the field already have a
+   * photos table, and `ADD COLUMN` on an existing one is how they get it. A
+   * second run throws "duplicate column", which is the normal way of saying it
+   * is already done.
+   */
+  try {
+    db.exec('ALTER TABLE photos ADD COLUMN faces TEXT');
+  } catch {
+    // Already present.
+  }
 
   const asBuffer = (v) => (v == null ? null : Buffer.from(v));
 
@@ -60,6 +100,24 @@ export function openDatabase(dir) {
           mime = excluded.mime, bytes = excluded.bytes, qr = excluded.qr,
           created_at = excluded.created_at, expires_at = excluded.expires_at
       `).run(token, mime, bytes, qr ?? null, createdAt, expiresAt);
+    },
+
+    /** The face boxes for a photo, or an empty array. */
+    faces(token) {
+      const row = db.prepare('SELECT faces FROM photos WHERE token = ?').get(token);
+      if (!row?.faces) return [];
+      try {
+        const parsed = JSON.parse(row.faces);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    },
+
+    /** Store the boxes. Silently does nothing for a photo that is not there. */
+    setFaces(token, faces) {
+      db.prepare('UPDATE photos SET faces = ? WHERE token = ?')
+        .run(JSON.stringify(faces ?? []), token);
     },
 
     /**
@@ -216,5 +274,80 @@ export function openDatabase(dir) {
     },
   };
 
-  return { file, db, photos, frames, kv, close: () => db.close() };
+  /**
+   * Cards made from a photo.
+   *
+   * The row/status shape is kept general (`pending`, `ready`, `failed`) so a
+   * slower derivative could be added later without a schema change; the card
+   * itself is written ready in one step.
+   */
+  const derivatives = {
+    /** A pending row, ready for `finish` or `fail` once the work is done. */
+    start(token, kind) {
+      const id = crypto.randomUUID();
+      db.prepare(`
+        INSERT INTO derivatives (id, token, kind, status, created_at)
+        VALUES (?, ?, ?, 'pending', ?)
+      `).run(id, token, kind, new Date().toISOString());
+      return id;
+    },
+
+    finish(id, { mime, bytes }) {
+      db.prepare(`
+        UPDATE derivatives SET status = 'ready', mime = ?, bytes = ?, error = NULL
+        WHERE id = ?
+      `).run(mime, bytes, id);
+    },
+
+    fail(id, message) {
+      db.prepare(`
+        UPDATE derivatives SET status = 'failed', error = ? WHERE id = ?
+      `).run(String(message ?? 'Unknown error').slice(0, 500), id);
+    },
+
+    /** Bytes for one derivative, or null. Used by the route that serves it. */
+    get(id) {
+      const row = db.prepare('SELECT * FROM derivatives WHERE id = ?').get(id);
+      if (!row) return null;
+      return {
+        id: row.id,
+        token: row.token,
+        kind: row.kind,
+        status: row.status,
+        mime: row.mime,
+        bytes: asBuffer(row.bytes),
+        error: row.error,
+        createdAt: row.created_at,
+      };
+    },
+
+    /**
+     * The newest row of each kind for a photo, without the bytes.
+     *
+     * Metadata only, never the bytes: the download page reads this on mobile
+     * data, which is the connection the whole booth is built around.
+     */
+    latest(token) {
+      const rows = db.prepare(`
+        SELECT id, kind, status, mime, error, created_at FROM derivatives
+        WHERE token = ? ORDER BY created_at DESC
+      `).all(token);
+
+      const seen = new Map();
+      for (const r of rows) {
+        if (seen.has(r.kind)) continue;
+        seen.set(r.kind, {
+          id: r.id,
+          kind: r.kind,
+          status: r.status,
+          mime: r.mime,
+          error: r.error,
+          createdAt: r.created_at,
+        });
+      }
+      return [...seen.values()];
+    },
+  };
+
+  return { file, db, photos, frames, kv, derivatives, close: () => db.close() };
 }

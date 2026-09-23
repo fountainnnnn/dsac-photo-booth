@@ -98,6 +98,14 @@ export interface CaptureSettings {
    * existed. Nobody should lose an event's photos to an upgrade.
    */
   galleryTtlHours: number;
+  /**
+   * Beta: lets a guest tap themselves in the group photo and save a card of
+   * just them. Off by default and off means exactly the booth as it was —
+   * no extra section on the download page, and no face detection at the
+   * shutter. Kept as a capture setting so it lives in the same place on the
+   * laptop booth and the hosted one, and so it can be switched mid-event.
+   */
+  betaCardCrop: boolean;
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -113,6 +121,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   rotationDeg: 0,
   linkTtlHours: 168,
   galleryTtlHours: 0,
+  betaCardCrop: false,
 };
 
 export function useCaptureSettings() {

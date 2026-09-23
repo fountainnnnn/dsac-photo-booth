@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Check, Copy, DownloadSimple } from '@phosphor-icons/react';
 import BrandMark from '@/components/ui/BrandMark';
+import CropCard from '@/components/features/crop-card/CropCard';
+import { cardSrc, useCard } from '@/components/features/crop-card/useCard';
 
 interface DownloadPageProps {
   token: string;
@@ -28,6 +30,22 @@ export default function DownloadPage({ token }: DownloadPageProps) {
    * Deliberately not persisted — it belongs to this photo and this guest.
    */
   const [caption, setCaption] = useState(DEFAULT_LINKEDIN_TEXT);
+
+  const { enabled: cardEnabled, card, event, faces, upload } = useCard(token);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const handleCard = async (blob: Blob) => {
+    setBusy(true);
+    setCardError(null);
+    try {
+      await upload(blob);
+    } catch (err) {
+      setCardError(err instanceof Error ? err.message : 'Could not save your card.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(caption).catch(() => {});
@@ -75,6 +93,62 @@ export default function DownloadPage({ token }: DownloadPageProps) {
               Save photo
             </a>
           </section>
+
+          {/*
+            Beta, switched on in Settings. Off, none of this renders and the
+            page is exactly the download page it has always been.
+          */}
+          {cardEnabled && (
+            <>
+          <div className="h-px bg-[#ececee]" />
+
+          {/*
+            Make a card of yourself. Offered after the photo, never instead of
+            it — a guest who only wants their picture should not have to walk
+            past a feature to reach the save button.
+          */}
+          <section>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a1a1aa]">Make your card</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight">Tap yourself in the photo.</h2>
+            <p className="mt-1.5 text-sm leading-6 text-[#52525b]">
+              You’ll get a card of just you, stamped with the event.
+            </p>
+
+            <div className="mt-3">
+              <CropCard
+                photoSrc={previewHref}
+                event={event}
+                faces={faces}
+                onCard={handleCard}
+                busy={busy}
+              />
+            </div>
+
+            {cardError && (
+              <p className="mt-2 text-xs leading-5 text-[#b91c1c]">{cardError}</p>
+            )}
+
+            {card?.status === 'ready' && (
+              <div className="mt-4 flex items-center gap-3 rounded-lg border border-[#e5e5e8] bg-[#fafafa] p-3">
+                <img
+                  src={cardSrc(card.id)}
+                  alt="Your card"
+                  className="h-24 w-auto rounded shadow-sm"
+                />
+                <a
+                  href={cardSrc(card.id, true)}
+                  download
+                  data-testid="download-page-save-card"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#18181b] px-4 text-sm font-semibold text-white transition hover:bg-[#e1262f]"
+                >
+                  <DownloadSimple className="h-4 w-4" />
+                  Save card
+                </a>
+              </div>
+            )}
+          </section>
+            </>
+          )}
 
           <div className="h-px bg-[#ececee]" />
 

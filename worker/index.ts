@@ -50,6 +50,9 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // not start deleting an event. Deliberately unrelated to the link's life: a
   // link may die in an hour while the photo lives a month.
   galleryTtlHours: 0,
+  // Beta: the tap-yourself card on the download page. Off means the booth is
+  // exactly as it was before the feature existed.
+  betaCardCrop: false,
 };
 
 /**
@@ -278,6 +281,116 @@ app.get('/api/download/:token', ((c, next) => svc(c).auth.requireAuth('download'
 app.get('/api/preview/:token', ((c, next) => svc(c).auth.requireAuth('download', 'booth')(c, next)) as MiddlewareHandler<Ctx>,
   (c) => servePhoto(c, false));
 
+// ── Beta: the card a guest crops of themselves ───────────────────────────────
+//
+// Ported from server/index.mjs. The browser crops and draws the card and posts
+// the finished PNG; this only stores it. Every route but the config one is
+// refused while the beta is off, so "off" means the booth as it was.
+
+const guestOrBooth: MiddlewareHandler<Ctx> = (c, next) =>
+  svc(c).auth.requireAuth('download', 'booth')(c, next);
+
+/** Read live, so the Settings toggle reaches the next guest without a deploy. */
+async function cardEnabled(c: C): Promise<boolean> {
+  const stored = await svc(c).db.kv.get<Record<string, unknown>>('captureSettings', {});
+  return stored?.betaCardCrop === true;
+}
+
+const BETA_OFF = { error: 'The card beta is switched off.' };
+
+/** Whether the card is offered, and the event to print on it. */
+app.get('/api/derivatives/config', guestOrBooth, async (c) => {
+  const stored = await svc(c).db.kv.get<Record<string, unknown>>('captureSettings', {});
+  return c.json({
+    cardEnabled: stored?.betaCardCrop === true,
+    event: {
+      eventName: (stored?.eventName as string | undefined) ?? DEFAULT_CAPTURE_SETTINGS.eventName,
+      eventDate: (stored?.eventDate as string | undefined) ?? '',
+    },
+  });
+});
+
+/** The kiosk's face boxes for a photo it has just taken. */
+app.post('/api/photos/:token/faces', booth, async (c) => {
+  if (!(await cardEnabled(c))) return c.json(BETA_OFF, 403);
+  const token = c.req.param('token');
+  if (!(await svc(c).db.photos.get(token))) return c.json({ error: 'Photo not found' }, 404);
+
+  const body = await c.req.json<{ faces?: unknown }>().catch(() => null);
+  if (!Array.isArray(body?.faces)) return c.json({ error: 'Expected { faces: [] }' }, 400);
+
+  // Well-formed boxes only, and a cap: this is written from a page.
+  const clean = (body.faces as Record<string, unknown>[])
+    .filter(f => ['x', 'y', 'w', 'h'].every(k => Number.isFinite(f?.[k])))
+    .slice(0, 50)
+    .map(f => ({ x: f.x, y: f.y, w: f.w, h: f.h }));
+
+  await svc(c).db.cards.setFaces(token, clean);
+  return c.json({ faces: clean.length });
+});
+
+/** The newest card for a photo, and where the faces in it are. */
+app.get('/api/derivatives/:token', guestOrBooth, async (c) => {
+  if (!(await cardEnabled(c))) return c.json(BETA_OFF, 403);
+  const token = c.req.param('token');
+  const meta = await svc(c).db.photos.get(token);
+  if (!meta) return c.json({ error: 'Photo not found' }, 404);
+  if (await expiredForGuest(c, meta.expiresAt)) return c.json(GONE, 410);
+
+  const { cards } = svc(c).db;
+  const latest = await cards.latest(token);
+  return c.json({
+    derivatives: latest
+      ? [{ id: latest.id, kind: 'card', status: 'ready', mime: latest.mime, error: null, createdAt: latest.createdAt }]
+      : [],
+    faces: await cards.faces(token),
+  });
+});
+
+/** One card's bytes — an <img> src, or a save link with ?save=1. */
+app.get('/api/derivatives/item/:id', guestOrBooth, async (c) => {
+  if (!(await cardEnabled(c))) return c.json(BETA_OFF, 403);
+  const { db, blobs } = svc(c);
+  const card = await db.cards.get(c.req.param('id'));
+  if (!card) return c.json({ error: 'Not found' }, 404);
+
+  const meta = await db.photos.get(card.token);
+  if (meta && await expiredForGuest(c, meta.expiresAt)) return c.json(GONE, 410);
+
+  const blob = await blobs.get(`card/${card.id}`);
+  if (!blob) return c.json({ error: 'Not found' }, 404);
+
+  const headers: Record<string, string> = {
+    'Content-Type': card.mime,
+    'Cache-Control': 'private, max-age=86400',
+  };
+  if (c.req.query('save')) {
+    headers['Content-Disposition'] =
+      `attachment; filename="dsac-card-${fileStamp(new Date(card.createdAt))}.png"`;
+  }
+  return new Response(blob.body as BodyInit, { headers });
+});
+
+/** The card, already cropped and framed on the guest's phone. */
+app.post('/api/derivatives/:token/card', guestOrBooth, async (c) => {
+  if (!(await cardEnabled(c))) return c.json(BETA_OFF, 403);
+  const token = c.req.param('token');
+  const meta = await svc(c).db.photos.get(token);
+  if (!meta) return c.json({ error: 'Photo not found' }, 404);
+  if (await expiredForGuest(c, meta.expiresAt)) return c.json(GONE, 410);
+
+  const file = await readImage(c);
+  if (file instanceof Response) return file;
+
+  const { db, blobs } = svc(c);
+  const id = crypto.randomUUID();
+  // Bytes first, then the row, as with photos: a row without bytes is a broken
+  // card, whereas bytes without a row are merely unreachable storage.
+  await blobs.put(`card/${id}`, await file.arrayBuffer(), file.type);
+  await db.cards.add(id, token, file.type, new Date().toISOString());
+  return c.json({ id, kind: 'card', status: 'ready' }, 201);
+});
+
 /**
  * The QR code, drawn on demand rather than stored.
  *
@@ -342,6 +455,15 @@ async function deletePhoto(
 ): Promise<void> {
   await db.photos.delete(token);
   await blobs.delete(`photo/${token}`).catch(() => { /* the row is gone; a stray blob is harmless */ });
+
+  // Any cards made from it, from the beta. Guarded as a whole: on a database
+  // that has never had the beta's tables applied this throws, and deleting a
+  // photo must keep working exactly as it did before the beta existed.
+  try {
+    const ids = await db.cards.idsFor(token);
+    await db.cards.deleteFor(token);
+    await Promise.all(ids.map(id => blobs.delete(`card/${id}`).catch(() => {})));
+  } catch { /* no beta tables here, so no cards to remove */ }
 }
 
 app.delete('/api/photos/:token', booth, async (c) => {

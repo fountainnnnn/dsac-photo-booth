@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Backfill face boxes</title>
+<style>body{font:14px system-ui;padding:24px;max-width:60ch;line-height:1.5}
+pre{background:#f4f4f5;padding:10px;border-radius:4px;white-space:pre-wrap}</style>
+<h1>Backfill face boxes</h1>
+<p>Finds the people in photographs already in the gallery, so their guests get a
+card crop sized to a person. While the <b>Tap-yourself card</b> beta is on, new
+photographs are done automatically at the shutter; this is only for ones taken
+before it was switched on.</p>
+<p>Requires the beta to be on and the booth password to have been entered in
+this browser.</p>
+<button id="go">Find faces in every photo</button>
+<pre id="log">Ready.</pre>
+<script type="module">
+import { detectFacesTiled, getDetector } from './tiledFaces.mjs';
+
+const log = document.getElementById('log');
+const say = m => { log.textContent += '\n' + m; };
+
+document.getElementById('go').onclick = async () => {
+  log.textContent = 'Loading the model\u2026';
+  const detector = await getDetector();
+  if (!detector) { say('This machine cannot run the detector.'); return; }
+  say('Model ready.');
+
+  const res = await fetch('/api/photos/recent');
+  const body = await res.json();
+  const photos = body.photos ?? body;
+  say(`${photos.length} photographs.`);
+
+  let withFaces = 0;
+  for (const p of photos) {
+    try {
+      const img = new Image();
+      img.src = `/api/preview/${p.token}`;
+      await img.decode();
+      const faces = await detectFacesTiled(img);
+      await fetch(`/api/photos/${p.token}/faces`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ faces }),
+      });
+      if (faces.length) withFaces += 1;
+      say(`${p.token.slice(0, 8)}  ${faces.length} face(s)`);
+    } catch (e) {
+      say(`${p.token.slice(0, 8)}  skipped (${e.message})`);
+    }
+  }
+  say(`Done. ${withFaces} of ${photos.length} photographs have faces.`);
+};
+</script>

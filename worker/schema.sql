@@ -62,3 +62,29 @@ CREATE TABLE IF NOT EXISTS blobs (
   content_type TEXT NOT NULL,
   bytes        BLOB NOT NULL
 );
+
+-- Beta: the card a guest crops of themselves on the download page. Metadata
+-- only; the PNG lives in the blob store under `card/<id>`. No foreign key,
+-- like everything else here, so deleting a photo removes its cards explicitly
+-- (see deletePhoto in worker/index.ts).
+--
+-- Only ever read or written while the "Tap-yourself card" beta is switched on.
+-- A booth that never switches it on never touches these tables, which is also
+-- why a deployment that has not yet had this file re-applied keeps working.
+CREATE TABLE IF NOT EXISTS derivatives (
+  id         TEXT PRIMARY KEY,
+  token      TEXT NOT NULL,
+  kind       TEXT NOT NULL,
+  mime       TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS derivatives_token ON derivatives (token, kind, created_at);
+
+-- Face boxes the kiosk found in a photo just after taking it, as JSON. A table
+-- of its own rather than a column on photos, because ADD COLUMN fails when run
+-- twice and this file has to stay safe to re-apply.
+CREATE TABLE IF NOT EXISTS photo_faces (
+  token TEXT PRIMARY KEY,
+  faces TEXT NOT NULL
+);
