@@ -116,7 +116,7 @@ const booth = auth.requireAuth('booth');
 let tunnelOrigin = null;
 
 // When a production build exists we serve it from this same process, so the
-// kiosk and the phone download page share one origin (and one Railway service).
+// kiosk and the phone download page share one origin.
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
 const SERVES_FRONTEND = fs.existsSync(path.join(DIST_DIR, 'index.html'));
 
