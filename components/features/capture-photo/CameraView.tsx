@@ -155,8 +155,12 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
       if (e.touches.length < 2) { pinchStartDist = null; pinchStartCrop = null; }
     };
 
-    // Trackpad/mouse wheel, for the laptop this booth usually runs on.
+    // Trackpad pinch, for the laptop this booth usually runs on. Browsers
+    // report a pinch as a wheel event with ctrlKey set; a plain two-finger
+    // scroll has it clear. Zooming on every wheel event meant anyone brushing
+    // the trackpad over the stage zoomed the camera and saved it.
     const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
       e.preventDefault();
       const current = captureSettingsRef.current.crop ?? FULL_FRAME;
       const factor = Math.exp(e.deltaY * 0.0015);
@@ -218,7 +222,14 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
       await raiseToMaxResolution(stream);
 
       streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        // Not left to the autoPlay attribute. Brave can block autoplay even
+        // for muted video, and this <video> is hidden, so a blocked one just
+        // leaves the canvas black. A refusal here is retried on the first
+        // touch or key press below.
+        void videoRef.current.play().catch(() => {});
+      }
       setPermission('granted');
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -264,6 +275,21 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
     queueMicrotask(() => { void startCamera(); });
     return () => stopStream();
   }, [startCamera, stopStream, settingsLoading]);
+
+  // A browser that refused to start the video will allow it once someone
+  // interacts with the page, so resume it on the first touch or key press.
+  useEffect(() => {
+    const resume = () => {
+      const video = videoRef.current;
+      if (video?.srcObject && video.paused) void video.play().catch(() => {});
+    };
+    window.addEventListener('pointerdown', resume);
+    window.addEventListener('keydown', resume);
+    return () => {
+      window.removeEventListener('pointerdown', resume);
+      window.removeEventListener('keydown', resume);
+    };
+  }, []);
 
   // ── Frame preloading ─────────────────────────────────────────────────────────
   // The shutter must never await a network image: a slow or failed PNG would
