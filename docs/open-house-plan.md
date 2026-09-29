@@ -47,29 +47,31 @@ Work order: Phase 0 (strip down) first, then phases 1-4.
       `PUBLIC_URL` / `CLOUDFLARED_PROTOCOL` settings. The QR codes depend on
       the tunnel.
 
-### 0.3 Passwords: remove both, and keep guests out of the booth pages
+### 0.3 Passwords: keep the booth password, remove the photo password
 
-- [ ] Remove the `booth` and `download` passwords: `server/auth.mjs`,
-      `BOOTH_PASSWORD` / `DOWNLOAD_PASSWORD` in `server/env-file.mjs` and
-      `.env.example`, `PasswordGate.tsx`, `PasswordsCard.tsx`, `boothGated`
-      in `src/App.tsx`, the login/logout/status/reveal routes, and password
-      wording in `StudioShell.tsx` and `QrDownloadScreen.tsx`.
-- [ ] **Replace the gate with a tunnel rule.** The tunnel URL is printed in
-      every QR code, so without a password any guest could open
-      `<tunnel>/gallery` or `/settings` and see or delete everyone's photos,
-      change settings or fire the shutter. Rule: a request that arrived
-      through the Cloudflare tunnel (Cloudflare's edge always adds
-      `cf-ray` / `cf-connecting-ip`; the laptop's own browser does not) may
-      only reach the guest routes: the download page (the path
-      `getDownloadToken` in `src/App.tsx` recognises, plus the built JS/CSS
-      and fonts it loads), `/api/download/:token`, `/api/preview/:token` and
-      `/api/share/*` (LinkedIn preview). Everything else, pages and API,
-      answers only on the laptop itself. The check is on the header being present, so
-      faking it can only lock someone out further. Confirm the headers with a
-      real quick tunnel when implementing.
-- [ ] Downloads need no password: photo tokens are random UUIDs
+The **booth password stays** as it is: it guards capture, settings, gallery,
+frames and the phone remote, over the tunnel too. That matters because the
+tunnel URL is printed in every QR code; without it any guest could open
+`<tunnel>/gallery` or `/settings`. The phone remote keeps working over the
+tunnel, behind the same password.
+
+The **photo password goes**: a guest scans and sees their photo straight
+away.
+
+- [ ] `server/auth.mjs`: drop the `download` scope (`SCOPES`,
+      `TOKEN_TTL_MS`, `COOKIE`, env reading); keep `booth`.
+- [ ] `server/index.mjs`: `/api/download/:token` and `/api/preview/:token`
+      use `auth.requireAuth('download', 'booth')` today; make them open.
+      (`guestOrBooth` goes with the crop card, 0.4.)
+- [ ] `src/App.tsx`: remove the `PasswordGate` around `DownloadPage`; keep
+      `boothGated`.
+- [ ] `QrDownloadScreen.tsx`: remove the photo-password block (it reads
+      `/api/settings/passwords/reveal` and shows the password under the QR).
+- [ ] `PasswordsCard.tsx` and `revealPasswords`: booth password only.
+- [ ] `DOWNLOAD_PASSWORD` out of `server/env-file.mjs` and `.env.example`.
+- [ ] No photo password is safe enough: photo tokens are random UUIDs
       (`crypto.randomUUID()` in `server/index.mjs`), so a link cannot be
-      guessed.
+      guessed. Only someone given the QR or link can open a photo.
 
 ### 0.4 Remove the guest crop card
 
@@ -188,7 +190,7 @@ preview/shutter parity, existing e2e still pass.
 ## Phase 2: backgrounds from a typed prompt
 
 - [ ] Text box on the capture screen: "Where do you want to be?"
-- [ ] Server route (laptop only, see 0.3) calls OpenRouter
+- [ ] Server route (behind the booth password) calls OpenRouter
       `POST https://openrouter.ai/api/v1/chat/completions`, model
       `google/gemini-3.1-flash-image`, `modalities: ["image", "text"]`, 2K
       output, aspect close to the frame's photo window. Returns the image,
@@ -276,26 +278,24 @@ tunnel and background generation.
    offline, never alters faces). The other reading of "final pass with the
    vision model" is the AI edit model (Gemini through OpenRouter): about
    US$0.10 more per photo, and it can change faces and avatars. Which?
-2. **Phone remote**: with the tunnel rule in 0.3 it no longer works over the
-   tunnel. Drop it for Open House, or allow it on the same Wi-Fi only?
-3. **Frames page**: with only doodle left, keep the Frames page (uploading
+2. **Frames page**: with only doodle left, keep the Frames page (uploading
    other frames) and the "no frame" option, or remove both?
-4. **How the laptop runs it**: `npm run booth` from a checkout, or a packaged
+3. **How the laptop runs it**: `npm run booth` from a checkout, or a packaged
    app? Which OS and model? This decides 0.6 and how hard to push phases 1
    and 3.
-5. **Typing the prompt**: guests type at the laptop's keyboard, or something
+4. **Typing the prompt**: guests type at the laptop's keyboard, or something
    else?
-6. **Avatars**: how many, and who makes the artwork?
-7. Do the existing colour looks apply to the people only, or the background
+5. **Avatars**: how many, and who makes the artwork?
+6. Do the existing colour looks apply to the people only, or the background
    too? Default: people only.
 
 ## Validation
 
 `npm run lint`, `npm run test:run`, `npm run build`, then `npm run booth` on
-the booth laptop: try a guest link through the tunnel (only the download page
-opens; `/gallery` and `/settings` refuse), then test in front of the green
-screen and without it, with a group, and compare the preview with the
-downloaded photo.
+the booth laptop. Through the tunnel: a guest link opens the photo with no
+password, while `/gallery` and `/settings` still ask for the booth password.
+Then test in front of the green screen and without it, with a group, and
+compare the preview with the downloaded photo.
 
 ## References
 
