@@ -1,172 +1,301 @@
-# Open House booth: backgrounds and face filters
+# Open House booth plan
 
-Status: planned, not started. Written 2026-09-29 from a planning discussion.
-Applies to the `open-house` branch only (see `CLAUDE.md`).
+Status: planned, not started. Written 2026-09-29 from planning discussions.
+Applies to the `open-house` branch only (see `CLAUDE.md`). None of this
+touches the DSAC booth on `main`.
 
 ## Goal
 
-On the capture screen a guest makes two choices before the shot:
+A stripped-down booth for Open House that runs on the booth laptop
+(localhost only, never hosted), where a guest:
 
-1. **Background**: where they want to be (beach, space, campus...).
-2. **Face filter**: a Snapchat-style effect that follows each face (glasses,
-   hats, ears, masks).
+1. **Types a background** ("a beach at sunset", "on the moon"). An AI image
+   model generates it, and it is placed behind the guest.
+2. **Picks an avatar**: a Snapchat-style face filter that follows each face,
+   chosen from a fixed set made in advance. No customising.
+3. Sees all of it live in the preview, takes the photo, and scans a QR code
+   to download it. Photos stay on the laptop and are served through the
+   Cloudflare tunnel, as today.
 
-The live preview shows the result as they pose, and the photo they download
-is exactly what they saw. Download stays as it is today: a QR code, served
-through the Cloudflare tunnel the local server opens. Open House runs on
-localhost only and is never hosted.
+Work order: Phase 0 (strip down) first, then phases 1-4.
+
+## Phase 0: strip the booth down
+
+### 0.1 Frames: keep only the doodle frame
+
+- [ ] Delete from `public/frames/` everything except `frame-doodle.png`
+      (tech, amber, crystal, diamond, sapphire, and their `-text` variants).
+- [ ] `types/frame.ts`: drop the tech frame and the four in the list near the
+      bottom (diamond, sapphire, amber, crystal); keep `doodle`.
+- [ ] Make doodle the default: `selectedFrameId` is `''` today in both
+      `server/index.mjs` and `components/features/remote/useCaptureSettings.ts`.
+
+### 0.2 Hosting: remove the Cloudflare Worker, keep the tunnel
+
+- [ ] Delete `worker/` (index, auth, blobs, db, env, remote, schema.sql,
+      CONTRACTS.md) and `wrangler.jsonc`. Without `wrangler.jsonc`,
+      `wrangler deploy` cannot run from this branch at all, so the live DSAC
+      booth is safe by construction.
+- [ ] `package.json`: remove `wrangler`, `@cloudflare/workers-types` and
+      `hono` (only `worker/` imports it).
+- [ ] Remove front-end branches that exist only for the hosted booth:
+      `localArchive` in `/api/health` and `GalleryPage.tsx`, the
+      `editable: false` path in `EnvironmentCard.tsx`, and hosted notes in
+      `PasswordsCard.tsx` / `useCaptureSettings.ts`.
+- [ ] **Keep**: `server/tunnel.mjs`, the `cloudflared` dependency,
+      `scripts/fetch-cloudflared-win.mjs` (Windows packaging), and the
+      `PUBLIC_URL` / `CLOUDFLARED_PROTOCOL` settings. The QR codes depend on
+      the tunnel.
+
+### 0.3 Passwords: remove both, and keep guests out of the booth pages
+
+- [ ] Remove the `booth` and `download` passwords: `server/auth.mjs`,
+      `BOOTH_PASSWORD` / `DOWNLOAD_PASSWORD` in `server/env-file.mjs` and
+      `.env.example`, `PasswordGate.tsx`, `PasswordsCard.tsx`, `boothGated`
+      in `src/App.tsx`, the login/logout/status/reveal routes, and password
+      wording in `StudioShell.tsx` and `QrDownloadScreen.tsx`.
+- [ ] **Replace the gate with a tunnel rule.** The tunnel URL is printed in
+      every QR code, so without a password any guest could open
+      `<tunnel>/gallery` or `/settings` and see or delete everyone's photos,
+      change settings or fire the shutter. Rule: a request that arrived
+      through the Cloudflare tunnel (Cloudflare's edge always adds
+      `cf-ray` / `cf-connecting-ip`; the laptop's own browser does not) may
+      only reach the guest routes: the download page (the path
+      `getDownloadToken` in `src/App.tsx` recognises, plus the built JS/CSS
+      and fonts it loads), `/api/download/:token`, `/api/preview/:token` and
+      `/api/share/*` (LinkedIn preview). Everything else, pages and API,
+      answers only on the laptop itself. The check is on the header being present, so
+      faking it can only lock someone out further. Confirm the headers with a
+      real quick tunnel when implementing.
+- [ ] Downloads need no password: photo tokens are random UUIDs
+      (`crypto.randomUUID()` in `server/index.mjs`), so a link cannot be
+      guessed.
+
+### 0.4 Remove the guest crop card
+
+The "crop a card of yourself" feature on the download page, behind the Beta
+switch. Not to be confused with `CameraCropCard.tsx` in the remote, which is
+the camera zoom/crop and stays.
+
+- [ ] Delete `components/features/crop-card/` (CropCard, useCard,
+      detectFaces, cropGeometry and its test).
+- [ ] Remove the card section from `src/pages/DownloadPage.tsx`, the Beta
+      card (`components/features/settings/BetaCard.tsx`) from Settings, the
+      face detection that runs after the shutter (`CameraView.tsx` /
+      `CapturePage.tsx`), the routes `/api/photos/:token/faces` and
+      `/api/derivatives/*`, and the faces/derivatives tables in
+      `server/db.mjs`.
+- [ ] Delete `public/vision/tiledFaces.mjs`, `backfill.html` and
+      `blaze_face_short_range.tflite`.
+- [ ] **Keep** `scripts/vendor-vision.mjs` and the MediaPipe runtime it
+      copies: phases 1 and 3 need it.
+
+### 0.5 Remove Google Drive archiving
+
+- [ ] Delete `server/drive.mjs`, the `/api/drive/connect` and
+      `/api/drive/callback` routes, the `GOOGLE_*` settings in
+      `server/env-file.mjs` and `.env.example`, the Drive UI in
+      `EnvironmentCard.tsx` and `CaptureSettingsCard.tsx`, and `archive` in
+      `/api/health`.
+- [ ] `sweepGallery` in `server/index.mjs`: drop the Drive branch. Photos
+      stay in the local `data/` folder. Gallery auto-delete
+      (`galleryTtlHours`) keeps its default of 0, meaning keep forever; link
+      expiry (`linkTtlHours`) stays as it is.
+
+### 0.6 Housekeeping
+
+- [ ] The desktop updater (`server/updates.mjs`, `UpdateCard.tsx`,
+      `electron-updater`) checks **DSAC's** GitHub releases. In a packaged
+      Open House app it would offer to install DSAC over it. Remove it, or
+      point it at an Open House release channel.
+- [ ] Rename for Open House: `package.json` `name`/`description`,
+      `electron-builder.yml` `appId`/`productName`/artifact names/`publish`,
+      `README.md`. `docs/stories/` and `docs/app_description.txt` describe DSAC.
+- [ ] `CLAUDE.md` is shared with `main` apart from the "This checkout is"
+      line. Once `wrangler.jsonc` is gone, update its deploy section on both
+      branches (cherry-pick) so they stay in step.
 
 ## Decisions
 
 | Decision | Why |
 | --- | --- |
-| Remove the background with a **green screen and a colour key** in the browser | Sharpest edges, keeps hair and anything guests hold, and it is simple per-pixel maths on the graphics chip, so it runs live on the weak booth laptop. No model, no download. |
-| **Preset background images** first | Free, instant in the preview, no moderation problem. |
-| **Face filters with MediaPipe Face Landmarker**, drawn locally | 478 points per face plus head angle, runs live on a laptop CPU, Apache 2.0. The booth already ships the MediaPipe runtime (`public/vision/`). |
-| AI never touches the people | Editing models redraw the whole picture, so faces, hair and filters drift. If AI is used, it only makes the background image (phase 3). |
-| One drawing routine for preview and photo | `drawPhoto` in `useLivePreview.ts` is already shared by the live preview and the shutter (`CameraView.tsx` `doCapture`). New layers go into that shared path so the two cannot disagree. |
+| Background removal is a **setting with two modes**: colour key (green screen) or segmentation (no green screen) | Use the green screen when there is one; segmentation as the fallback. |
+| Colour key in the browser, not an AI keyer | Sharpest edges, keeps hair and props, and it is simple maths on the graphics chip, so it runs live on the weak booth laptop. |
+| Segmentation with **MediaPipe Selfie Segmenter** live | ~250 KB, runs live on CPU. Good for 1-4 people near the camera; softer hair edges. |
+| Optional **edge clean-up pass** at the shutter | A stronger matting model re-cuts the saved photo when live segmentation looks jagged. Toggle it by how well segmentation does on the day. |
+| Guests **type the background**; AI generates only the background | Editing models redraw the whole picture, so faces, hair and filters drift. Generating just the background, placed behind the cut-out people, never touches them. |
+| **Avatars from a fixed set**, made in advance | No moderation problem, predictable look, no per-photo cost. Artwork can be made once with an image model and cleaned up into transparent PNGs. |
+| Face tracking with **MediaPipe Face Landmarker** | 478 points and head angle per face, live on a laptop CPU, Apache 2.0. The runtime is already vendored. |
+| One drawing routine for preview and photo | `drawPhoto` in `useLivePreview.ts` is shared by the live preview and the shutter (`doCapture` in `CameraView.tsx`). New layers go into it so the two cannot disagree. |
 
 ### Rejected
 
 - **CorridorKey** (Corridor Digital's AI keyer): needs a 6-8 GB GPU or Apple
-  M1+, runs as a Python program, is built for film frames rather than live
-  video, and is not an API. The booth laptop cannot run it.
-- **Instance segmentation (YOLO-seg etc.)**: low-resolution masks give soft,
-  blotchy edges, too heavy to run live on this laptop, cuts off props.
-  Ultralytics YOLO is AGPL-3.0.
+  M1+, runs as a Python program, built for film frames not live video, not an
+  API. The booth laptop cannot run it.
+- **Instance segmentation (YOLO-seg etc.)**: low-resolution masks, soft
+  blotchy edges, too heavy live on this laptop, cuts off props. Separate
+  people are not needed. Ultralytics YOLO is AGPL-3.0.
+- **BRIA RMBG-2.0**: licence does not allow commercial use.
 - **AI edit of the whole final photo** (the first idea): alters faces and
-  filters; kept only as the background-generation step in phase 3.
+  filters. See open question 1.
 
 ## Layer order
 
 Both the preview and the shutter draw, bottom to top:
 
-1. Background image, cover-cropped into the frame's photo window. **Not
-   mirrored**: the preview mirrors the camera, and a mirrored background
-   would show any text backwards.
-2. Keyed camera image (green removed), with the existing crop, mirror,
-   rotation and colour filters.
-3. Face filters, at the face points mapped through the same crop, mirror
+1. Background (generated from the guest's text, or a preset), cover-cropped
+   into the frame's photo window. **Not mirrored**: the preview mirrors the
+   camera, and a mirrored background would show any text backwards.
+2. The people: camera image with the background removed (colour key or
+   segmentation), with the existing crop, mirror, rotation and colour looks.
+3. Avatar filters at the face points, mapped through the same crop, mirror
    and rotation as layer 2.
-4. Event frame PNG, then the date stamp (as today).
+4. Doodle frame, then the date stamp (as today).
 
-## Phase 1: green-screen key and preset backgrounds
+With background removal off, layers 1 and 2 are just the camera, as today.
 
-- [ ] WebGL keyer: takes the raw `<video>` frame, outputs a canvas with alpha.
-      Chroma distance from the key colour with tolerance and softness
-      (`smoothstep`) for the alpha, spill suppression (pull green down to
-      `max(r, b)`), slight edge feather. The same function runs every
-      preview frame and once at full resolution at the shutter.
-- [ ] Uneven lighting: the screen will have lighter and darker patches.
-      Compare colour only (Cb/Cr, ignoring brightness Y) and/or green
-      dominance (`g - max(r, b)`), so a shadowed patch still keys.
-- [ ] Clean plate: a "capture empty screen" button at setup stores one frame
-      of the empty green screen; the keyer then compares each pixel with the
-      same position in that frame instead of a single key colour. Handles
-      uneven light because camera and screen do not move. Re-capture if the
-      camera, crop or lighting changes.
-- [ ] `drawPhoto`: draw the background first, then the keyed canvas instead
-      of the raw video. Keep the scratch-canvas reuse pattern already used
-      for `rampLayer` (no per-frame allocation).
-- [ ] Key settings in capture settings: key colour (pick from the preview),
-      tolerance, softness, spill. Editable from Settings and the phone
-      remote, since lighting changes on the day.
-- [ ] Background library: upload, list and delete, modelled on frames
-      (`/api/frames`, `useFrameCatalogue.ts`, SQLite). Files in
-      `public/backgrounds/` for the bundled ones.
-- [ ] Background picker on the capture screen (and on the remote).
-- [ ] "Green screen" switch: off means the booth behaves exactly as before.
-- [ ] Tests: keyer maths as a pure function (alpha, spill), layer order in
-      `drawPhoto`, preview/shutter parity, existing e2e still pass.
+## Phase 1: background removal, two modes
 
-## Phase 2: face filters
+- [ ] Setting **Background removal**: Off / Colour key (green screen) /
+      Segmentation. Off keeps the booth as it is today.
+- [ ] Both modes produce the same thing, a canvas of the people with
+      transparency, which `drawPhoto` draws over layer 1. Reuse the scratch
+      canvas pattern of `rampLayer` (no per-frame allocation).
 
-- [ ] Commit `face_landmarker.task` (~4 MB) beside `blaze_face_short_range.tflite`
-      in `public/vision/`; check `scripts/vendor-vision.mjs` still copies
-      what is needed.
-- [ ] Live tracking: `FaceLandmarker` in VIDEO mode on the raw video, CPU
-      delegate by default, capped at about 6 faces. Detect at ~15 fps and
-      reuse the last result in between, smoothed so filters do not jitter.
-      GPU delegate is a one-line switch if the laptop copes better with it.
-- [ ] Map landmark coordinates through the same crop, mirror and rotation
-      that `drawPhoto` applies to the video.
-- [ ] Filter definitions in `types/filter.ts` (like `types/frame.ts`): a
-      transparent PNG in `public/filters/`, which landmarks anchor it
-      (e.g. eye centres), how it scales (e.g. eye distance), and an offset.
-      Angle comes from the eye line / head pose.
-- [ ] At the shutter: one fresh detection on the full-resolution frame, so
-      filters land precisely on the saved photo.
-- [ ] Filter picker on the capture screen (and on the remote), including
-      "none".
-- [ ] Test at the real booth distance. Face Landmarker is short-range; if the
-      back row of a group loses tracking, reuse the tiled search in
-      `public/vision/tiledFaces.mjs` for the detection step.
+**Colour key**
 
-## Phase 3 (optional): AI-generated backgrounds from typed text
+- [ ] WebGL keyer on the raw `<video>` frame: colour distance with tolerance
+      and softness (`smoothstep`) for transparency, spill suppression (pull
+      green down to `max(r, b)`), slight edge feather.
+- [ ] Uneven lighting: compare colour only (Cb/Cr, ignoring brightness Y)
+      and/or green dominance (`g - max(r, b)`), so shadowed green still keys.
+- [ ] Clean plate: a "capture empty screen" button stores one frame of the
+      empty green screen; each pixel is then compared with the same spot in
+      that frame. Re-capture if the camera, crop or lighting changes.
+- [ ] Settings for key colour (pick from the preview), tolerance, softness,
+      spill; editable during the event.
 
-The guest types a scene; the booth generates just the background before the
-shot, and the live preview shows them in it.
+**Segmentation**
 
-- [ ] Server route (booth-auth only) calls OpenRouter
+- [ ] Commit the MediaPipe Selfie Segmenter model (~250 KB) in
+      `public/vision/`. Run it live on CPU; smooth the mask between frames so
+      edges do not flicker; feather the edge.
+
+**Tests**: keyer maths as a pure function, layer order in `drawPhoto`,
+preview/shutter parity, existing e2e still pass.
+
+## Phase 2: backgrounds from a typed prompt
+
+- [ ] Text box on the capture screen: "Where do you want to be?"
+- [ ] Server route (laptop only, see 0.3) calls OpenRouter
       `POST https://openrouter.ai/api/v1/chat/completions`, model
-      `google/gemini-3.1-flash-image`, `modalities: ["image", "text"]`,
-      2K output. Returns the image to the kiosk, which uses it as layer 1.
-- [ ] The guest never writes the prompt. The server wraps their text:
-      "A photo backdrop of: {text}. No people, no text, no logos.
-      Photorealistic, eye-level, even lighting." Length cap, blocked-word
-      list, and fall back to a preset if the model refuses or fails.
-- [ ] `OPENROUTER_API_KEY` added to `server/env-file.mjs` so it is set on the
-      Environment tab. It never reaches the browser.
-- [ ] Waiting state (5-30 s) that shows a preset meanwhile; cap generations
-      per guest (retakes cost the same again).
-- [ ] Notice on screen that the typed text goes to an online service.
+      `google/gemini-3.1-flash-image`, `modalities: ["image", "text"]`, 2K
+      output, aspect close to the frame's photo window. Returns the image,
+      which becomes layer 1 in the live preview before the guest poses.
+- [ ] The guest never writes the prompt. The server wraps their text: "A photo
+      backdrop of: {text}. No people, no text, no logos. Photorealistic,
+      eye-level, even lighting." Length cap, blocked-word list, fall back to a
+      preset if the model refuses or fails.
+- [ ] `OPENROUTER_API_KEY` in `server/env-file.mjs`, set on the Environment
+      tab. It never reaches the browser.
+- [ ] Waiting state (5-30 s) showing a preset meanwhile. A few preset
+      backgrounds bundled in `public/backgrounds/` for that and as defaults.
+- [ ] Cap generations per guest (each costs the same again).
+- [ ] Short notice on screen that the typed text goes to an online service.
+
+## Phase 3: avatars (face filters from a fixed set)
+
+- [ ] Make the avatar set in advance: transparent PNGs in `public/filters/`.
+      Can be generated once with an image model, then cleaned up.
+- [ ] Filter definitions in `types/filter.ts` (like `types/frame.ts`): the
+      image, which landmarks anchor it (e.g. eye centres), how it scales (e.g.
+      eye distance), an offset. Angle from the eye line / head pose.
+- [ ] Commit `face_landmarker.task` (~4 MB) in `public/vision/`.
+- [ ] Live tracking: `FaceLandmarker` in VIDEO mode on the raw video, CPU by
+      default (GPU is a one-line switch), about 6 faces max. Detect at ~15 fps,
+      reuse the last result in between, smoothed so filters do not jitter.
+- [ ] Map landmarks through the same crop, mirror and rotation as the video.
+- [ ] At the shutter, one fresh detection on the full-resolution frame.
+- [ ] Avatar picker on the capture screen, including "none".
+- [ ] Test at the real booth distance: Face Landmarker is short-range, and
+      the back row of a group may lose tracking.
+
+## Phase 4: edge clean-up pass (toggle)
+
+- [ ] Setting **Edge clean-up**: on/off, default off. When on, the shutter
+      re-cuts the people from the full-resolution frame with a stronger
+      matting model, and that mask replaces the live one for the saved photo
+      only. The preview stays on the fast live mask.
+- [ ] Model: MODNet (Apache 2.0, 7-26 MB, runs in the browser through ONNX
+      Runtime Web / transformers.js, probably about a second on the weak
+      laptop; measure). BiRefNet-lite (MIT, 115-224 MB) if the laptop can
+      take it.
+- [ ] Mainly for segmentation mode; check whether colour key benefits too.
+- [ ] Turn it on when live segmentation edges look jagged on the day.
 
 ## Costs
 
-Phases 1 and 2 are free: everything runs on the laptop, and the tunnel is
-free. Phase 3 costs per generated background (Gemini 3.1 Flash Image,
-including OpenRouter's 5.5% card fee on credits; the prompt text costs
-effectively nothing):
+Everything runs on the laptop and the tunnel is free, except phase 2. Per
+generated background with Gemini 3.1 Flash Image, including OpenRouter's
+5.5% card fee on credits (the prompt text costs effectively nothing):
 
 | Size | Per background | 300 guests |
 | --- | --- | --- |
-| 2048px (matches the 1921x1201 frames) | ~US$0.107 | ~US$32 |
+| 2048px (matches the 1921x1201 frame) | ~US$0.107 | ~US$32 |
 | 1024px | ~US$0.071 | ~US$21 |
 
-Do not use Gemini 2.5 Flash Image: Google shuts it down on 2026-10-02.
+Each regenerate costs the same again. Do not use Gemini 2.5 Flash Image:
+Google shuts it down on 2026-10-02.
 
 ## Event-day setup
 
-- The green screen fills the camera's whole view, including for groups.
-  Anything past its edges shows as the real room. If groups spill over, add
-  a person mask from MediaPipe's selfie segmenter as a garbage matte for the
-  edges only.
-- Light the screen evenly: no creases, no shadows.
-- Guests stand 1-2 m in front of it, so it does not throw green onto them
-  and their shadows do not fall on it (near-black shadow cannot be told
-  apart from dark hair or clothes).
-- Light the screen with its own light(s), separate from the guests' light.
+With a green screen:
+
+- It fills the camera's whole view, including for groups. Anything past its
+  edges shows as the real room.
+- Light it evenly with its own light(s), separate from the guests' light;
+  no creases.
+- Guests stand 1-2 m in front, so it does not throw green onto them and their
+  shadows do not land on it (near-black shadow cannot be told apart from dark
+  hair or clothes).
 - Green clothing disappears; tell guests.
-- Tune key colour and tolerance on the day, in the venue's light.
-- Laptop on mains power, high-performance mode. Internet for the tunnel
-  (and phase 3).
+- Tune key colour and tolerance on the day, and capture the clean plate.
+
+Without a green screen:
+
+- Plain, evenly lit wall or cloth in a colour unlike typical clothing.
+- Guests near the camera, small groups, no one walking past behind.
+
+Both: laptop on mains power in high-performance mode, and internet for the
+tunnel and background generation.
 
 ## Open questions
 
-- Which laptop (make and model)? Face tracking is the heaviest part; test on
-  it early.
-- Who picks the background and filter: the guest on the kiosk screen, or the
-  operator on the phone remote?
-- Where does the filter artwork come from, and how many filters?
-- Do colour filters (the existing looks) apply to the person only, or to the
-  background too? Default: person only.
-- Phase 3 at all, or presets only?
+1. **Edge clean-up pass**: this plan uses a local matting model (free,
+   offline, never alters faces). The other reading of "final pass with the
+   vision model" is the AI edit model (Gemini through OpenRouter): about
+   US$0.10 more per photo, and it can change faces and avatars. Which?
+2. **Phone remote**: with the tunnel rule in 0.3 it no longer works over the
+   tunnel. Drop it for Open House, or allow it on the same Wi-Fi only?
+3. **Frames page**: with only doodle left, keep the Frames page (uploading
+   other frames) and the "no frame" option, or remove both?
+4. **How the laptop runs it**: `npm run booth` from a checkout, or a packaged
+   app? Which OS and model? This decides 0.6 and how hard to push phases 1
+   and 3.
+5. **Typing the prompt**: guests type at the laptop's keyboard, or something
+   else?
+6. **Avatars**: how many, and who makes the artwork?
+7. Do the existing colour looks apply to the people only, or the background
+   too? Default: people only.
 
 ## Validation
 
-`npm run lint`, `npm run test:run`, `npm run build`, then run it with
-`npm run booth` on the booth laptop in front of the green screen with a
-group, and compare the preview with the downloaded photo.
+`npm run lint`, `npm run test:run`, `npm run build`, then `npm run booth` on
+the booth laptop: try a guest link through the tunnel (only the download page
+opens; `/gallery` and `/settings` refuse), then test in front of the green
+screen and without it, with a group, and compare the preview with the
+downloaded photo.
 
 ## References
 
@@ -174,4 +303,6 @@ group, and compare the preview with the downloaded photo.
 - OpenRouter fees: https://openrouter.ai/docs/faq
 - Gemini image pricing and reference-image limits: https://ai.google.dev/gemini-api/docs/pricing,
   https://ai.google.dev/gemini-api/docs/image-generation
+- MODNet: https://github.com/ZHKKKe/MODNet (browser build: https://huggingface.co/Xenova/modnet)
+- BiRefNet: https://github.com/ZhengPeng7/BiRefNet (browser build: https://huggingface.co/onnx-community/BiRefNet_lite-ONNX)
 - CorridorKey: https://github.com/nikopueringer/CorridorKey
