@@ -9,7 +9,7 @@ meant for one must not land in the other by accident.
 | **DSAC** photo booth | `main` | SP DSAC events. The live booth: laptop app and https://booth.spmsdsac.workers.dev |
 | **Open House** photo booth | `open-house` | Open House. Runs on localhost only, never hosted. Split off `main` on 2026-09-29 |
 
-**This checkout is: Open House (`open-house`).**
+**This checkout is: Open House (`open-house`).** Planned work: `docs/open-house-plan.md`.
 
 ## Before editing anything
 
