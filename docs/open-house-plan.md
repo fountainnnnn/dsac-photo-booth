@@ -57,6 +57,14 @@ Both the preview and the shutter draw, bottom to top:
       (`smoothstep`) for the alpha, spill suppression (pull green down to
       `max(r, b)`), slight edge feather. The same function runs every
       preview frame and once at full resolution at the shutter.
+- [ ] Uneven lighting: the screen will have lighter and darker patches.
+      Compare colour only (Cb/Cr, ignoring brightness Y) and/or green
+      dominance (`g - max(r, b)`), so a shadowed patch still keys.
+- [ ] Clean plate: a "capture empty screen" button at setup stores one frame
+      of the empty green screen; the keyer then compares each pixel with the
+      same position in that frame instead of a single key colour. Handles
+      uneven light because camera and screen do not move. Re-capture if the
+      camera, crop or lighting changes.
 - [ ] `drawPhoto`: draw the background first, then the keyed canvas instead
       of the raw video. Keep the scratch-canvas reuse pattern already used
       for `rampLayer` (no per-frame allocation).
@@ -134,7 +142,10 @@ Do not use Gemini 2.5 Flash Image: Google shuts it down on 2026-10-02.
   a person mask from MediaPipe's selfie segmenter as a garbage matte for the
   edges only.
 - Light the screen evenly: no creases, no shadows.
-- Guests stand 1-2 m in front of it, so it does not throw green onto them.
+- Guests stand 1-2 m in front of it, so it does not throw green onto them
+  and their shadows do not fall on it (near-black shadow cannot be told
+  apart from dark hair or clothes).
+- Light the screen with its own light(s), separate from the guests' light.
 - Green clothing disappears; tell guests.
 - Tune key colour and tolerance on the day, in the venue's light.
 - Laptop on mains power, high-performance mode. Internet for the tunnel
