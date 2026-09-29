@@ -7,7 +7,7 @@ meant for one must not land in the other by accident.
 | App | Branch | Used for |
 | --- | --- | --- |
 | **DSAC** photo booth | `main` | SP DSAC events. The live booth: laptop app and https://booth.spmsdsac.workers.dev |
-| **Open House** photo booth | `open-house` | Open House. Split off `main` on 2026-09-29 |
+| **Open House** photo booth | `open-house` | Open House. Runs on localhost only, never hosted. Split off `main` on 2026-09-29 |
 
 **This checkout is: Open House (`open-house`).**
 
@@ -28,13 +28,23 @@ app it was found in, then cherry-picked into the other. Never merge one branch
 into the other wholesale: branding, frames, copy, settings and deploy config
 differ on purpose.
 
-## Deploying
+## Running and deploying
 
-The DSAC booth deploys from `main`: `npm run build && npx wrangler deploy`,
-then push `main`.
+The DSAC hosted booth deploys from `main`: `npm run build && npx wrangler
+deploy`, then push `main`.
 
-Open House has no deploy targets of its own yet. Until these point at Open
-House resources, they still point at DSAC's live ones:
+Open House is never hosted. It runs on the booth laptop and is served from
+localhost (http://localhost:3001). Guests download their photo the usual way:
+the server opens a Cloudflare tunnel at startup and the QR code points at that
+public URL, so a phone on mobile data can reach the laptop. The Worker in
+`worker/` is not part of Open House.
+
+Run it from its own checkout of `open-house`, not by switching branches in the
+DSAC folder: the local server keeps photos and settings in the checkout's
+`data/` folder, and both booths listen on port 3001.
+
+`open-house` still carries DSAC's release settings, which point at DSAC's live
+booth:
 
 - `wrangler.jsonc` — worker `name`, the D1 database and the R2 bucket
 - `electron-builder.yml` — `appId`, `productName`, artifact names, `publish`
@@ -42,6 +52,7 @@ House resources, they still point at DSAC's live ones:
 - `package.json` — `name`, which also names the `%APPDATA%` data folder, and
   `version`, whose `v*` git tags are DSAC's
 
-So from `open-house`, do not run `npx wrangler deploy`,
-`npm run package -- --publish always` or `npm version`: each would overwrite or
-collide with the live DSAC booth.
+So from `open-house`, never run `npx wrangler deploy`, and do not run
+`npm run package -- --publish always` or `npm version` until the last two
+files are changed to Open House's own: each would overwrite or collide with
+the live DSAC booth.
