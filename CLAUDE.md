@@ -33,26 +33,18 @@ differ on purpose.
 The DSAC hosted booth deploys from `main`: `npm run build && npx wrangler
 deploy`, then push `main`.
 
-Open House is never hosted. It runs on the booth laptop and is served from
-localhost (http://localhost:3001). Guests download their photo the usual way:
-the server opens a Cloudflare tunnel at startup and the QR code points at that
-public URL, so a phone on mobile data can reach the laptop. The Worker in
-`worker/` is not part of Open House.
+Open House is never hosted, and `open-house` has no Worker and no
+`wrangler.jsonc`, so a deploy cannot run from it. It runs on the booth laptop
+and is served from localhost (`npm run booth`, http://localhost:3001). Guests
+download their photo the usual way: the server opens a Cloudflare tunnel at
+startup and the QR code points at that public URL, so a phone on mobile data
+can reach the laptop.
 
 Run it from its own checkout of `open-house`, not by switching branches in the
 DSAC folder: the local server keeps photos and settings in the checkout's
 `data/` folder, and both booths listen on port 3001.
 
-`open-house` still carries DSAC's release settings, which point at DSAC's live
-booth:
-
-- `wrangler.jsonc` — worker `name`, the D1 database and the R2 bucket
-- `electron-builder.yml` — `appId`, `productName`, artifact names, `publish`
-  repository (DSAC booths read their updates from its releases)
-- `package.json` — `name`, which also names the `%APPDATA%` data folder, and
-  `version`, whose `v*` git tags are DSAC's
-
-So from `open-house`, never run `npx wrangler deploy`, and do not run
-`npm run package -- --publish always` or `npm version` until the last two
-files are changed to Open House's own: each would overwrite or collide with
-the live DSAC booth.
+On `open-house` the package name, app id and product name are Open House's
+own, and there is no updater and no `publish` target, so packaging it cannot
+touch DSAC's releases. Still never run `npm version` there: its `v*` tags
+would collide with DSAC's.
