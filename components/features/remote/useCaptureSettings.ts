@@ -121,6 +121,12 @@ export interface CaptureSettings {
    * deleting the key.
    */
   promptBackgrounds: boolean;
+  /**
+   * Only the people at the front — the group having their photo taken — get
+   * avatars and, with no green screen, are cut out; a queue behind them is
+   * left alone. Judged by face size, so it needs the face tracker running.
+   */
+  focusFront: boolean;
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -142,6 +148,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   edgeCleanup: false,
   cleanPlateAt: '',
   promptBackgrounds: true,
+  focusFront: true,
 };
 
 export function useCaptureSettings() {

@@ -602,6 +602,9 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // anything once OPENROUTER_API_KEY is set; this is the way to turn it off
   // without deleting the key.
   promptBackgrounds: true,
+  // Only the group at the front gets avatars and, with no green screen, is
+  // cut out; people further back are left alone. Judged by face size.
+  focusFront: true,
 };
 
 /**

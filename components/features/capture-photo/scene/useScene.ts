@@ -6,7 +6,8 @@ import {
 import type { SceneLayers } from '../useLivePreview';
 import { ChromaKeyer } from './chromaKey';
 import { PersonSegmenter, cutOut } from './segmentation';
-import { FaceTracker, type Region } from './faces';
+import { FaceTracker, type FacePoints, type Region } from './faces';
+import { faceBox, frontFaces } from './front';
 import { matte, preloadMatting } from './matting';
 
 /**
@@ -33,6 +34,11 @@ export interface SceneConfig {
    * looked for there.
    */
   region?: Region | null;
+  /**
+   * Only the people at the front: avatars on their faces alone, and with no
+   * green screen, only their shapes cut out. See `front.ts`.
+   */
+  focusFront?: boolean;
 }
 
 export type PartStatus = 'off' | 'loading' | 'ready' | 'failed';
@@ -101,7 +107,13 @@ export function useScene(config: SceneConfig) {
   }, []);
 
   const { bgRemoval, cleanPlateAt, edgeCleanup } = config;
-  const wantsFaces = Boolean(config.choice.avatarId);
+  // Faces are wanted for avatars, and to tell the group from the crowd when a
+  // model is finding the people.
+  const wantsFaces = Boolean(config.choice.avatarId)
+    || (Boolean(config.focusFront) && bgRemoval === 'segment');
+
+  // The group as it was last frame, so membership is sticky (see front.ts).
+  const lastFront = useRef<FacePoints[]>([]);
 
   // The keyer, and the clean plate it compares against.
   useEffect(() => {
@@ -187,14 +199,33 @@ export function useScene(config: SceneConfig) {
     };
   }, []);
 
+  /** The faces that count: everyone, or only the group at the front. */
+  const focused = useCallback((faces: FacePoints[]): FacePoints[] => {
+    if (!configRef.current.focusFront) return faces;
+    const front = frontFaces(faces, lastFront.current);
+    lastFront.current = front;
+    return front;
+  }, []);
+
   /** This preview frame's scene. Cheap: everything heavy is throttled. */
   const sceneFrame = useCallback((video: HTMLVideoElement): SceneLayers | null => {
     const c = configRef.current;
+    const { background, avatar } = pictures();
+
+    const tracking = tracker.current
+      && (avatar || (c.focusFront && c.bgRemoval === 'segment'));
+    let faces: FacePoints[] | null = null;
+    if (tracking) {
+      tracker.current!.update(video, c.region ?? null);
+      faces = focused(tracker.current!.faces);
+    }
+
     let person: HTMLCanvasElement | null = null;
     if (c.bgRemoval === 'key' && keyer.current) {
       person = keyer.current.process(video, c.chromaKey, PREVIEW_MAX_WIDTH);
     } else if (c.bgRemoval === 'segment' && segmenter.current) {
-      segmenter.current.update(video);
+      // Until faces are known, everyone is kept.
+      segmenter.current.update(video, c.focusFront && faces ? faces.map(faceBox) : null);
       const mask = segmenter.current.mask;
       if (mask) {
         person = cutOut(video, mask, PREVIEW_MAX_WIDTH, previewCut.current ?? undefined);
@@ -202,15 +233,9 @@ export function useScene(config: SceneConfig) {
       }
     }
 
-    const { background, avatar } = pictures();
-    let tracked = null;
-    if (avatar && tracker.current) {
-      tracker.current.update(video, c.region ?? null);
-      tracked = tracker.current.faces;
-    }
     if (!person && !avatar) return null;
-    return { person, background, avatar, faces: tracked };
-  }, [pictures]);
+    return { person, background, avatar, faces: avatar ? faces : null };
+  }, [pictures, focused]);
 
   /**
    * The scene for the photo itself, at full resolution. Everything that
@@ -220,7 +245,9 @@ export function useScene(config: SceneConfig) {
   const captureScene = useCallback(async (video: HTMLVideoElement): Promise<SceneLayers | null> => {
     const c = configRef.current;
     const { background, avatar } = pictures();
-    const facesNow = avatar && tracker.current ? tracker.current.detectNow(video, c.region ?? null) : null;
+    const facesNow = avatar && tracker.current
+      ? focused(tracker.current.detectNow(video, c.region ?? null))
+      : null;
 
     let person: HTMLCanvasElement | null = null;
     if (c.bgRemoval === 'key' && keyer.current) {
@@ -236,7 +263,7 @@ export function useScene(config: SceneConfig) {
 
     if (!person && !avatar) return null;
     return { person, background, avatar, faces: facesNow };
-  }, [pictures]);
+  }, [pictures, focused]);
 
   const status: SceneStatus = { removal, faces };
   return { sceneFrame, captureScene, status };

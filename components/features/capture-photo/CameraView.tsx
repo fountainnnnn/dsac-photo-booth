@@ -120,6 +120,7 @@ export default function CameraView({
     cleanPlateAt: captureSettings.cleanPlateAt,
     choice,
     region: crop,
+    focusFront: captureSettings.focusFront,
   });
 
   const updateCaptureSettings = useCallback((patch: Partial<typeof captureSettings>) => {

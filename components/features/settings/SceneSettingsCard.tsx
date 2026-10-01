@@ -252,6 +252,22 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
         </div>
       )}
 
+      <label className="mt-6 flex items-start gap-3">
+        <input type="checkbox" checked={settings.focusFront}
+          onChange={e => push({ ...settings, focusFront: e.target.checked })}
+          className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+        <span>
+          <span className="block text-[0.8rem] font-semibold text-[var(--ink)]">Only the people at the front</span>
+          <span className="mt-1 block text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+            The group having their photo taken — however many — gets avatars and,
+            with no green screen, is kept in front of the background. People
+            further back, like a queue, are left out. Judged by how big faces are,
+            so guests should face the camera. Someone overlapping a guest in the
+            picture stays; a green screen avoids that.
+          </span>
+        </span>
+      </label>
+
       {mode !== 'off' && (
         <label className="mt-6 flex items-start gap-3">
           <input type="checkbox" checked={settings.promptBackgrounds}
