@@ -45,7 +45,12 @@ export function preloadMatting(): Promise<InferenceSession> {
     // No cross-origin isolation here, so no threads for the CPU fallback; say
     // so rather than have the runtime try and warn.
     ort.env.wasm.numThreads = 1;
-    const sess = await ort.InferenceSession.create(MODEL, { executionProviders: ['webgpu', 'wasm'] });
+    // NCHW: in its default layout WebGPU got a quarter of MODNet's pixels
+    // wrong — holes through people — while matching the CPU exactly in this
+    // one, at about the same speed.
+    const sess = await ort.InferenceSession.create(MODEL, {
+      executionProviders: [{ name: 'webgpu', preferredLayout: 'NCHW' }, 'wasm'],
+    });
     const { w, h } = modelSize(16, 9);
     await sess.run({ [sess.inputNames[0]]: new ort.Tensor('float32', new Float32Array(3 * w * h), [1, 3, h, w]) });
     return sess;
