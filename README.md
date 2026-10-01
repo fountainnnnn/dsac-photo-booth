@@ -48,10 +48,12 @@ stand in. Settings > Background chooses how the room is taken away:
   pixel is then judged against its own spot, so shadows and uneven light key
   cleanly, and the key colour is set from it. Tune tolerance, edge softness and
   green cast with the live preview on the same card.
-- **No green screen**: MediaPipe's multiclass segmenter finds the people. Best
-  with a plain wall and guests near the camera. The **edge clean-up pass**
-  re-cuts each photo with MODNet at the shutter for cleaner hair and edges, at
-  the cost of a second or so per photo.
+- **No green screen**: MediaPipe's multiclass segmenter finds the people —
+  over the whole frame about once a second, and every update in close-up over
+  just the area they stand in, which keeps arms and hands that a whole-frame
+  pass cuts short. Best with a plain wall and guests near the camera. The
+  **edge clean-up pass** re-cuts each photo with MODNet at the shutter for
+  cleaner hair and edges.
 
 If an OpenRouter API key is set on the Environment tab (`OPENROUTER_API_KEY`),
 guests can also **type a background** ("a beach at sunset") and an image model
@@ -63,7 +65,13 @@ checked against a short blocked-word list and wrapped in the booth's own prompt
 `data/backgrounds/` by its prompt, so the same words are only paid for once.
 Without a key, guests see only the ready-made backgrounds.
 
-Everything else runs on the laptop's CPU, offline. The models live in
+Everything else runs on the laptop, offline, on its graphics chip where the
+browser allows and its CPU otherwise. The **Speed on this laptop** box on the
+same Settings card shows how long each step takes on the machine running the
+booth. On a recent Mac: the live cut-out takes about 50 ms, the preview runs at
+about 28 frames a second with it (43 with a green screen or avatars only), and
+shutter to QR code is under a second, about 2 s with the clean-up pass. A slow
+laptop will be several times slower; if the readout says so, use a green screen. The models live in
 `public/vision/` (MediaPipe face mesh and segmenter) and `public/matting/`
 (MODNet); MediaPipe's runtime is copied there at build time. The backgrounds in
 `public/backgrounds/` and avatars in `public/avatars/` are placeholder SVGs in

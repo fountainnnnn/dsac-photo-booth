@@ -214,23 +214,28 @@ export function useScene(config: SceneConfig) {
 
     const tracking = tracker.current
       && (avatar || (c.focusFront && c.bgRemoval === 'segment'));
-    let faces: FacePoints[] | null = null;
-    if (tracking) {
-      tracker.current!.update(video, c.region ?? null);
-      faces = focused(tracker.current!.faces);
-    }
 
     let person: HTMLCanvasElement | null = null;
+    let segmented = false;
     if (c.bgRemoval === 'key' && keyer.current) {
       person = keyer.current.process(video, c.chromaKey, PREVIEW_MAX_WIDTH);
     } else if (c.bgRemoval === 'segment' && segmenter.current) {
-      // Until faces are known, everyone is kept.
-      segmenter.current.update(video, c.focusFront && faces ? faces.map(faceBox) : null);
+      // The group as last tracked; until faces are known, everyone is kept.
+      const front = c.focusFront && tracking && lastFront.current.length ? lastFront.current : null;
+      segmented = segmenter.current.update(video, front ? front.map(faceBox) : null);
       const mask = segmenter.current.mask;
       if (mask) {
         person = cutOut(video, mask, PREVIEW_MAX_WIDTH, previewCut.current ?? undefined);
         previewCut.current = person;
       }
+    }
+
+    // Faces on a frame the segmenter did not run on: both at once stalled the
+    // preview for a tenth of a second at a time.
+    let faces: FacePoints[] | null = null;
+    if (tracking) {
+      if (!segmented) tracker.current!.update(video, c.region ?? null);
+      faces = focused(tracker.current!.faces);
     }
 
     if (!person && !avatar) return null;

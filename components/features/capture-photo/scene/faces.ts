@@ -1,5 +1,6 @@
 import type { FaceLandmarker } from '@mediapipe/tasks-vision';
 import { createFaceLandmarker, videoClock } from './vision';
+import { recordSpeed } from './speed';
 
 /**
  * Tracking faces for the avatars.
@@ -247,6 +248,7 @@ export class FaceTracker {
     } catch (err) {
       console.warn('[booth] Face tracking failed on a frame:', err);
     }
+    recordSpeed('faces', performance.now() - now);
   }
 
   /**

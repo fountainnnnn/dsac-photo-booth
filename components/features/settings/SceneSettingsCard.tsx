@@ -6,6 +6,7 @@ import { cameraConstraints, raiseToMaxResolution } from '@/components/features/c
 import { useLivePreview } from '@/components/features/capture-photo/useLivePreview';
 import { CLEAN_PLATE_URL, useScene } from '@/components/features/capture-photo/scene/useScene';
 import { plateKeyColour } from '@/components/features/capture-photo/scene/chromaKey';
+import { readSpeeds } from '@/components/features/capture-photo/scene/speed';
 import { unmirrorCrop } from '@/components/features/remote/useCaptureSettings';
 import { BACKGROUNDS, type BgRemoval, type ChromaKeySettings } from '@/types/scene';
 
@@ -190,6 +191,7 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
               </p>
             )}
           </div>
+          <SpeedReadout />
           <div className="mt-2 flex items-center gap-2">
             <span className="text-[0.72rem] text-[var(--ink-3)]">Preview over</span>
             {BACKGROUNDS.map(bg => (
@@ -306,6 +308,49 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
         </label>
       )}
     </section>
+  );
+}
+
+/**
+ * How long the work takes on this laptop, read off the live preview above and
+ * the last photo taken on the capture screen. The point is to judge a slow
+ * laptop on the day, not to benchmark.
+ */
+function SpeedReadout() {
+  const [speeds, setSpeeds] = useState(readSpeeds);
+  useEffect(() => {
+    const id = setInterval(() => setSpeeds(readSpeeds()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const rows: [string, string][] = [];
+  if (speeds.segment !== undefined) {
+    const perSecond = Math.max(1, Math.round(1000 / Math.max(33, speeds.segment * 2)));
+    rows.push(['Cut-out, live', `${speeds.segment} ms each, about ${perSecond} a second`]);
+  }
+  if (speeds.faces !== undefined) rows.push(['Face tracking, live', `${speeds.faces} ms each`]);
+  if (speeds.shutter !== undefined) rows.push(['Last photo, shutter to finished', `${(speeds.shutter / 1000).toFixed(1)} s`]);
+  if (speeds.cleanup !== undefined) rows.push(['…of which edge clean-up', `${(speeds.cleanup / 1000).toFixed(1)} s`]);
+  if (!rows.length) return null;
+
+  // At 150ms a cut-out the mask moves a few times a second and visibly trails
+  // a guest who moves; that is the point to suggest the green screen.
+  const slow = (speeds.segment ?? 0) > 150;
+  return (
+    <div className="mt-3 rounded-xl border border-dashed border-[var(--border)] px-3.5 py-2.5">
+      <p className="text-[0.72rem] font-semibold text-[var(--ink-2)]">Speed on this laptop</p>
+      <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[0.72rem] text-[var(--ink-3)]">
+        {rows.map(([k, v]) => (
+          <div key={k} className="contents"><dt>{k}</dt><dd className="font-mono">{v}</dd></div>
+        ))}
+      </dl>
+      {slow && (
+        <p className="mt-1.5 text-[0.72rem] font-medium text-[var(--accent-ink)]">
+          Slow for live cut-outs: the edges will trail guests who move. A green
+          screen is much lighter work.
+        </p>
+      )}
+    </div>
   );
 }
 

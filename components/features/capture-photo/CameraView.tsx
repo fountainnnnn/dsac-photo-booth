@@ -12,6 +12,7 @@ import {
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useLivePreview, drawPhoto } from './useLivePreview';
 import { useScene, type SceneStatus } from './scene/useScene';
+import { recordSpeed } from './scene/speed';
 import type { TypedBackgroundState } from './scene/useTypedBackground';
 import {
   AVATARS, BACKGROUNDS, DEFAULT_SCENE_CHOICE, TYPED_BACKGROUND_ID, type SceneChoice,
@@ -55,6 +56,16 @@ function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 
       if (blob) resolve(blob);
       else reject(new Error('Could not capture photo'));
     }, type, quality);
+  });
+}
+
+/** The bytes as a data URL, without encoding the picture a second time. */
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read photo'));
+    reader.readAsDataURL(blob);
   });
 }
 
@@ -408,6 +419,7 @@ export default function CameraView({
   const doCapture = useCallback(async () => {
     const video = videoRef.current;
     if (!video || !isStreaming) return;
+    const started = performance.now();
 
     // Always redraw from the raw <video>, never by copying the preview canvas.
     // The preview is sized to the stage in screen pixels — perhaps 900 wide —
@@ -473,8 +485,12 @@ export default function CameraView({
       }
     }
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    // Encoded once. It used to be encoded twice, to a data URL and to a blob,
+    // which on a slow laptop cost the guest most of a second at full size.
     const blob = await canvasToBlob(canvas);
+    const dataUrl = await blobToDataUrl(blob);
+    // Shutter to finished photo, on this laptop: shown in Settings > Background.
+    recordSpeed('shutter', performance.now() - started);
     onCapture(blob, dataUrl);
   }, [isStreaming, filters, lookRamp, rotationDeg, activeFrame, crop, captureSettings, onCapture, captureScene]);
 

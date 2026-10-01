@@ -1,5 +1,6 @@
 import type { InferenceSession } from 'onnxruntime-web';
 import { alphaMaskCanvas } from './segmentation';
+import { recordSpeed } from './speed';
 
 /**
  * The edge clean-up pass: re-cutting the people once, at the shutter, with a
@@ -15,9 +16,13 @@ import { alphaMaskCanvas } from './segmentation';
  * two are combined: the segmenter decides where the people are, MODNet adds
  * the detail at their edges. See `combine`.
  *
- * It runs on onnxruntime-web's CPU (wasm) backend, split into its own chunk;
- * Vite emits the runtime's wasm as an asset. The model itself is committed in
- * `public/matting/`.
+ * It runs on the graphics chip through WebGPU where the browser has it, and on
+ * the CPU otherwise: measured in Chrome on a laptop, 190ms against 1.3s. The
+ * weights are the full-precision ones: the 8-bit copy, a quarter the size,
+ * left holes through people's bodies, and was no faster.
+ *
+ * onnxruntime-web is split into its own chunk and Vite emits its wasm as an
+ * asset. The model itself is committed in `public/matting/`.
  */
 
 const MODEL = '/matting/modnet.onnx';
@@ -27,14 +32,23 @@ const STEP = 32;
 
 let session: Promise<InferenceSession> | null = null;
 
-/** Start loading now, so the first photo does not wait for twenty megabytes. */
+/**
+ * Start loading now, so the first photo does not wait for twenty megabytes —
+ * and run the model once on a blank picture the shape of a webcam's. The
+ * graphics chip prepares its work for each picture size on first use, which
+ * took longer than the model itself: the first photo with clean-up on took
+ * over four seconds, the ones after it well under one.
+ */
 export function preloadMatting(): Promise<InferenceSession> {
   session ??= (async () => {
-    const ort = await import('onnxruntime-web/wasm');
-    // No cross-origin isolation here, so no threads; say so rather than have
-    // the runtime try and warn.
+    const ort = await import('onnxruntime-web/webgpu');
+    // No cross-origin isolation here, so no threads for the CPU fallback; say
+    // so rather than have the runtime try and warn.
     ort.env.wasm.numThreads = 1;
-    return ort.InferenceSession.create(MODEL, { executionProviders: ['wasm'] });
+    const sess = await ort.InferenceSession.create(MODEL, { executionProviders: ['webgpu', 'wasm'] });
+    const { w, h } = modelSize(16, 9);
+    await sess.run({ [sess.inputNames[0]]: new ort.Tensor('float32', new Float32Array(3 * w * h), [1, 3, h, w]) });
+    return sess;
   })();
   session.catch(() => { session = null; });
   return session;
@@ -91,9 +105,10 @@ export async function matte(
   source: HTMLVideoElement | HTMLCanvasElement,
   people: HTMLCanvasElement | null,
 ): Promise<HTMLCanvasElement | null> {
+  const started = performance.now();
   try {
     const sess = await preloadMatting();
-    const ort = await import('onnxruntime-web/wasm');
+    const ort = await import('onnxruntime-web/webgpu');
 
     const sw = source instanceof HTMLVideoElement ? source.videoWidth : source.width;
     const sh = source instanceof HTMLVideoElement ? source.videoHeight : source.height;
@@ -128,7 +143,9 @@ export async function matte(
     }
     // A matte is already soft at the edges, so it keeps its whole 0–1 range
     // rather than being squeezed the way the segmenter's confidence is.
-    return alphaMaskCanvas(values, ow, oh, undefined, 0, 1);
+    const matteCanvas = alphaMaskCanvas(values, ow, oh, undefined, 0, 1);
+    recordSpeed('cleanup', performance.now() - started);
+    return matteCanvas;
   } catch (err) {
     console.warn('[booth] Edge clean-up failed; using the live mask:', err);
     return null;

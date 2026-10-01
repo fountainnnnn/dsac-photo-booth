@@ -180,16 +180,15 @@ describe('CameraView', () => {
     const outputSize: { w: number; h: number }[] = [];
     const toDataURLSpy = vi
       .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
-      .mockImplementation(function (this: HTMLCanvasElement) {
-        outputSize.push({ w: this.width, h: this.height });
-        return 'data:image/jpeg;base64,fake';
-      });
+      .mockReturnValue('data:image/jpeg;base64,fake');
+    // The photo is encoded once, to a blob; the data URL is read from it.
     const toBlobSpy = vi
       .spyOn(HTMLCanvasElement.prototype, 'toBlob')
       .mockImplementation(function (
         this: HTMLCanvasElement,
         cb: BlobCallback | null
       ) {
+        outputSize.push({ w: this.width, h: this.height });
         cb?.(fakeBlob);
       });
 

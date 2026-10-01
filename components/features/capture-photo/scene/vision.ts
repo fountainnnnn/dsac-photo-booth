@@ -8,9 +8,12 @@ import type { FaceLandmarker, ImageSegmenter } from '@mediapipe/tasks-vision';
  * runtime (about twelve megabytes) is copied into `public/vision/wasm` at build
  * time by `scripts/vendor-vision.mjs`; the models sit beside it, committed.
  *
- * Everything runs on the CPU by default: the booth laptop is weak, and the CPU
- * path is the one that works on every machine. Both models are small enough
- * for a live preview there.
+ * Both models run on the graphics chip where they can, and fall back to the
+ * CPU where they cannot. Measured in Chrome on a laptop, the segmenter took
+ * 157ms a frame on the CPU and 24ms on the graphics chip: the difference
+ * between a live preview whose cut-out lags a second behind and one that
+ * keeps up. MediaPipe's wasm runs on one CPU core only, so the graphics chip
+ * is the only way to make it faster.
  */
 
 const WASM_DIR = '/vision/wasm';
@@ -34,15 +37,29 @@ function load() {
   return loaded;
 }
 
+type Delegate = 'GPU' | 'CPU';
+
+/** Try the graphics chip, and the CPU if it will not have it. */
+async function onGpuElseCpu<T>(what: string, make: (delegate: Delegate) => Promise<T>): Promise<T> {
+  try {
+    return await make('GPU');
+  } catch (err) {
+    console.warn(`[booth] ${what} cannot use the graphics chip; using the CPU:`, err);
+    return make('CPU');
+  }
+}
+
 /** The person segmenter, for removing a background without a green screen. */
 export async function createSegmenter(): Promise<ImageSegmenter> {
   const { vision, fileset } = await load();
-  return vision.ImageSegmenter.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: SEGMENTER_MODEL, delegate: 'CPU' },
-    runningMode: 'VIDEO',
+  return onGpuElseCpu('Segmentation', delegate => vision.ImageSegmenter.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: SEGMENTER_MODEL, delegate },
+    // IMAGE: it is given two different pictures each update (the whole
+    // frame and a close-up), which is not one video.
+    runningMode: 'IMAGE',
     outputConfidenceMasks: true,
     outputCategoryMask: false,
-  });
+  }));
 }
 
 /**
@@ -51,8 +68,8 @@ export async function createSegmenter(): Promise<ImageSegmenter> {
  */
 export async function createFaceLandmarker(runningMode: 'VIDEO' | 'IMAGE' = 'VIDEO'): Promise<FaceLandmarker> {
   const { vision, fileset } = await load();
-  return vision.FaceLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: LANDMARKER_MODEL, delegate: 'CPU' },
+  return onGpuElseCpu('Face tracking', delegate => vision.FaceLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: LANDMARKER_MODEL, delegate },
     runningMode,
     numFaces: MAX_FACES,
     // Find generously, keep strictly. The finder at its 0.5 default missed
@@ -64,7 +81,7 @@ export async function createFaceLandmarker(runningMode: 'VIDEO' | 'IMAGE' = 'VID
     minFacePresenceConfidence: 0.7,
     outputFaceBlendshapes: false,
     outputFacialTransformationMatrixes: false,
-  });
+  }));
 }
 
 /**
