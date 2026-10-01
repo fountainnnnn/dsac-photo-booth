@@ -45,19 +45,23 @@ export async function createSegmenter(): Promise<ImageSegmenter> {
   });
 }
 
-/** The face mesh, for pinning avatars to faces. */
-export async function createFaceLandmarker(): Promise<FaceLandmarker> {
+/**
+ * The face mesh, for pinning avatars to faces. VIDEO mode follows a face it
+ * has found from frame to frame; IMAGE mode looks afresh every time.
+ */
+export async function createFaceLandmarker(runningMode: 'VIDEO' | 'IMAGE' = 'VIDEO'): Promise<FaceLandmarker> {
   const { vision, fileset } = await load();
   return vision.FaceLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: LANDMARKER_MODEL, delegate: 'CPU' },
-    runningMode: 'VIDEO',
+    runningMode,
     numFaces: MAX_FACES,
-    // Below the 0.5 default: on a group photo the stricter threshold missed
-    // two of four faces in every tiling tried, 0.3 found all four with no
-    // false ones. A missed face loses its avatar; a stray one would be drawn
-    // on the wall, but none turned up.
+    // Find generously, keep strictly. The finder at its 0.5 default missed
+    // one of four faces in a group photo, so it runs at 0.3. But on a mottled
+    // grey backdrop it also found a face that was not there — at the defaults
+    // too — and a guest got a second pair of glasses floating beside them. The
+    // mesh's own "is this a face" check at 0.7 dropped it and kept all four.
     minFaceDetectionConfidence: 0.3,
-    minFacePresenceConfidence: 0.3,
+    minFacePresenceConfidence: 0.7,
     outputFaceBlendshapes: false,
     outputFacialTransformationMatrixes: false,
   });
