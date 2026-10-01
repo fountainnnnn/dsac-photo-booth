@@ -58,6 +58,15 @@ const PASS_SIZE = 640;
 const MIN_INTERVAL_MS = 50;
 
 /**
+ * How long a tile's faces stand before they are dropped, if the tile has not
+ * come round again. Each tile only runs every third update, and on a slow
+ * laptop an update takes far longer than MIN_INTERVAL_MS: a window counted in
+ * intervals expired faces before their tile came back, and avatars on a group
+ * standing back flickered on and off.
+ */
+const TILE_MAX_AGE_MS = 1500;
+
+/**
  * How much of a new position is taken each update. Below 1 so a face that
  * jitters by a pixel does not make its hat shake; high enough that a guest
  * who moves is followed rather than chased.
@@ -211,8 +220,9 @@ export class FaceTracker {
 
   /** Whole-region faces first, then any the tiles found that it missed. */
   private merged(now: number): FacePoints[] {
-    // A tile's answer is kept until it comes round again, and a little longer.
-    const fresh = (p: Pass) => now - p.at < MIN_INTERVAL_MS * (this.tiles.length + 1) * 2;
+    // A tile's answer stands until it comes round again (it is replaced then),
+    // or until it is too old to trust.
+    const fresh = (p: Pass) => now - p.at < TILE_MAX_AGE_MS;
     return dedupe([
       ...this.whole.faces,
       ...this.tiles.filter(fresh).flatMap(p => p.faces),
