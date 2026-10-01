@@ -33,19 +33,9 @@ export default function App() {
   if (pathname === '/frames') return boothGated(<FramesPage />);
   if (pathname === '/remote') return boothGated(<RemotePage />);
 
-  // The guest side. The password comes before the photo is shown, not before
-  // the save button — a picture you can see is a picture you can keep.
-  if (downloadToken) {
-    return (
-      <PasswordGate
-        scope="download"
-        title="Photo locked"
-        hint="Ask the booth crew for the photo password."
-      >
-        <DownloadPage token={downloadToken} />
-      </PasswordGate>
-    );
-  }
+  // The guest side, with no password: the token in the link is unguessable,
+  // so holding the link is what lets a guest in.
+  if (downloadToken) return <DownloadPage token={downloadToken} />;
 
   return boothGated(<CapturePage />);
 }

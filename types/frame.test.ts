@@ -57,8 +57,8 @@ function draw(id: string) {
 }
 
 describe('drawDateStamp', () => {
-  it('centres the event name above the date on both frames', () => {
-    for (const id of ['tech', 'doodle']) {
+  it('centres the event name above the date on the doodle frame', () => {
+    for (const id of ['doodle']) {
       const slot = frame(id).captionSlot!;
       const [name, date] = draw(id);
       expect(name.text).toBe('AI Learning Journey');
@@ -75,9 +75,9 @@ describe('drawDateStamp', () => {
   it('shrinks a long name rather than overrunning its budget', () => {
     const { ctx, drawn } = recorder();
     const long = 'An Extraordinarily Long Event Name That Will Never Fit';
-    drawDateStamp(ctx, frame('tech'), FRAME_W, FRAME_H, { ...EVENT, eventName: long });
+    drawDateStamp(ctx, frame('doodle'), FRAME_W, FRAME_H, { ...EVENT, eventName: long });
 
-    const slot = frame('tech').captionSlot!;
+    const slot = frame('doodle').captionSlot!;
     const nominal = slot.nameAbove!.sizeFrac * FRAME_H;
     const size = fontPx(drawn[0].font);
     expect(size).toBeLessThan(nominal);
@@ -88,12 +88,12 @@ describe('drawDateStamp', () => {
 
   it('draws only the date when the event name is blank', () => {
     const { ctx, drawn } = recorder();
-    drawDateStamp(ctx, frame('tech'), FRAME_W, FRAME_H, { ...EVENT, eventName: '  ' });
+    drawDateStamp(ctx, frame('doodle'), FRAME_W, FRAME_H, { ...EVENT, eventName: '  ' });
     expect(drawn.map((d) => d.text)).toEqual([TODAY]);
   });
 
   it('sets the event name bold and the date regular', () => {
-    const [name, date] = draw('tech');
+    const [name, date] = draw('doodle');
     expect(name.font).toMatch(/^bold /);
     expect(date.font).not.toMatch(/bold/);
   });
@@ -103,7 +103,7 @@ describe('drawDateStamp', () => {
   // bold, as does every fallback behind it — so the outline would over-ink a
   // face already at the weight it was asked for. Nothing is stroked any more.
   it('strokes nothing: the name carries its own weight', () => {
-    for (const id of ['tech', 'doodle']) {
+    for (const id of ['doodle']) {
       const { ctx, stroked } = recorder();
       drawDateStamp(ctx, frame(id), FRAME_W, FRAME_H, EVENT);
       expect(stroked).toEqual([]);
@@ -111,7 +111,7 @@ describe('drawDateStamp', () => {
   });
 
   it('sets both caption lines in the same face, the name bold', () => {
-    const [name, date] = draw('tech');
+    const [name, date] = draw('doodle');
     expect(name.font).toContain('Roboto');
     expect(date.font).toContain('Roboto');
     // Weight is what separates them now, not family.
@@ -121,7 +121,7 @@ describe('drawDateStamp', () => {
 
   it('writes today, spelled out, with no way to pin a stale date', () => {
     const { ctx, drawn } = recorder();
-    drawDateStamp(ctx, frame('tech'), FRAME_W, FRAME_H, { eventName: '' });
+    drawDateStamp(ctx, frame('doodle'), FRAME_W, FRAME_H, { eventName: '' });
     expect(drawn[0].text).toBe(TODAY);
     expect(drawn[0].text).toMatch(/^\d{1,2} [A-Z][a-z]{2} \d{4}$/);
   });

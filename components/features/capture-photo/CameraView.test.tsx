@@ -35,6 +35,9 @@ function mockSettings(timerSecs: number) {
       return new Response(JSON.stringify({
         settings: {
           timerSecs,
+          // No frame, so a capture is the camera's own size. Open House
+          // defaults to the doodle frame.
+          selectedFrameId: '',
           filters: { brightness: 100, contrast: 100, saturation: 100, hue: 0 },
         },
       }), { headers: { 'Content-Type': 'application/json' } });

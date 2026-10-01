@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Camera, Eye, EyeSlash, Image as ImageIcon } from '@phosphor-icons/react';
+import { Camera, Eye, EyeSlash } from '@phosphor-icons/react';
 
 /**
  * A full-screen password card in front of a page.
  *
- * `booth` guards the interface, `download` guards a guest's photo. The check
+ * `booth` guards the interface; guests' photos have no password. The check
  * lives on the server — every gated API route demands the same cookie this
  * login sets — so the card is the door handle, not the lock: skipping it just
  * moves the 401 from a tidy screen into a broken-looking page.
@@ -13,7 +13,7 @@ import { Camera, Eye, EyeSlash, Image as ImageIcon } from '@phosphor-icons/react
  * appears, so a fresh install works before anyone has set anything up.
  */
 
-export type AuthScope = 'booth' | 'download';
+export type AuthScope = 'booth';
 
 interface ScopeStatus {
   required: boolean;
@@ -50,28 +50,21 @@ export function useAuthStatus() {
 }
 
 /**
- * The line the art panel carries. It is the only copy that differs between the
- * two scopes, so it lives here rather than being threaded through as props no
- * caller would ever want to vary.
+ * The line the art panel carries, kept per scope so another gate can be added
+ * without threading copy through props no caller would ever want to vary.
  */
 const PITCH: Record<AuthScope, { eyebrow: string; line: string }> = {
   booth: {
     eyebrow: 'SP Data Science & Analytics Centre',
     line: 'Three, two, one — and the booth does the rest.',
   },
-  download: {
-    eyebrow: 'SP Data Science & Analytics Centre',
-    line: 'Your photo is waiting on the other side of this.',
-  },
 };
 
-/** A camera for the booth itself, a photo for the picture waiting on the other side. */
-const ICON: Record<AuthScope, typeof Camera> = { booth: Camera, download: ImageIcon };
+const ICON: Record<AuthScope, typeof Camera> = { booth: Camera };
 
-/** What the submit button says, so it reads as opening a booth or a photo rather than a generic form. */
+/** What the submit button says, so it reads as opening the booth rather than a generic form. */
 const UNLOCK_LABEL: Record<AuthScope, string> = {
   booth: 'Unlock the booth',
-  download: 'Unlock my photo',
 };
 
 /**

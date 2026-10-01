@@ -200,35 +200,10 @@ export const EVENT_NAME_FONT_STACK = STAMP_FONT_STACK;
 
 export const NAME_WEIGHT = 'bold';
 
-/** Ships with the app. Geometry is measured off the artboards, so it lives here
- *  rather than in the database an operator can edit. */
+/** Ships with the app. Geometry is measured off the artboard, so it lives here
+ *  rather than in the database an operator can edit. Open House ships only the
+ *  doodle frame; operators can still upload others on the Frames tab. */
 const BUILT_IN_SOURCE: FrameConfig[] = [
-  {
-    id: 'tech',
-    label: 'Tech',
-    src: '/frames/frame-tech.png',
-    // Cut-out measured at 161,190 sized 1614x786 — a wide 2.05 slot. The window
-    // is the 16:9 rect that covers it, so 61px above and 62px below sit behind
-    // the artwork. That loss is the price of not distorting anyone.
-    window: { x: 0.08381, y: 0.10746, w: 0.84019, h: 0.75593 },
-    // A centred two-line block keeps the caption away from edge artwork.
-    captionSlot: {
-      nameRightFrac: 0.5,
-      dateLeftFrac: 0.5,
-      baselineFrac: 0.968,
-      sizeFrac: 0.031,
-      colour: '#b1dfe0',
-      dateAlign: 'center',
-      gapFrac: 0,
-      maxNameWidthFrac: 0.46,
-      nameAbove: {
-        centreFrac: 0.5,
-        baselineFrac: 0.91,
-        sizeFrac: 0.038833,   // 46.6px on the artboard; a pixel up from 0.038
-        maxWidthFrac: 0.5,
-      },
-    },
-  },
   {
     id: 'doodle',
     label: 'Doodle',
@@ -256,55 +231,6 @@ const BUILT_IN_SOURCE: FrameConfig[] = [
     },
   },
 ];
-
-/**
- * "Photo Overlay rev2" stage frames — four DSAC branded borders, each shipped
- * as a plain artboard and a "-text" one with the stage name printed top-left.
- * All four share one artboard: same 1921x1201 canvas, same transparent
- * cut-out (measured off the alpha channel at x108,y97 sized 1720x910 — a
- * 1.89 slot, wider than 16:9), and the same bottom DSAC/Singapore Polytechnic
- * logo band with no caption baked in. The window below is the 16:9 rect that
- * covers that cut-out (width matched to it, height grown to clear the top and
- * bottom edges, centred on the cut-out's own centre) — same "cover, don't
- * stretch" rule the tech/doodle frames use. The caption sits in the logo band
- * itself, shifted right of "DSAC | SINGAPORE POLYTECHNIC" and left of the dot
- * pattern in the corner, the only clear stretch of that band.
- */
-const STAGE_WINDOW = { x: 0.05622, y: 0.05683, w: 0.89536, h: 0.80558 };
-const STAGE_CAPTION: CaptionSlot = {
-  nameRightFrac: 0.66,
-  dateLeftFrac: 0.66,
-  baselineFrac: 0.965,
-  sizeFrac: 0.028,
-  colour: '#bdece6',
-  dateAlign: 'center',
-  gapFrac: 0,
-  maxNameWidthFrac: 0.34,
-  nameAbove: {
-    centreFrac: 0.66,
-    baselineFrac: 0.915,
-    // 39.4px on the 1201px artboard — a pixel up from 0.032, and a pixel that
-    // scales: a 3754px-wide photo gets the same nudge in proportion.
-    sizeFrac: 0.032833,
-    maxWidthFrac: 0.34,
-  },
-};
-const STAGE_FRAMES: [string, string, string][] = [
-  ['diamond', 'Diamond', 'frame-diamond'],
-  ['sapphire', 'Sapphire Stage', 'frame-sapphire'],
-  ['amber', 'Amber Arena', 'frame-amber'],
-  ['crystal', 'Crystal Cove', 'frame-crystal'],
-];
-for (const [id, label, file] of STAGE_FRAMES) {
-  BUILT_IN_SOURCE.push({
-    id, label, src: `/frames/${file}.png`,
-    window: STAGE_WINDOW, captionSlot: STAGE_CAPTION,
-  });
-  BUILT_IN_SOURCE.push({
-    id: `${id}-text`, label: `${label} (labelled)`, src: `/frames/${file}-text.png`,
-    window: STAGE_WINDOW, captionSlot: STAGE_CAPTION,
-  });
-}
 
 export const BUILT_IN_FRAMES: FrameConfig[] = BUILT_IN_SOURCE.map((f) => ({
   ...f, builtIn: true, enabled: true,

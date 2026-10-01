@@ -1,8 +1,8 @@
 {
-  "name": "dsac-photo-booth",
+  "name": "open-house-photo-booth",
   "version": "0.1.13",
   "private": true,
-  "description": "Photo booth for SP DSAC AI Learning Journey events",
+  "description": "Photo booth for Open House, run on the booth laptop",
   "main": "electron/main.cjs",
   "engines": {
     "node": ">=22.12.0"
@@ -26,16 +26,13 @@
     "@phosphor-icons/react": "^2.1.10",
     "cloudflared": "^0.7.1",
     "cors": "^2.8.5",
-    "electron-updater": "^6.8.9",
     "express": "^5.2.1",
-    "hono": "^4.13.0",
     "multer": "^2.0.2",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260804.1",
     "@eslint/js": "^9.39.2",
     "@mediapipe/tasks-vision": "^1.0.1",
     "@playwright/test": "^1.58.2",
@@ -61,8 +58,7 @@
     "typescript": "^5",
     "typescript-eslint": "^8.49.0",
     "vite": "^8.0.11",
-    "vitest": "^4.1.1",
-    "wrangler": "^4.119.0"
+    "vitest": "^4.1.1"
   },
   "overrides": {
     "postcss": "8.5.10"

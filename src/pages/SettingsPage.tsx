@@ -15,8 +15,6 @@ import PresetsCard from '@/components/features/remote/PresetsCard';
 import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 import PasswordsCard from '@/components/features/auth/PasswordsCard';
 import EnvironmentCard from '@/components/features/settings/EnvironmentCard';
-import UpdateCard from '@/components/features/settings/UpdateCard';
-import BetaCard from '@/components/features/settings/BetaCard';
 
 /**
  * Settings — everything an operator changes, so the capture screen can be
@@ -377,16 +375,12 @@ export default function SettingsPage() {
       {tab === 'event' && (
         <div className="mt-8 flex max-w-[46rem] flex-col gap-8">
           <EventSettingsCard {...capture} />
-          <BetaCard {...capture} />
         </div>
       )}
 
       {tab === 'environment' && (
-        <div className="mt-8 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-8">
+        <div className="mt-8 flex max-w-[46rem] flex-col gap-8">
           <EnvironmentCard />
-          <aside className="flex flex-col gap-8">
-            <UpdateCard />
-          </aside>
         </div>
       )}
 

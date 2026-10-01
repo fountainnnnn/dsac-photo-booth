@@ -1,32 +1,29 @@
 import crypto from 'node:crypto';
 
 /**
- * Two shared passwords, two scopes.
+ * One shared password, for the interface: capture, settings, gallery, and the
+ * phone remote. Whoever runs the event enters it once per device.
  *
- *  - `booth`    — the interface: capture, settings, gallery, and the phone
- *                 remote. Whoever runs the event enters it once per device.
- *  - `download` — a guest's photo. Entered on their phone after scanning the
- *                 QR, before the picture is shown; shown before download, not
- *                 after, because an image you can see is an image you can save.
+ * Guests' photos have no password. A photo's link carries a random UUID, so
+ * only someone handed the QR code or the link can open it.
  *
- * Each is seeded from .env (BOOTH_PASSWORD / DOWNLOAD_PASSWORD) and can be
- * overridden from Settings, which stores a salted hash in the database. A
- * scope with no password anywhere is simply open — otherwise handing someone
- * the .exe would lock them out of an app with no password to type.
+ * The password is seeded from .env (BOOTH_PASSWORD). A booth with no password
+ * anywhere is simply open — otherwise handing someone the app would lock them
+ * out of an interface with no password to type.
  *
  * This is a gate, not real security: the app is a static bundle on a public
- * tunnel, and anyone determined can read it. It exists to keep passers-by out
- * of Settings and casual QR-forwarders away from photos, which is the actual
- * threat at an event.
+ * tunnel, and anyone determined can read it. It exists to keep passers-by, and
+ * guests who strip the path off their QR link, out of Settings and the
+ * gallery, which is the actual threat at an event.
  *
  * Sessions are random tokens in memory, handed out as cookies so that plain
  * <a href> downloads carry them without any client code. They die with the
  * server, which restarts per event anyway.
  */
 
-const SCOPES = ['booth', 'download'];
-const TOKEN_TTL_MS = { booth: 3 * 24 * 60 * 60 * 1000, download: 24 * 60 * 60 * 1000 };
-const COOKIE = { booth: 'dsac_booth', download: 'dsac_dl' };
+const SCOPES = ['booth'];
+const TOKEN_TTL_MS = { booth: 3 * 24 * 60 * 60 * 1000 };
+const COOKIE = { booth: 'open_house_booth' };
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   const hash = crypto.scryptSync(password, salt, 32).toString('hex');
@@ -51,16 +48,14 @@ function parseCookies(header) {
 }
 
 export function createAuth(kv) {
-  // The plain env values are kept as well as their hashes: they are the only
-  // passwords we ever hold in readable form, and Settings offers to show them
-  // back to the operator. See `revealPasswords` below.
-  const envPlain = { booth: null, download: null };
+  // The plain env value, kept to know where the password came from.
+  const envPlain = { booth: null };
 
   // Env passwords are hashed when they are read, so verification is uniform.
-  const envHash = { booth: null, download: null };
+  const envHash = { booth: null };
 
   /**
-   * Re-read both passwords from the environment.
+   * Re-read the password from the environment.
    *
    * Called once on the way up, and again whenever Settings saves — the booth
    * is a laptop app now, so the person changing the password is standing at
@@ -68,9 +63,7 @@ export function createAuth(kv) {
    */
   function reloadFromEnv() {
     envPlain.booth = process.env.BOOTH_PASSWORD || null;
-    envPlain.download = process.env.DOWNLOAD_PASSWORD || null;
     envHash.booth = envPlain.booth ? hashPassword(envPlain.booth) : null;
-    envHash.download = envPlain.download ? hashPassword(envPlain.download) : null;
   }
 
   reloadFromEnv();
@@ -174,34 +167,9 @@ export function createAuth(kv) {
     res.json(out);
   }
 
-  /**
-   * Show the photo password, and only that one.
-   *
-   * The booth password is deliberately never returned. Settings sits behind it,
-   * so anyone reading this is already inside — but "already inside" is a laptop
-   * left unattended at a stand, and the password is the same one that opens the
-   * booth on every other device. Showing it turns a borrowed screen into
-   * permanent access. Whoever administers the booth reads it from the
-   * deployment instead.
-   *
-   * The photo password is different in kind: it exists to be said out loud to a
-   * queue of guests, so keeping it from the operator running that queue would
-   * protect nothing.
-   */
-  function revealPasswords(req, res) {
-    const out = {};
-    for (const scope of SCOPES) {
-      const { source } = resolve(scope);
-      const plain = scope === 'download' && source === 'env' ? envPlain[scope] : null;
-      out[scope] = { revealable: Boolean(plain), password: plain, source };
-    }
-    res.setHeader('Cache-Control', 'no-store');
-    res.json(out);
-  }
-
-  // `isAuthed` is exported as well as used by the middleware: routes that are
-  // reachable by either scope sometimes need to know *which* one let the
-  // request in. A guest holding a lapsed download link is turned away where
-  // the operator, on the same URL, is not.
-  return { requireAuth, isAuthed, login, logout, status, revealPasswords, reloadFromEnv };
+  // `isAuthed` is exported as well as used by the middleware: the photo routes
+  // are open to guests but need to know whether the operator is asking. A
+  // guest holding a lapsed download link is turned away where the operator,
+  // on the same URL, is not.
+  return { requireAuth, isAuthed, login, logout, status, reloadFromEnv };
 }

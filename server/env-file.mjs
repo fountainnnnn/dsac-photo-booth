@@ -2,10 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * The booth's settings that are not settings: ports, paths, passwords.
+ * The booth's settings that are not settings: ports, paths, the password.
  *
- * These used to live only in a `.env` beside the source, or in a Cloudflare
- * secret. Neither survives the way the booth is actually run now — a packaged
+ * These used to live only in a `.env` beside the source. Neither survives the way the booth is actually run now — a packaged
  * .exe on a laptop, with no repository to edit and no deployment to hold
  * secrets. The file was simply unreachable: the archive does not contain one,
  * and nothing in the interface could write one.
@@ -62,7 +61,7 @@ export function readEnvFile(file) {
  */
 export function writeEnvFile(file, values) {
   const lines = [
-    '# DSAC Photo Booth settings.',
+    '# Open House Photo Booth settings.',
     '#',
     '# Written by the Settings page. You can edit it by hand as well — the app',
     '# reads it at startup — but anything saved from Settings overwrites it.',
@@ -99,13 +98,6 @@ export const ENV_FIELDS = [
     restart: false,
   },
   {
-    key: 'DOWNLOAD_PASSWORD',
-    label: 'Photo password',
-    help: 'Guests type this after scanning the QR, before their photo is shown. Empty means no gate.',
-    secret: true,
-    restart: false,
-  },
-  {
     key: 'PUBLIC_URL',
     label: 'Public URL',
     help: 'A fixed address to bake into QR codes instead of the Cloudflare tunnel. Leave empty to use the tunnel.',
@@ -133,34 +125,6 @@ export const ENV_FIELDS = [
     restart: true,
   },
   {
-    key: 'GOOGLE_DRIVE_FOLDER_ID',
-    label: 'Drive folder ID',
-    help: 'Swept photos are uploaded here before they are deleted. From the folder\u2019s URL: '
-      + 'drive.google.com/drive/folders/THIS-PART. All four Drive values are needed, or cleanup just deletes.',
-    restart: false,
-  },
-  {
-    key: 'GOOGLE_CLIENT_ID',
-    label: 'Google client ID',
-    help: 'From the OAuth client you create in Google Cloud. Ends in .apps.googleusercontent.com.',
-    restart: false,
-  },
-  {
-    key: 'GOOGLE_CLIENT_SECRET',
-    label: 'Google client secret',
-    help: 'From the same OAuth client.',
-    secret: true,
-    restart: false,
-  },
-  {
-    key: 'GOOGLE_REFRESH_TOKEN',
-    label: 'Google refresh token',
-    help: 'Minted once by approving that client against your own account. Uploads happen as you, '
-      + 'into your Drive, on your quota.',
-    secret: true,
-    restart: false,
-  },
-  {
     key: 'CLOUDFLARED_PROTOCOL',
     label: 'Tunnel protocol',
     help: 'http2 gets through school and corporate networks that block QUIC. Change only if the tunnel will not start.',
@@ -182,7 +146,7 @@ export function pickEditable(values) {
 
 /**
  * Push saved values into `process.env`, so the parts of the booth that read it
- * live — the public origin, the passwords once reloaded — follow immediately.
+ * live — the public origin, the password once reloaded — follow immediately.
  * An emptied value is deleted rather than set to '', because the code that
  * reads these treats empty and absent alike but only tests for absence.
  */

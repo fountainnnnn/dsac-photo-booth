@@ -54,7 +54,7 @@ describe('coverAspect', () => {
 });
 
 describe('photoOutputSize with a non-16:9 camera', () => {
-  const stage = BUILT_IN_FRAMES.find(f => f.id === 'diamond')!;
+  const stage = BUILT_IN_FRAMES.find(f => f.id === 'doodle')!;
 
   it('counts only the pixels actually drawn', () => {
     const size = photoOutputSize({ width: 1920, height: 1440 }, null, stage);

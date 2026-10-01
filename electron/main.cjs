@@ -118,7 +118,7 @@ function createWindow() {
     show: false,
     backgroundColor: '#101014',   // matches --stage, so there is no white flash
     autoHideMenuBar: true,
-    title: 'DSAC Photo Booth',
+    title: 'Open House Photo Booth',
     webPreferences: {
       // The page is ordinary web content served over http and has no business
       // reaching Node. These are already the defaults; say so explicitly.
@@ -170,82 +170,6 @@ function installMenu() {
   }]));
 }
 
-/**
- * Hand the Settings page a working "check for updates".
- *
- * Nothing is downloaded or installed without a click: `autoDownload` and
- * `autoInstallOnAppQuit` are both off. A booth is running in front of people,
- * and an update that restarted the app mid-event would be a worse bug than
- * whatever it was fixing.
- *
- * The updater and the Express server talk through server/updates.mjs, which
- * both sides import by the same path and therefore share. That is what keeps
- * Electron out of the server: run from a terminal, nothing calls
- * `configureUpdates`, the state stays `unsupported`, and the card hides.
- *
- * Failure here is never fatal. A booth on a school network that blocks GitHub
- * must still open and take photos.
- */
-async function wireUpdates() {
-  if (!app.isPackaged) return;
-
-  let updates;
-  let autoUpdater;
-  try {
-    updates = await import(pathToFileURL(path.join(ROOT, 'server', 'updates.mjs')).href);
-    ({ autoUpdater } = require('electron-updater'));
-  } catch (err) {
-    console.error(`  Updates unavailable: ${err.message}`);
-    return;
-  }
-
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
-  // The .exe is unsigned, so there is no signature for the updater to verify.
-  // Saying so is honest; the alternative is a silent failure at install time.
-  autoUpdater.logger = { info: console.log, warn: console.warn, error: console.error, debug: () => {} };
-
-  autoUpdater.on('checking-for-update', () => updates.patchUpdateState({
-    status: 'checking', error: null,
-  }));
-  autoUpdater.on('update-available', (info) => updates.patchUpdateState({
-    status: 'available',
-    availableVersion: info?.version ?? null,
-    releaseNotes: typeof info?.releaseNotes === 'string' ? info.releaseNotes : null,
-    checkedAt: new Date().toISOString(),
-    error: null,
-  }));
-  autoUpdater.on('update-not-available', () => updates.patchUpdateState({
-    status: 'current', availableVersion: null, checkedAt: new Date().toISOString(), error: null,
-  }));
-  autoUpdater.on('download-progress', (p) => updates.patchUpdateState({
-    status: 'downloading', percent: Math.round(p?.percent ?? 0),
-  }));
-  autoUpdater.on('update-downloaded', () => updates.patchUpdateState({
-    status: 'ready', percent: 100,
-  }));
-  autoUpdater.on('error', (err) => updates.patchUpdateState({
-    status: 'error', error: err?.message ?? String(err),
-  }));
-
-  updates.configureUpdates({
-    check: () => autoUpdater.checkForUpdates(),
-    download: () => autoUpdater.downloadUpdate(),
-    // The window is closed first so the installer is not fighting a live app
-    // for its own files, which on Windows is how an update half-applies.
-    install: async () => {
-      updates.patchUpdateState({ status: 'ready' });
-      setTimeout(() => autoUpdater.quitAndInstall(false, true), 250);
-    },
-  }, app.getVersion());
-
-  // One check on launch, which is the moment an operator is setting up and can
-  // actually act on the answer.
-  autoUpdater.checkForUpdates().catch((err) => updates.patchUpdateState({
-    status: 'error', error: err?.message ?? String(err),
-  }));
-}
-
 app.on('second-instance', () => {
   if (!win) return;
   if (win.isMinimized()) win.restore();
@@ -280,7 +204,6 @@ app.whenReady().then(async () => {
   // pathToFileURL, not the bare path: a Windows drive letter inside a dynamic
   // import() is parsed as a URL scheme and throws.
   await import(pathToFileURL(path.join(ROOT, 'server', 'index.mjs')).href);
-  await wireUpdates();
 
   if (await waitForServer()) return createWindow();
 

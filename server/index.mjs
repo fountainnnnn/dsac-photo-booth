@@ -15,11 +15,6 @@ import { startTunnel } from './tunnel.mjs';
 import {
   ENV_FIELDS, applyToProcessEnv, parseEnv, pickEditable, readEnvFile, writeEnvFile,
 } from './env-file.mjs';
-import { getUpdateState, runUpdateAction } from './updates.mjs';
-import {
-  archiveToDrive, claimState, driveAccessToken, driveAuthUrl, driveConfigured,
-  driveRedirectUri, exchangeCode,
-} from './drive.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.join(__dirname, '..');
@@ -108,7 +103,8 @@ const remote = createRemoteHub();
  */
 const PHOTOS_DIR = path.join(DATA_DIR, 'photos');
 fs.mkdirSync(PHOTOS_DIR, { recursive: true });
-// Booth password gates the interface; download password gates the photos.
+// The booth password gates the interface. A photo is open to whoever holds its
+// link: the token is a random UUID, so it cannot be guessed.
 const auth = createAuth(store.kv);
 const booth = auth.requireAuth('booth');
 
@@ -119,6 +115,10 @@ let tunnelOrigin = null;
 // kiosk and the phone download page share one origin.
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
 const SERVES_FRONTEND = fs.existsSync(path.join(DIST_DIR, 'index.html'));
+
+// Prefix of every file this booth writes to the archive folder, and of every
+// photo a guest downloads.
+const ARCHIVE_PREFIX = 'open-house-';
 
 function extForMime(mimeType) {
   return mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
@@ -131,20 +131,16 @@ function fileStamp(date) {
     + `-${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}`;
 }
 
+/** The archive name for a photo in the folder on this laptop. */
+function archiveFileName(token, mimeType, createdAt) {
+  return `${ARCHIVE_PREFIX}${fileStamp(createdAt)}-${token.slice(0, 8)}.${extForMime(mimeType)}`;
+}
+
 /**
  * Write the archive copy. Never throws: a full disk or a locked folder must
  * not cost the guest their QR code, which is the part they are standing there
  * waiting for.
  */
-/**
- * The archive name for a photo, used by the folder on this laptop and by the
- * Drive copy alike — one definition, so a photo cannot be filed under two
- * names and uploaded twice.
- */
-function archiveFileName(token, mimeType, createdAt) {
-  return `dsac-${fileStamp(createdAt)}-${token.slice(0, 8)}.${extForMime(mimeType)}`;
-}
-
 function archivePhoto(token, mimeType, bytes, createdAt) {
   const name = archiveFileName(token, mimeType, createdAt);
   try {
@@ -231,30 +227,17 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     publicOrigin: getPublicOrigin(),
-    // Whether this booth keeps its own copy of the photos in a folder the
-    // operator can open. True here and false on the hosted booth, which has
-    // no filesystem — the gallery reads this rather than offering a button
-    // that can only apologise.
-    localArchive: true,
-    // What cleanup does with a photo it retires. The capture settings card
-    // branches on this, so configuring Drive changes what the operator is
-    // promised as well as what happens.
-    //
-    // The local photo folder is not a safety net either way: deleting a photo
-    // removes the file beside the row.
-    archive: driveConfigured() ? 'drive' : 'none',
   });
 });
 
 // ── Passwords ────────────────────────────────────────────────────────────────
 // See server/auth.mjs for the model. Status and login are open by necessity.
-// There is no route for changing a password: they are set where the booth is
-// deployed and nowhere else.
+// There is no route for changing the password: it is set on the Environment
+// tab, which writes the settings file.
 
 app.get('/api/auth/status', auth.status);
 app.post('/api/auth/login', auth.login);
 app.post('/api/auth/logout', auth.logout);
-app.get('/api/settings/passwords/reveal', booth, auth.revealPasswords);
 
 // ── Settings file ────────────────────────────────────────────────────────────
 // The booth runs as an app on a laptop, so the operator *is* the deployment.
@@ -272,12 +255,6 @@ function envPayload() {
     file: SETTINGS_ENV_FILE,
     fields: ENV_FIELDS,
     values,
-    // This booth owns its own settings file, so the tab is a real editor. The
-    // hosted booth answers the same shape with `editable: false`: it has no
-    // filesystem, and its values are Cloudflare secrets that only the
-    // deployment can change.
-    editable: true,
-    managedBy: null,
     // Which boot-time values no longer match the ones this process started
     // with. Compared against the effective value rather than the file's, or a
     // booth with no file yet would report every default as a pending change
@@ -287,25 +264,6 @@ function envPayload() {
       .map(f => f.key),
   };
 }
-
-// ── Updates ──────────────────────────────────────────────────────────────────
-// Reports only; the operator presses the buttons. See server/updates.mjs.
-
-app.get('/api/update', booth, (_req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.json(getUpdateState());
-});
-
-app.post('/api/update/:action', booth, async (req, res) => {
-  const action = String(req.params.action);
-  if (!['check', 'download', 'install'].includes(action)) {
-    return res.status(400).json({ error: `Unknown update action: ${action}` });
-  }
-
-  const result = await runUpdateAction(action);
-  if (!result.ok) return res.status(400).json({ error: result.error, ...getUpdateState() });
-  return res.json(getUpdateState());
-});
 
 app.get('/api/settings/env', booth, (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -317,7 +275,7 @@ app.put('/api/settings/env', booth, (req, res) => {
    * Merged over what is already saved, never straight from the request.
    *
    * The card sends every field, so a plain replace looked equivalent — but it
-   * makes a short request destructive: a save carrying only the Drive keys
+   * makes a short request destructive: a save carrying only a few keys once
    * dropped BOOTH_PASSWORD from the file and from the environment, and the
    * booth came back with no gate at all. An omitted key now means "leave it
    * alone", while a key sent empty still clears it, which is what the card
@@ -345,85 +303,13 @@ app.put('/api/settings/env', booth, (req, res) => {
     return res.status(500).json({ error: `Could not write ${SETTINGS_ENV_FILE}: ${err.message}` });
   }
 
-  // The live half: the public origin is read per request, and the passwords
-  // are re-hashed here rather than at the next launch. Ports and paths cannot
+  // The live half: the public origin is read per request, and the password
+  // is re-hashed here rather than at the next launch. Ports and paths cannot
   // follow, which is what `pendingRestart` in the payload tells the operator.
   applyToProcessEnv(values);
   auth.reloadFromEnv();
 
   return res.json(envPayload());
-});
-
-// ── Connecting Google Drive ──────────────────────────────────────────────────
-// The operator approves the booth in their own browser and the booth catches
-// the redirect itself, so the refresh token is never shown or retyped.
-
-/** A page for the browser tab the operator is left looking at. */
-function connectPage(title, body) {
-  return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
-<style>
-  body { font: 16px/1.6 system-ui, sans-serif; margin: 0; display: grid;
-         place-items: center; min-height: 100vh; background: #101014; color: #f2f2f5; }
-  main { max-width: 32rem; padding: 2rem; text-align: center; }
-  h1 { font-size: 1.25rem; margin: 0 0 .75rem; }
-  p { margin: 0; color: #b9b9c4; }
-</style></head>
-<body><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(body)}</p></main></body></html>`;
-}
-
-app.get('/api/drive/connect', booth, (_req, res) => {
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    return res.status(400).json({
-      error: 'Save the Google client ID and secret first, then connect.',
-    });
-  }
-  const url = driveAuthUrl(port);
-  if (!url) return res.status(400).json({ error: 'Could not build the consent link.' });
-  return res.json({ url, redirectUri: driveRedirectUri(port) });
-});
-
-/**
- * Google's redirect lands here, in the operator's ordinary browser — which
- * carries no booth cookie, so this route cannot sit behind the gate. The
- * single-use `state` issued at connect time is what makes it safe: a redirect
- * this booth did not start is refused before any code is exchanged.
- */
-app.get('/api/drive/callback', async (req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-
-  if (req.query.error) {
-    return res.status(400).send(connectPage(
-      'Not connected',
-      `Google reported: ${req.query.error}. Nothing was saved; you can close this tab and try again.`,
-    ));
-  }
-  if (!claimState(String(req.query.state ?? ''))) {
-    return res.status(400).send(connectPage(
-      'Not connected',
-      'This link did not come from the booth, or it has already been used. Press Connect again.',
-    ));
-  }
-
-  const { refreshToken, error } = await exchangeCode(String(req.query.code ?? ''), port);
-  if (error) return res.status(400).send(connectPage('Not connected', error));
-
-  try {
-    const values = { ...readEnvFile(SETTINGS_ENV_FILE), GOOGLE_REFRESH_TOKEN: refreshToken };
-    writeEnvFile(SETTINGS_ENV_FILE, values);
-    applyToProcessEnv(values);
-  } catch (err) {
-    return res.status(500).send(connectPage(
-      'Not connected',
-      `Google approved the booth but the token could not be saved: ${err.message}`,
-    ));
-  }
-
-  console.log('  Google Drive connected; refresh token saved.');
-  return res.send(connectPage(
-    'Connected',
-    'The booth can now archive photos to your Drive. You can close this tab.',
-  ));
 });
 
 app.post('/api/photos', booth, upload.single('file'), validateImage, (_req, res) => {
@@ -482,11 +368,12 @@ app.post('/api/photos/composed', booth, upload.single('file'), validateImage, as
 /**
  * A lapsed link is the guest's problem, never the operator's.
  *
- * Both routes below admit two kinds of caller: the guest who scanned the QR
- * (download scope) and the operator paging through the gallery (booth scope).
- * The photo itself is kept either way — expiry only retires the link — so the
- * guest gets a plain 410 while the booth is waved through on the same URL.
- * Returns a truthy reason when the request must be refused.
+ * Both routes below admit two kinds of caller: the guest who scanned the QR,
+ * who needs no password, and the operator paging through the gallery, who is
+ * signed in to the booth. The photo itself is kept either way — expiry only
+ * retires the link — so the guest gets a plain 410 while the booth is waved
+ * through on the same URL. Returns a truthy reason when the request must be
+ * refused.
  */
 function expiredForGuest(req, photo) {
   if (!hasExpired(photo.expiresAt)) return false;
@@ -495,7 +382,7 @@ function expiredForGuest(req, photo) {
 
 const GONE = { error: 'This download link has expired. Ask the booth crew for a new one.' };
 
-app.get('/api/download/:token', auth.requireAuth('download', 'booth'), (req, res) => {
+app.get('/api/download/:token', (req, res) => {
   const photo = store.photos.get(req.params.token);
   if (!photo) return res.status(404).json({ error: 'Photo not found' });
   if (expiredForGuest(req, photo)) return res.status(410).json(GONE);
@@ -507,13 +394,13 @@ app.get('/api/download/:token', auth.requireAuth('download', 'booth'), (req, res
   // shot, so the download matches the name in the archive folder.
   res.setHeader(
     'Content-Disposition',
-    `attachment; filename="dsac-photo-${fileStamp(new Date(photo.createdAt))}${ext}"`,
+    `attachment; filename="${ARCHIVE_PREFIX}photo-${fileStamp(new Date(photo.createdAt))}${ext}"`,
   );
   res.setHeader('Cache-Control', 'private, max-age=86400');
   return res.send(photo.bytes);
 });
 
-app.get('/api/preview/:token', auth.requireAuth('download', 'booth'), (req, res) => {
+app.get('/api/preview/:token', (req, res) => {
   const photo = store.photos.get(req.params.token);
   if (!photo) return res.status(404).json({ error: 'Photo not found' });
   if (expiredForGuest(req, photo)) return res.status(410).json(GONE);
@@ -534,123 +421,6 @@ app.get('/api/qr/:token', booth, (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=86400');
   return res.send(photo.qr);
 });
-
-// ── The card a guest crops of themselves ────────────────────────────────────
-//
-// The browser does all the pixel work — the crop, the frame drawn around it —
-// and posts the finished card here, the same split `/api/photos/composed`
-// already uses. The server only stores it.
-
-/** The guest's own photo, or a 404/410. Every derivative route starts here. */
-function photoForGuest(req, res) {
-  const photo = store.photos.get(req.params.token);
-  if (!photo) {
-    res.status(404).json({ error: 'Photo not found' });
-    return null;
-  }
-  if (expiredForGuest(req, photo)) {
-    res.status(410).json(GONE);
-    return null;
-  }
-  return photo;
-}
-
-const guestOrBooth = auth.requireAuth('download', 'booth');
-
-/**
- * Whether the card is offered, and what to print on it.
- *
- * The page asks before it shows anything, so with the beta off a guest sees
- * the download page exactly as it has always been. The event name and date
- * come along because the card prints them and the capture settings they live
- * in are booth-gated; only these fields cross over, not the whole object.
- */
-app.get('/api/derivatives/config', guestOrBooth, (_req, res) => {
-  const settings = store.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS);
-  res.json({
-    cardEnabled: settings.betaCardCrop === true,
-    event: {
-      eventName: settings.eventName ?? DEFAULT_CAPTURE_SETTINGS.eventName,
-      eventDate: settings.eventDate ?? '',
-    },
-  });
-});
-
-/**
- * The face boxes the kiosk detected on a photo it has just taken.
- *
- * Booth-gated, because only the kiosk writes these — a guest must not be able
- * to tell the booth where the faces are. Sent after the upload rather than with
- * it, so detection can never delay the shutter or fail a capture.
- */
-app.post('/api/photos/:token/faces', booth, (req, res) => {
-  if (!cardEnabled()) return res.status(403).json({ error: 'The card beta is switched off.' });
-  const photo = store.photos.get(req.params.token);
-  if (!photo) return res.status(404).json({ error: 'Photo not found' });
-
-  const incoming = Array.isArray(req.body?.faces) ? req.body.faces : null;
-  if (!incoming) return res.status(400).json({ error: 'Expected { faces: [] }' });
-
-  // Keep only well-formed boxes, and cap the count: this is written from a page
-  // and should not be able to put unbounded JSON in the row.
-  const clean = incoming
-    .filter(f => ['x', 'y', 'w', 'h'].every(k => Number.isFinite(f?.[k])))
-    .slice(0, 50)
-    .map(f => ({ x: f.x, y: f.y, w: f.w, h: f.h }));
-
-  store.photos.setFaces(req.params.token, clean);
-  return res.json({ faces: clean.length });
-});
-
-/** The newest card for a photo, and where the faces in it are. */
-app.get('/api/derivatives/:token', guestOrBooth, (req, res) => {
-  if (!cardEnabled()) return res.status(403).json({ error: 'The card beta is switched off.' });
-  if (!photoForGuest(req, res)) return undefined;
-  return res.json({
-    derivatives: store.derivatives.latest(req.params.token),
-    // Where the people are, so the guest's crop can be sized to one of them
-    // rather than to the photograph. Empty for photos taken before the booth
-    // detected faces, which simply means the old tap-and-drag behaviour.
-    faces: store.photos.faces(req.params.token),
-  });
-});
-
-/** The bytes of one card — an <img> src, or a save link. */
-app.get('/api/derivatives/item/:id', guestOrBooth, (req, res) => {
-  if (!cardEnabled()) return res.status(403).json({ error: 'The card beta is switched off.' });
-  const row = store.derivatives.get(req.params.id);
-  if (!row || row.status !== 'ready' || !row.bytes) {
-    return res.status(404).json({ error: 'Not ready' });
-  }
-
-  const photo = store.photos.get(row.token);
-  if (photo && expiredForGuest(req, photo)) return res.status(410).json(GONE);
-
-  res.setHeader('Content-Type', row.mime);
-  res.setHeader('Cache-Control', 'private, max-age=86400');
-
-  // `?save=1` turns the same URL into a download, so the page needs one route
-  // for the <img> and the Save button both.
-  if (req.query.save) {
-    const ext = extForMime(row.mime);
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="dsac-${row.kind}-${fileStamp(new Date(row.createdAt))}.${ext}"`,
-    );
-  }
-  return res.send(row.bytes);
-});
-
-/** The card the guest cropped of themselves, already framed in the browser. */
-app.post('/api/derivatives/:token/card',
-  guestOrBooth, upload.single('file'), validateImage, (req, res) => {
-    if (!cardEnabled()) return res.status(403).json({ error: 'The card beta is switched off.' });
-    if (!photoForGuest(req, res)) return undefined;
-
-    const id = store.derivatives.start(req.params.token, 'card');
-    store.derivatives.finish(id, { mime: req.file.mimetype, bytes: req.file.buffer });
-    return res.status(201).json({ id, kind: 'card', status: 'ready' });
-  });
 
 /**
  * The whole event, newest first — lapsed links included.
@@ -694,7 +464,7 @@ function deletePhoto(token) {
   const suffix = `-${token.slice(0, 8)}.`;
   try {
     for (const name of fs.readdirSync(PHOTOS_DIR)) {
-      if (name.startsWith('dsac-') && name.includes(suffix)) {
+      if (name.startsWith(ARCHIVE_PREFIX) && name.includes(suffix)) {
         fs.rmSync(path.join(PHOTOS_DIR, name), { force: true });
       }
     }
@@ -792,9 +562,10 @@ app.post('/api/remote/command', booth, (req, res) => {
 
 const DEFAULT_CAPTURE_SETTINGS = {
   timerSecs: 3,
-  selectedFrameId: '',
+  // The doodle frame is the only one Open House ships.
+  selectedFrameId: 'doodle',
   filters: { brightness: 100, contrast: 100, saturation: 100, hue: 0 },
-  eventName: 'Transformation Made Possible',
+  eventName: 'Open House',
   // Empty means whatever day the photo is taken. Set it only when the
   // booth runs on a different day from the event it is stamping.
   eventDate: '',
@@ -813,20 +584,7 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // lose an event to an upgrade. Deliberately unrelated to the link's life: a
   // link may die in an hour while the photo lives a month.
   galleryTtlHours: 0,
-  // Beta: the tap-yourself card on the download page. Off means the booth is
-  // exactly as it was before the feature existed.
-  betaCardCrop: false,
 };
-
-/**
- * Whether the card beta is switched on right now.
- *
- * Read live on every request, so the Settings toggle takes effect on the next
- * guest without a restart — and can be turned off mid-event if it misbehaves.
- */
-function cardEnabled() {
-  return store.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS)?.betaCardCrop === true;
-}
 
 /**
  * When a link handed out right now should stop working, read from the setting
@@ -960,20 +718,12 @@ app.get('/api/frames/:id/image', booth, (req, res) => {
   return res.send(image.buffer);
 });
 
-// Open to the world, because LinkedIn's crawler has no cookie to send. That
-// makes every caller a guest unless they happen to be the operator, so the
-// lapsed-link rule applies here as it does on the download itself.
 /**
  * The photo, for a social crawler.
  *
- * LinkedIn fetches `og:image` with no cookie, so pointing it at the gated
- * preview meant every shared post came out imageless — the whole point of
- * sharing. This is the same bytes without the password gate.
- *
- * That is a deliberate loosening, and a small one: the share page it belongs
- * to is already public, the token is unguessable, and a guest who presses
- * "Post on LinkedIn" is asking for the photo to be seen. Link expiry still
- * applies, so a lapsed link leaks nothing.
+ * Open to the world like the download itself, because LinkedIn's crawler has
+ * no cookie to send. Link expiry applies with no exception for the operator,
+ * so a lapsed link leaks nothing.
  */
 app.get('/api/share/:token/image', (req, res) => {
   const photo = store.photos.get(req.params.token);
@@ -990,9 +740,11 @@ app.get('/api/share/:token', (req, res) => {
   if (!photo) return res.status(404).send('Photo not found');
   if (expiredForGuest(req, photo)) return res.status(410).send(GONE.error);
 
-  const safeTitle = 'My AI Learning Journey at SP DSAC';
-  const safeDescription = 'A photo from the Singapore Polytechnic Data Science and Analytics Centre AI Learning Journey.';
-  // The public copy, not the gated preview: a crawler has no session.
+  const eventName = store.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS)?.eventName
+    || DEFAULT_CAPTURE_SETTINGS.eventName;
+  const safeTitle = `My photo from ${eventName}`;
+  const safeDescription = `A photo from the ${eventName} photo booth.`;
+  // The public copy: a crawler has no session.
   const imageHref = url(`/api/share/${encodeURIComponent(req.params.token)}/image`);
   const pageHref = sharePreviewUrl(req.params.token);
   const downloadHref = downloadUrl(req.params.token);
@@ -1073,7 +825,7 @@ app.use((err, _req, res, next) => {
  * The setting is read on every run rather than at boot, so shortening the span
  * mid-event takes effect within the hour and not at the next restart.
  */
-async function sweepGallery() {
+function sweepGallery() {
   const stored = store.kv.get('captureSettings', {});
   const hours = Number(stored?.galleryTtlHours ?? 0);
   if (!Number.isFinite(hours) || hours <= 0) return;
@@ -1082,46 +834,26 @@ async function sweepGallery() {
   const tokens = store.photos.olderThan(cutoff);
   if (!tokens.length) return;
 
-  // One token for the whole run: they last an hour and so does the interval.
-  const archiving = driveConfigured();
-  const accessToken = archiving ? await driveAccessToken() : null;
-
   // One photo at a time, each guarded: a single unreadable file must not
   // abandon the rest of the run, or one bad photo keeps every older one alive.
   let swept = 0;
-  let held = 0;
   for (const token of tokens) {
     try {
-      // Archive first, and let Drive's answer decide. A photo that could not
-      // be saved is kept and tried again next hour — an outage delays a
-      // deletion, it never turns into one.
-      if (archiving) {
-        const photo = store.photos.get(token);
-        if (!photo) {
-          console.error(`  Refusing to sweep ${token}: its bytes are missing.`);
-          held += 1;
-          continue;
-        }
-        const name = archiveFileName(token, photo.mime, new Date(photo.createdAt));
-        if (!await archiveToDrive({ name, mime: photo.mime, bytes: photo.bytes }, accessToken)) {
-          held += 1;
-          continue;
-        }
-      }
       deletePhoto(token);
       swept += 1;
     } catch (err) {
       console.error(`  Gallery sweep could not delete ${token}: ${err.message}`);
     }
   }
-  console.log(
-    `  Gallery sweep removed ${swept} of ${tokens.length} photo(s) older than ${hours}h`
-    + (held ? `; kept ${held} that Drive did not confirm` : ''),
-  );
+  console.log(`  Gallery sweep removed ${swept} of ${tokens.length} photo(s) older than ${hours}h`);
 }
 
 const runSweep = () => {
-  void sweepGallery().catch(err => console.error(`  Gallery sweep failed: ${err.message}`));
+  try {
+    sweepGallery();
+  } catch (err) {
+    console.error(`  Gallery sweep failed: ${err.message}`);
+  }
 };
 
 /**
@@ -1137,9 +869,8 @@ const runSweep = () => {
  * Starting up is therefore the sweep's real trigger, and the interval is only
  * for a booth left running through a long event.
  *
- * The short delay is not timing anything — it just keeps a backlog of Drive
- * uploads off the moment an operator is opening the app and waiting for a
- * camera and a tunnel.
+ * The short delay is not timing anything — it just keeps the sweep off the
+ * moment an operator is opening the app and waiting for a camera and a tunnel.
  */
 const GALLERY_SWEEP_MS = 60 * 60 * 1000;
 const SWEEP_ON_START_MS = 15 * 1000;
@@ -1172,7 +903,7 @@ async function openTunnelWithRetries(targetPort) {
 }
 
 const server = app.listen(port, '0.0.0.0', async () => {
-  console.log('\n  DSAC Photo Booth\n');
+  console.log('\n  Open House Photo Booth\n');
   banner('Local', `http://localhost:${SERVES_FRONTEND ? port : frontendPort}`);
   banner('Database', store.file);
   banner('Photos stored', `${store.photos.count()}`);

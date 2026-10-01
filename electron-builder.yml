@@ -8,11 +8,11 @@
 #   npm run package   ->  release/
 #
 # Two artefacts come out, because "send someone an exe" can mean either thing:
-#   DSAC Photo Booth <version>.exe          installer, adds a desktop shortcut
-#   DSAC Photo Booth <version> portable.exe single file, runs from anywhere
+#   Open-House-Photo-Booth-Setup.exe       installer, adds a desktop shortcut
+#   Open-House-Photo-Booth-portable.exe    single file, runs from anywhere
 
-appId: sg.edu.sp.dsac.photobooth
-productName: DSAC Photo Booth
+appId: sg.edu.sp.openhouse.photobooth
+productName: Open House Photo Booth
 copyright: Singapore Polytechnic Data Science & Analytics Centre
 
 directories:
@@ -43,17 +43,9 @@ extraResources:
   - from: build/cloudflared.exe
     to: cloudflared.exe
 
-# Where the installed app looks for new versions. The repository is public, so
-# the booth needs no token to read its releases.
-#
-# Only the nsis build can update itself — electron-updater cannot patch a
-# portable .exe, which has no install location to write back to. The portable
-# artefact is still built, for a USB stick, but whoever runs it replaces it by
-# hand.
-publish:
-  provider: github
-  owner: fountainnnnn
-  repo: dsac-photo-booth
+# No `publish` block, on purpose. Open House has no release channel of its
+# own, and the DSAC booth's releases on GitHub are what DSAC booths update
+# from: publishing this build there would offer it to them.
 
 win:
   icon: build/icon.png
@@ -72,17 +64,11 @@ nsis:
   createDesktopShortcut: always
   createStartMenuShortcut: true
   # No version in the filename. The laptop keeps one file, at one name, and
-  # the desktop shortcut and install path stay put across every update — which
-  # is also what lets someone re-download over the old copy without ending up
-  # with four numbered installers in Downloads.
-  # Hyphens, not spaces: GitHub rewrites spaces in an uploaded asset's name,
-  # and the updater looks for the name latest.yml recorded. A file uploaded by
-  # hand as "DSAC Photo Booth Setup.exe" arrives as "DSAC.Photo.Booth.Setup.exe"
-  # and every booth's update check 404s against a release that looks complete.
-  artifactName: DSAC-Photo-Booth-Setup.${ext}
+  # the desktop shortcut and install path stay put across every rebuild.
+  artifactName: Open-House-Photo-Booth-Setup.${ext}
 
 portable:
-  artifactName: DSAC-Photo-Booth-portable.${ext}
+  artifactName: Open-House-Photo-Booth-portable.${ext}
   # Photos and settings live in the user's AppData either way, so a portable
   # run keeps its database across launches instead of starting empty.
   requestExecutionLevel: user
