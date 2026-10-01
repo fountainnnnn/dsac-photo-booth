@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle, Camera, Images, LockSimple, Trash, UploadSimple, Warning,
-  CalendarBlank, Sliders,
+  CalendarBlank, MagicWand, Sliders,
 } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useFrameCatalogue, type FrameSetting } from '@/components/features/frames/useFrameCatalogue';
@@ -15,6 +15,7 @@ import PresetsCard from '@/components/features/remote/PresetsCard';
 import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 import PasswordsCard from '@/components/features/auth/PasswordsCard';
 import EnvironmentCard from '@/components/features/settings/EnvironmentCard';
+import SceneSettingsCard from '@/components/features/settings/SceneSettingsCard';
 
 /**
  * Settings — everything an operator changes, so the capture screen can be
@@ -24,12 +25,13 @@ import EnvironmentCard from '@/components/features/settings/EnvironmentCard';
  * and should not be able to change the frame, the look, or the countdown by
  * leaning on the screen.
  */
-type TabId = 'frames' | 'camera' | 'event' | 'access' | 'environment';
+type TabId = 'frames' | 'camera' | 'background' | 'event' | 'access' | 'environment';
 
 const TABS: { id: TabId; label: string; Icon: typeof Camera }[] = [
   { id: 'event',  label: 'Event',   Icon: CalendarBlank },
   { id: 'frames', label: 'Frames',  Icon: Images },
   { id: 'camera', label: 'Camera',  Icon: Camera },
+  { id: 'background', label: 'Background', Icon: MagicWand },
   { id: 'access', label: 'Access',  Icon: LockSimple },
   // Last, and deliberately dullest: ports, folders and passwords are set once
   // when the booth is built and never touched during an event.
@@ -369,6 +371,12 @@ export default function SettingsPage() {
             {/* Sits under the camera cards because it saves what they set. */}
             <PresetsCard {...capture} />
           </aside>
+        </div>
+      )}
+
+      {tab === 'background' && (
+        <div className="mt-8 flex max-w-[46rem] flex-col gap-8">
+          <SceneSettingsCard {...capture} />
         </div>
       )}
 

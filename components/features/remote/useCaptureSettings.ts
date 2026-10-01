@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { LookRamp, ImageFilters } from '@/types/editor';
 import { DEFAULT_FILTERS, DEFAULT_RAMP } from '@/types/editor';
 import { DEFAULT_EVENT_DETAILS } from '@/types/frame';
+import { DEFAULT_CHROMA_KEY, type BgRemoval, type ChromaKeySettings } from '@/types/scene';
 
 /**
  * Timer and image adjustments, which live in Settings rather than on the
@@ -98,6 +99,22 @@ export interface CaptureSettings {
    * existed. Nobody should lose an event's photos to an upgrade.
    */
   galleryTtlHours: number;
+  /**
+   * How the room behind the guests is taken away: not at all, by keying out
+   * a green screen, or by a model that finds the people. The guest then picks
+   * what goes behind them on the capture screen.
+   */
+  bgRemoval: BgRemoval;
+  /** Tuning for the green screen, used when `bgRemoval` is 'key'. */
+  chromaKey: ChromaKeySettings;
+  /**
+   * Re-cut the people at the shutter with a matting model, for cleaner edges
+   * than the live segmenter's. Only with `bgRemoval` 'segment'; costs about a
+   * second per photo on a slow laptop.
+   */
+  edgeCleanup: boolean;
+  /** When the empty green screen was captured; empty means never. */
+  cleanPlateAt: string;
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -114,6 +131,10 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   rotationDeg: 0,
   linkTtlHours: 168,
   galleryTtlHours: 0,
+  bgRemoval: 'off',
+  chromaKey: DEFAULT_CHROMA_KEY,
+  edgeCleanup: false,
+  cleanPlateAt: '',
 };
 
 export function useCaptureSettings() {

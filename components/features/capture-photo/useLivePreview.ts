@@ -2,6 +2,28 @@ import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import type { LookRamp, ImageFilters } from '@/types/editor';
 import { filtersAreNeutral, filtersToCSS, rampStartEdge } from '@/types/editor';
 import type { FrameWindow } from '@/types/frame';
+import type { AvatarOption } from '@/types/scene';
+import type { FacePoints } from './scene/faces';
+import { drawAvatars, type PhotoGeometry } from './scene/avatars';
+
+/**
+ * What goes around the people, for one draw. Absent, the photo is the plain
+ * camera, exactly as before any of this existed.
+ */
+export interface SceneLayers {
+  /**
+   * The camera with the room taken away (transparent), the camera's own
+   * shape. Drawn in place of the camera, so the crop, mirror, rotation and
+   * Look all apply to it as they would to the camera.
+   */
+  person?: HTMLCanvasElement | null;
+  /** Behind the people, filling the photo's window. Never mirrored. */
+  background?: HTMLImageElement | HTMLCanvasElement | null;
+  /** Drawn on every face, upright, after the people. */
+  avatar?: { option: AvatarOption; image: HTMLImageElement } | null;
+  /** Faces, in the raw camera's 0–1 coordinates. */
+  faces?: FacePoints[] | null;
+}
 
 export interface LivePreviewOptions {
   filters: ImageFilters;
@@ -30,6 +52,14 @@ export interface LivePreviewOptions {
    * selected. Null, undefined or 0 draws straight, as before this existed.
    */
   rotationDeg?: number | null;
+  /** The scene for this draw. See `SceneLayers`. */
+  scene?: SceneLayers | null;
+}
+
+/** Live-preview options, plus where each frame's scene comes from. */
+export interface UseLivePreviewOptions extends LivePreviewOptions {
+  /** Called once per preview frame, before drawing it. */
+  sceneFrame?: ((video: HTMLVideoElement) => SceneLayers | null) | null;
 }
 
 /**
@@ -77,9 +107,24 @@ export interface UseLivePreviewResult {
   canvasRef: RefObject<HTMLCanvasElement | null>;
 }
 
+/** Draw an image to fill a rectangle, trimming whatever overhangs. */
+function drawCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement | HTMLCanvasElement,
+  dx: number, dy: number, dw: number, dh: number,
+) {
+  const iw = img instanceof HTMLImageElement ? img.naturalWidth : img.width;
+  const ih = img instanceof HTMLImageElement ? img.naturalHeight : img.height;
+  if (!iw || !ih) return;
+  const scale = Math.max(dw / iw, dh / ih);
+  const sw = dw / scale;
+  const sh = dh / scale;
+  ctx.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, dx, dy, dw, dh);
+}
+
 /**
- * Draw one frame of video onto a canvas: white bed, crop, mirror, filters,
- * then the Look ramp.
+ * Draw one frame of video onto a canvas: white bed, background, crop, mirror,
+ * filters, the Look ramp, then avatars.
  *
  * This is the single place that turns the camera into a picture. The live
  * preview runs it every rAF and the shutter runs it once at full resolution,
@@ -89,7 +134,7 @@ export interface UseLivePreviewResult {
 export function drawPhoto(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
-  { w, h, filters, contentRect, sourceRect, lookRamp, rotationDeg }: DrawPhotoOptions,
+  { w, h, filters, contentRect, sourceRect, lookRamp, rotationDeg, scene }: DrawPhotoOptions,
 ) {
   // Destination: the frame's cut-out, or the whole canvas when bare.
   const dx = contentRect ? Math.round(contentRect.x * w) : 0;
@@ -107,11 +152,22 @@ export function drawPhoto(
   // around a frame's cut-out, the margins when the crop is zoomed out past
   // the whole scene so the camera sits inside the photo, and the corners a
   // rotated picture swings clear of.
-  if (contentRect || sourceRect || rotationRad) {
+  //
+  // With the room taken away the whole picture is see-through apart from the
+  // people, so it needs the bed too.
+  const person = scene?.person ?? null;
+  if (contentRect || sourceRect || rotationRad || person) {
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, w, h);
   }
+
+  // The chosen scene, behind everyone. Not mirrored, not turned and not given
+  // the Look: it is a picture in its own right, not part of the camera.
+  if (person && scene?.background) drawCover(ctx, scene.background, dx, dy, dw, dh);
+
+  // The people with the room taken away, or the camera itself.
+  const src: HTMLVideoElement | HTMLCanvasElement = person ?? video;
 
   // Source: the operator's crop region, or the whole picture, narrowed to the
   // shape of where it is going.
@@ -121,8 +177,8 @@ export function drawPhoto(
   // which nothing guarantees: a 4:3 webcam stretched every face by a third,
   // but only with a frame on, because a bare stage takes the camera's own
   // shape. `coverAspect` trims the overhang instead.
-  const vw = video.videoWidth  || dw;
-  const vh = video.videoHeight || dh;
+  const vw = (person ? person.width : video.videoWidth) || dw;
+  const vh = (person ? person.height : video.videoHeight) || dh;
   const { sx, sy, sw, sh } = coverAspect({
     sx: sourceRect ? Math.round(sourceRect.x * vw) : 0,
     sy: sourceRect ? Math.round(sourceRect.y * vh) : 0,
@@ -152,11 +208,18 @@ export function drawPhoto(
     ctx.rotate(-rotationRad);
     ctx.translate(-dw / 2, -dh / 2);
   }
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
+  ctx.drawImage(src, sx, sy, sw, sh, 0, 0, dw, dh);
   ctx.restore();
 
   if (ramping) {
-    drawLookRamp(ctx, video, startEdge, filters, { sx, sy, sw, sh, dx, dy, dw, dh, rotationRad });
+    drawLookRamp(ctx, src, startEdge, filters, { sx, sy, sw, sh, dx, dy, dw, dh, rotationRad });
+  }
+
+  if (scene?.avatar && scene.faces?.length) {
+    const geometry: PhotoGeometry = {
+      sx, sy, sw, sh, srcW: vw, srcH: vh, dx, dy, dw, dh, rotationRad,
+    };
+    drawAvatars(ctx, scene.faces, scene.avatar.option, scene.avatar.image, geometry);
   }
 }
 
@@ -179,7 +242,7 @@ let rampLayer: HTMLCanvasElement | null = null;
 
 function drawLookRamp(
   ctx: CanvasRenderingContext2D,
-  video: HTMLVideoElement,
+  video: HTMLVideoElement | HTMLCanvasElement,
   startEdge: 'top' | 'bottom' | 'left' | 'right',
   filters: ImageFilters,
   g: {
@@ -236,7 +299,7 @@ function drawLookRamp(
 
 export function useLivePreview(
   videoRef: RefObject<HTMLVideoElement | null>,
-  options: LivePreviewOptions,
+  options: UseLivePreviewOptions,
 ): UseLivePreviewResult {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const optionsRef = useRef(options);
@@ -256,8 +319,10 @@ export function useLivePreview(
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const { sceneFrame, ...draw } = optionsRef.current;
     drawPhoto(ctx, video, {
-      ...optionsRef.current,
+      ...draw,
+      scene: sceneFrame?.(video) ?? null,
       w: canvas.width,
       h: canvas.height,
     });

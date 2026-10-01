@@ -584,6 +584,17 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // lose an event to an upgrade. Deliberately unrelated to the link's life: a
   // link may die in an hour while the photo lives a month.
   galleryTtlHours: 0,
+  // How the room behind the guests is taken away: 'off', 'key' (a green
+  // screen, keyed by colour) or 'segment' (no screen; a model finds the
+  // people). Off is the booth as it always was.
+  bgRemoval: 'off',
+  chromaKey: { colour: '#00b140', tolerance: 0.35, softness: 0.25, spill: 0.7 },
+  // Re-cut the people with a matting model at the shutter, for cleaner edges
+  // than the live segmenter gives. Segmentation only.
+  edgeCleanup: false,
+  // When the empty green screen was last captured; empty means never. The
+  // kiosk refetches the plate whenever this changes.
+  cleanPlateAt: '',
 };
 
 /**
@@ -619,6 +630,46 @@ app.put('/api/settings/capture', booth, (req, res) => {
   // Nudge the kiosk so a settings change takes effect without a reload.
   remote.command('settings-changed', { settings: merged });
   return res.json({ settings: merged });
+});
+
+// ── Clean plate ──────────────────────────────────────────────────────────────
+// One frame of the empty green screen, taken at setup. The keyer compares each
+// pixel of the live camera with the same spot on it, which is what lets an
+// unevenly lit screen key cleanly. A PNG, because a lossy copy of the screen
+// would add noise to the very thing being compared against.
+
+const CLEAN_PLATE_FILE = path.join(DATA_DIR, 'clean-plate.png');
+
+/** Record when the plate changed, and nudge the kiosk to fetch it again. */
+function touchCleanPlate(at) {
+  const stored = store.kv.get('captureSettings', {});
+  const merged = { ...DEFAULT_CAPTURE_SETTINGS, ...stored, cleanPlateAt: at };
+  store.kv.set('captureSettings', merged);
+  remote.command('settings-changed', { settings: merged });
+  return merged;
+}
+
+app.get('/api/settings/clean-plate', booth, (_req, res) => {
+  if (!fs.existsSync(CLEAN_PLATE_FILE)) return res.status(404).json({ error: 'No clean plate' });
+  res.setHeader('Cache-Control', 'no-store');
+  return res.sendFile(path.basename(CLEAN_PLATE_FILE), { root: DATA_DIR });
+});
+
+app.put('/api/settings/clean-plate', booth, upload.single('file'), validateImage, (req, res) => {
+  if (req.file.mimetype !== 'image/png') {
+    return res.status(400).json({ error: 'The clean plate must be a PNG.' });
+  }
+  try {
+    fs.writeFileSync(CLEAN_PLATE_FILE, req.file.buffer);
+  } catch (err) {
+    return res.status(500).json({ error: `Could not save the clean plate: ${err.message}` });
+  }
+  return res.json({ settings: touchCleanPlate(new Date().toISOString()) });
+});
+
+app.delete('/api/settings/clean-plate', booth, (_req, res) => {
+  fs.rmSync(CLEAN_PLATE_FILE, { force: true });
+  return res.json({ settings: touchCleanPlate('') });
 });
 
 /**
@@ -793,7 +844,10 @@ if (SERVES_FRONTEND) {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
     if (req.path.startsWith('/api/')) return next();
     res.setHeader('Cache-Control', 'no-store');
-    return res.sendFile(path.join(DIST_DIR, 'index.html'));
+    // Relative to a root, not as one absolute path: `send` refuses any path
+    // with a dot-folder in it, so a booth checked out under one (a worktree
+    // in .claude/, say) served nothing but 404s.
+    return res.sendFile('index.html', { root: DIST_DIR });
   });
 }
 

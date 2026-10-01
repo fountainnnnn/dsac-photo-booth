@@ -4,12 +4,15 @@ import {
   Camera,
   CameraSlash,
   Gear,
+  Prohibit,
   Timer as TimerIcon,
   WifiHigh,
   WifiSlash,
 } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useLivePreview, drawPhoto } from './useLivePreview';
+import { useScene, type SceneStatus } from './scene/useScene';
+import { AVATARS, BACKGROUNDS, DEFAULT_SCENE_CHOICE, type SceneChoice } from '@/types/scene';
 import { cameraConstraints, raiseToMaxResolution } from './cameras';
 import { photoOutputSize } from './outputSize';
 import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
@@ -33,6 +36,12 @@ export interface CameraViewProps {
   onError?: (error: Error) => void;
   /** Fired when the phone remote asks to retake, so the flow can reset. */
   onRetake?: () => void;
+  /**
+   * The guest's background and avatar. Held by the page rather than here, so
+   * a retake — which remounts this view — keeps what they picked.
+   */
+  choice?: SceneChoice;
+  onChoiceChange?: (choice: SceneChoice) => void;
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 0.92): Promise<Blob> {
@@ -49,7 +58,9 @@ function isDrawable(img: HTMLImageElement | undefined): img is HTMLImageElement 
   return !!img && img.complete && img.naturalWidth > 0;
 }
 
-export default function CameraView({ onCapture, onError, onRetake }: CameraViewProps) {
+export default function CameraView({
+  onCapture, onError, onRetake, choice = DEFAULT_SCENE_CHOICE, onChoiceChange,
+}: CameraViewProps) {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
@@ -93,6 +104,18 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
   const crop = captureSettings.cropEnabled ? unmirrorCrop(captureSettings.crop) : null;
 
   const [countdown, setCountdown]     = useState<number | null>(null);
+  // The shutter has gone but the photo is still being finished — only ever
+  // long enough to see with the edge clean-up pass on.
+  const [finishing, setFinishing]     = useState(false);
+
+  const { sceneFrame, captureScene, status: sceneStatus } = useScene({
+    bgRemoval: captureSettings.bgRemoval,
+    chromaKey: captureSettings.chromaKey,
+    edgeCleanup: captureSettings.edgeCleanup,
+    cleanPlateAt: captureSettings.cleanPlateAt,
+    choice,
+    region: crop,
+  });
 
   const updateCaptureSettings = useCallback((patch: Partial<typeof captureSettings>) => {
     void saveCaptureSettings({ ...captureSettings, ...patch }).catch(() => {});
@@ -316,6 +339,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
     contentRect: displayFrame?.window ?? null,
     sourceRect: crop,
     rotationDeg,
+    sceneFrame,
   });
 
   // Size the stage in JS rather than with aspect-ratio + max-height. Those two
@@ -402,6 +426,17 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
     const outW = size.width;
     const outH = size.height;
 
+    // The background, the cut-out people and the avatars, at full size. Only
+    // the edge clean-up pass takes long enough to need saying so.
+    const slow = captureSettings.bgRemoval === 'segment' && captureSettings.edgeCleanup;
+    if (slow) setFinishing(true);
+    let scene = null;
+    try {
+      scene = await captureScene(video);
+    } finally {
+      if (slow) setFinishing(false);
+    }
+
     const canvas = document.createElement('canvas');
     canvas.width = outW; canvas.height = outH;
     const ctx = canvas.getContext('2d')!;
@@ -419,6 +454,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
       contentRect: activeFrame?.window ?? null,
       sourceRect: crop,
       rotationDeg,
+      scene,
     });
 
     if (activeFrame) {
@@ -434,7 +470,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
     const blob = await canvasToBlob(canvas);
     onCapture(blob, dataUrl);
-  }, [isStreaming, filters, lookRamp, rotationDeg, activeFrame, crop, captureSettings, onCapture]);
+  }, [isStreaming, filters, lookRamp, rotationDeg, activeFrame, crop, captureSettings, onCapture, captureScene]);
 
   const handleCapturePress = useCallback(() => {
     if (countdown !== null) {
@@ -515,10 +551,10 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
 
       {/* Header */}
       <header className="relative flex shrink-0 items-center gap-4">
-        {/* Centred over the frame, not the row. The capture rail takes 180px
-            off the right with a 20px gap, so the stage's midpoint sits 100px
+        {/* Centred over the frame, not the row. The capture rail takes 220px
+            off the right with a 20px gap, so the stage's midpoint sits 120px
             left of the panel's. */}
-        <h1 className="absolute left-[calc(50%-100px)] -translate-x-1/2 text-[1.6rem] font-semibold tracking-[-0.02em] text-[var(--ink)]">
+        <h1 className="absolute left-[calc(50%-120px)] -translate-x-1/2 text-[1.6rem] font-semibold tracking-[-0.02em] text-[var(--ink)]">
           Say cheese<span className="text-[var(--accent)]">.</span>
         </h1>
 
@@ -596,6 +632,14 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
               </div>
             )}
 
+            {finishing && (
+              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+                <p className="rounded-full bg-black/55 px-5 py-2.5 text-[0.9rem] font-semibold text-white backdrop-blur-md">
+                  Finishing your photo…
+                </p>
+              </div>
+            )}
+
             {errorMessage && (
               <div data-testid="capture-permission-notice" role="alert"
                 className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 px-8 text-center"
@@ -631,7 +675,7 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
 
         {/* Capture rail */}
         <aside data-testid="capture-controls"
-          className="flex w-[180px] shrink-0 flex-col self-center rounded-[20px] border border-[var(--border)] px-5 py-6">
+          className="flex max-h-full w-[220px] shrink-0 flex-col self-center overflow-y-auto rounded-[20px] border border-[var(--border)] px-5 py-6">
           <p className="text-center text-[1.05rem] font-semibold text-[var(--ink)]">Capture</p>
 
           <div className="mt-5 flex justify-center">
@@ -655,6 +699,16 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
               ? <>Frame: <strong className="font-semibold text-[var(--ink)]">{activeFrame.label}</strong></>
               : 'No frame'}
           </p>
+
+          {/* The two things a guest does choose: where they are, and what
+              they wear. Backgrounds only appear once Settings has a way to
+              take the real one away. */}
+          <ScenePickers
+            choice={choice}
+            onChange={c => onChoiceChange?.(c)}
+            showBackgrounds={captureSettings.bgRemoval !== 'off'}
+            status={sceneStatus}
+          />
         </aside>
       </div>
 
@@ -663,6 +717,83 @@ export default function CameraView({ onCapture, onError, onRetake }: CameraViewP
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+function pickerClass(on: boolean) {
+  return `relative overflow-hidden rounded-xl border-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+    on ? 'border-[var(--accent)]' : 'border-transparent hover:border-[var(--border)]'
+  }`;
+}
+
+/** What a part of the scene is doing, when it is not simply working. */
+function statusLine(status: SceneStatus, showBackgrounds: boolean, avatarOn: boolean): string | null {
+  if (showBackgrounds && status.removal === 'loading') return 'Getting backgrounds ready…';
+  if (showBackgrounds && status.removal === 'failed') return 'Backgrounds are unavailable on this laptop.';
+  if (avatarOn && status.faces === 'loading') return 'Getting avatars ready…';
+  if (avatarOn && status.faces === 'failed') return 'Avatars are unavailable on this laptop.';
+  return null;
+}
+
+/**
+ * The guest's choices, as pictures to tap. Large enough for a finger: this is
+ * a kiosk, and whoever is choosing is standing a pace back from it.
+ */
+function ScenePickers({ choice, onChange, showBackgrounds, status }: {
+  choice: SceneChoice;
+  onChange: (choice: SceneChoice) => void;
+  showBackgrounds: boolean;
+  status: SceneStatus;
+}) {
+  const note = statusLine(status, showBackgrounds, Boolean(choice.avatarId));
+  return (
+    <div className="mt-6 flex flex-col gap-5">
+      {showBackgrounds && (
+        <div>
+          <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">Background</p>
+          <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Background">
+            {BACKGROUNDS.map(bg => {
+              const on = choice.backgroundId === bg.id;
+              return (
+                <button key={bg.id} type="button" role="radio" aria-checked={on}
+                  data-testid={`background-${bg.id}`}
+                  onClick={() => onChange({ ...choice, backgroundId: bg.id })}
+                  className={pickerClass(on)}>
+                  <img src={bg.src} alt="" draggable={false} className="block aspect-video w-full object-cover" />
+                  <span className="block py-1 text-center text-[0.68rem] font-semibold text-[var(--ink-2)]">{bg.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">Avatar</p>
+        <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Avatar">
+          <button type="button" role="radio" aria-checked={!choice.avatarId}
+            data-testid="avatar-none" title="No avatar"
+            onClick={() => onChange({ ...choice, avatarId: '' })}
+            className={`${pickerClass(!choice.avatarId)} flex aspect-square items-center justify-center text-[var(--ink-3)]`}>
+            <Prohibit size={22} />
+            <span className="sr-only">No avatar</span>
+          </button>
+          {AVATARS.map(a => {
+            const on = choice.avatarId === a.id;
+            return (
+              <button key={a.id} type="button" role="radio" aria-checked={on}
+                data-testid={`avatar-${a.id}`} title={a.label}
+                onClick={() => onChange({ ...choice, avatarId: a.id })}
+                className={`${pickerClass(on)} flex aspect-square items-center justify-center p-1.5`}>
+                <img src={a.src} alt={a.label} draggable={false} className="max-h-full max-w-full object-contain" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {note && <p className="text-center text-[0.7rem] leading-[1.5] text-[var(--ink-3)]">{note}</p>}
+    </div>
+  );
+}
 
 /**
  * How much to shrink the event name so it fits its width budget — the same

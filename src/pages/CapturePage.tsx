@@ -3,6 +3,7 @@ import CameraView from '@/components/features/capture-photo/CameraView';
 import QrDownloadScreen from '@/components/features/qr-download/QrDownloadScreen';
 import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
 import type { ComposedUploadResponse } from '@/types/download';
+import { DEFAULT_SCENE_CHOICE, type SceneChoice } from '@/types/scene';
 
 /**
  * There is no confirmation step. A guest is standing at the booth and the
@@ -19,6 +20,9 @@ export default function CapturePage() {
   // Carried through so the QR screen can state this photo's own link window
   // rather than a figure written into the copy.
   const [expiresAt, setExpiresAt] = useState<string | undefined>(undefined);
+  // The guest's background and avatar. Kept here, not in the camera view, so
+  // a retake keeps them; the next guest simply picks again.
+  const [choice, setChoice] = useState<SceneChoice>(DEFAULT_SCENE_CHOICE);
 
   const resetFlow = useCallback(() => {
     setUploadError(null);
@@ -82,7 +86,12 @@ export default function CapturePage() {
     >
       {step === 'camera' && (
         <>
-          <CameraView onCapture={handleCapture} onRetake={handleRetake} />
+          <CameraView
+            onCapture={handleCapture}
+            onRetake={handleRetake}
+            choice={choice}
+            onChoiceChange={setChoice}
+          />
           {uploadError && (
             <p
               data-testid="upload-error"
