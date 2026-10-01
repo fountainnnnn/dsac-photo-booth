@@ -105,13 +105,29 @@ export const AVATARS: AvatarOption[] = [
   },
 ];
 
+/** The background id that means "the one the guest typed". */
+export const TYPED_BACKGROUND_ID = 'typed';
+
+/** A background drawn from what the guest typed. */
+export interface TypedBackground {
+  /** An object URL for the picture, owned by the capture page. */
+  src: string;
+  text: string;
+}
+
 /** What the guest has chosen on the capture screen. Empty avatar is none. */
 export interface SceneChoice {
   backgroundId: string;
   avatarId: string;
+  /** Set once the guest has had a background made from their words. */
+  typed?: TypedBackground | null;
 }
 
 export const DEFAULT_SCENE_CHOICE: SceneChoice = {
   backgroundId: BACKGROUNDS[0].id,
   avatarId: '',
+  typed: null,
 };
+
+/** Backgrounds a guest may have made, before they have to pick a ready one. */
+export const TYPED_PER_GUEST = 3;

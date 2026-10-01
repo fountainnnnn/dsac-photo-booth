@@ -1,8 +1,28 @@
 # Open House booth plan
 
-Status: planned, not started. Written 2026-09-29 from planning discussions.
-Applies to the `open-house` branch only (see `CLAUDE.md`). None of this
-touches the DSAC booth on `main`.
+Status (2026-10-01): **built**, phases 0-4, with OpenRouter set up but
+waiting for an API key. Written 2026-09-29 from planning discussions; the plan
+below is kept as the record of why. Applies to the `open-house` branch only
+(see `CLAUDE.md`). None of this touches the DSAC booth on `main`.
+
+What changed from the plan while building, after testing on real photos:
+
+- Segmentation uses MediaPipe's **multiclass** selfie segmenter (16 MB), not
+  the 250 KB selfie one: the light models ate through faces on a busy
+  backdrop. It is fed a 512px copy of each frame and paces itself.
+- The edge clean-up pass only adds MODNet's detail close to people the
+  segmenter found; on its own MODNet kept flags and chairs.
+- Face tracking also searches three square tiles across the photo's crop, at
+  a 0.3 detection threshold: a group standing back was otherwise missed.
+- Typed backgrounds use OpenRouter's `/api/v1/images` endpoint
+  (`resolution: 2K`, `aspect_ratio: 16:9`), are cached by prompt, and are
+  capped at three per guest.
+- Open question 1 settled on the local matting model. The phone remote stays
+  (booth password kept).
+
+Still to do: real avatar and background artwork; the OpenRouter key; a run on
+the actual booth laptop to see how the live preview copes with segmentation
+and face tracking together.
 
 ## Goal
 

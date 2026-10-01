@@ -115,6 +115,12 @@ export interface CaptureSettings {
   edgeCleanup: boolean;
   /** When the empty green screen was captured; empty means never. */
   cleanPlateAt: string;
+  /**
+   * Let guests type a background for an image model to draw. Needs
+   * OPENROUTER_API_KEY on the Environment tab; this switches it off without
+   * deleting the key.
+   */
+  promptBackgrounds: boolean;
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -135,6 +141,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   chromaKey: DEFAULT_CHROMA_KEY,
   edgeCleanup: false,
   cleanPlateAt: '',
+  promptBackgrounds: true,
 };
 
 export function useCaptureSettings() {

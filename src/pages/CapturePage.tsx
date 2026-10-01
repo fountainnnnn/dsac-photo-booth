@@ -4,6 +4,7 @@ import QrDownloadScreen from '@/components/features/qr-download/QrDownloadScreen
 import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
 import type { ComposedUploadResponse } from '@/types/download';
 import { DEFAULT_SCENE_CHOICE, type SceneChoice } from '@/types/scene';
+import { useTypedBackground } from '@/components/features/capture-photo/scene/useTypedBackground';
 
 /**
  * There is no confirmation step. A guest is standing at the booth and the
@@ -23,6 +24,9 @@ export default function CapturePage() {
   // The guest's background and avatar. Kept here, not in the camera view, so
   // a retake keeps them; the next guest simply picks again.
   const [choice, setChoice] = useState<SceneChoice>(DEFAULT_SCENE_CHOICE);
+  // Asked again each time the camera comes back, so a key saved in Settings
+  // turns typing on for the next guest.
+  const typing = useTypedBackground(step === 'camera');
 
   const resetFlow = useCallback(() => {
     setUploadError(null);
@@ -69,6 +73,14 @@ export default function CapturePage() {
     resetFlow();
   }, [resetFlow]);
 
+  // The next guest starts from scratch: their own background, avatar and
+  // tries. A retake (above) keeps all three.
+  const handleDone = useCallback(() => {
+    setChoice(DEFAULT_SCENE_CHOICE);
+    typing.reset();
+    handleRetake();
+  }, [handleRetake, typing]);
+
   // Retake is the only control the phone offers once a photo has landed, and
   // by then CameraView is unmounted — so the page itself has to listen for it.
   useRemote({
@@ -91,6 +103,7 @@ export default function CapturePage() {
             onRetake={handleRetake}
             choice={choice}
             onChoiceChange={setChoice}
+            typing={typing}
           />
           {uploadError && (
             <p
@@ -121,7 +134,7 @@ export default function CapturePage() {
           composedDataUrl={composedDataUrl}
           downloadUrl={downloadUrl}
           expiresAt={expiresAt}
-          onDone={handleRetake}
+          onDone={handleDone}
           onRetake={handleRetake}
         />
       )}

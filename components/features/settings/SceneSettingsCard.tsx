@@ -33,6 +33,17 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
   const [previewBg, setPreviewBg] = useState(BACKGROUNDS[0].id);
   const [plateBusy, setPlateBusy] = useState(false);
   const [plateNote, setPlateNote] = useState<string | null>(null);
+  // Whether an OpenRouter key is saved, which typed backgrounds need.
+  const [keySet, setKeySet] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    fetch('/api/backgrounds/status')
+      .then(r => (r.ok ? r.json() as Promise<{ configured?: boolean }> : null))
+      .then(s => { if (live) setKeySet(Boolean(s?.configured)); })
+      .catch(() => { if (live) setKeySet(false); });
+    return () => { live = false; };
+  }, []);
 
   const mode = settings.bgRemoval;
   const key = settings.chromaKey;
@@ -239,6 +250,28 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
             help="Takes back the green the screen reflects onto skin and hair."
             onChange={v => setKey({ spill: v })} />
         </div>
+      )}
+
+      {mode !== 'off' && (
+        <label className="mt-6 flex items-start gap-3">
+          <input type="checkbox" checked={settings.promptBackgrounds}
+            onChange={e => push({ ...settings, promptBackgrounds: e.target.checked })}
+            className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+          <span>
+            <span className="block text-[0.8rem] font-semibold text-[var(--ink)]">Let guests type a background</span>
+            <span className="mt-1 block text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+              A guest types a place and an image model draws it, through OpenRouter:
+              about US$0.10 a background, three tries per guest, and the same words
+              are only paid for once.{' '}
+              {keySet === false && (
+                <strong className="font-semibold text-[var(--accent-ink)]">
+                  Needs an OpenRouter API key on the Environment tab; until then guests
+                  only see the ready-made backgrounds.
+                </strong>
+              )}
+            </span>
+          </span>
+        </label>
       )}
 
       {mode === 'segment' && (

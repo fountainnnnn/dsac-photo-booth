@@ -12,7 +12,10 @@ import {
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useLivePreview, drawPhoto } from './useLivePreview';
 import { useScene, type SceneStatus } from './scene/useScene';
-import { AVATARS, BACKGROUNDS, DEFAULT_SCENE_CHOICE, type SceneChoice } from '@/types/scene';
+import type { TypedBackgroundState } from './scene/useTypedBackground';
+import {
+  AVATARS, BACKGROUNDS, DEFAULT_SCENE_CHOICE, TYPED_BACKGROUND_ID, type SceneChoice,
+} from '@/types/scene';
 import { cameraConstraints, raiseToMaxResolution } from './cameras';
 import { photoOutputSize } from './outputSize';
 import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
@@ -42,6 +45,8 @@ export interface CameraViewProps {
    */
   choice?: SceneChoice;
   onChoiceChange?: (choice: SceneChoice) => void;
+  /** Backgrounds from typed words; absent, typing is not offered. */
+  typing?: TypedBackgroundState;
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 0.92): Promise<Blob> {
@@ -59,7 +64,7 @@ function isDrawable(img: HTMLImageElement | undefined): img is HTMLImageElement 
 }
 
 export default function CameraView({
-  onCapture, onError, onRetake, choice = DEFAULT_SCENE_CHOICE, onChoiceChange,
+  onCapture, onError, onRetake, choice = DEFAULT_SCENE_CHOICE, onChoiceChange, typing,
 }: CameraViewProps) {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
@@ -708,6 +713,7 @@ export default function CameraView({
             onChange={c => onChoiceChange?.(c)}
             showBackgrounds={captureSettings.bgRemoval !== 'off'}
             status={sceneStatus}
+            typing={typing}
           />
         </aside>
       </div>
@@ -717,6 +723,44 @@ export default function CameraView({
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+/**
+ * Type a place, get a background. The text goes to an online image service,
+ * so the box says so; the server wraps it in its own prompt and checks it
+ * before anything is sent.
+ */
+function TypeABackground({ typing, onMade }: {
+  typing: TypedBackgroundState;
+  onMade: (typed: { src: string; text: string }) => void;
+}) {
+  const [text, setText] = useState('');
+  const spent = typing.left === 0;
+
+  const submit = async () => {
+    const made = await typing.generate(text);
+    if (made) onMade(made);
+  };
+
+  return (
+    <form className="mt-2" onSubmit={e => { e.preventDefault(); void submit(); }}>
+      <label className="sr-only" htmlFor="typed-background">Where do you want to be?</label>
+      <input id="typed-background" data-testid="typed-background-input"
+        value={text} onChange={e => setText(e.target.value)}
+        maxLength={120} disabled={typing.busy || spent} autoComplete="off"
+        placeholder={spent ? 'No more tries — pick one below' : 'Where do you want to be?'}
+        className="min-h-11 w-full rounded-xl border border-[var(--border)] bg-transparent px-3 text-[0.8rem] text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:opacity-60" />
+      <button type="submit" data-testid="typed-background-go"
+        disabled={typing.busy || spent || !text.trim()}
+        className="mt-2 min-h-10 w-full rounded-xl bg-[var(--ink)] px-3 text-[0.78rem] font-semibold text-white transition disabled:opacity-40">
+        {typing.busy ? 'Making your background…' : 'Make it'}
+      </button>
+      <p className="mt-1.5 text-[0.66rem] leading-[1.45] text-[var(--ink-3)]">
+        {typing.error
+          ?? (spent ? null : `${typing.left} ${typing.left === 1 ? 'try' : 'tries'} left. What you type is sent to an online image service.`)}
+      </p>
+    </form>
+  );
+}
 
 function pickerClass(on: boolean) {
   return `relative overflow-hidden rounded-xl border-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
@@ -737,11 +781,12 @@ function statusLine(status: SceneStatus, showBackgrounds: boolean, avatarOn: boo
  * The guest's choices, as pictures to tap. Large enough for a finger: this is
  * a kiosk, and whoever is choosing is standing a pace back from it.
  */
-function ScenePickers({ choice, onChange, showBackgrounds, status }: {
+function ScenePickers({ choice, onChange, showBackgrounds, status, typing }: {
   choice: SceneChoice;
   onChange: (choice: SceneChoice) => void;
   showBackgrounds: boolean;
   status: SceneStatus;
+  typing?: TypedBackgroundState;
 }) {
   const note = statusLine(status, showBackgrounds, Boolean(choice.avatarId));
   return (
@@ -749,7 +794,22 @@ function ScenePickers({ choice, onChange, showBackgrounds, status }: {
       {showBackgrounds && (
         <div>
           <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">Background</p>
+          {typing?.available && (
+            <TypeABackground
+              typing={typing}
+              onMade={typed => onChange({ ...choice, backgroundId: TYPED_BACKGROUND_ID, typed })}
+            />
+          )}
           <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Background">
+            {choice.typed && (
+              <button type="button" role="radio" aria-checked={choice.backgroundId === TYPED_BACKGROUND_ID}
+                data-testid="background-typed" title={choice.typed.text}
+                onClick={() => onChange({ ...choice, backgroundId: TYPED_BACKGROUND_ID })}
+                className={pickerClass(choice.backgroundId === TYPED_BACKGROUND_ID)}>
+                <img src={choice.typed.src} alt="" draggable={false} className="block aspect-video w-full object-cover" />
+                <span className="block truncate px-1 py-1 text-center text-[0.68rem] font-semibold text-[var(--ink-2)]">Yours</span>
+              </button>
+            )}
             {BACKGROUNDS.map(bg => {
               const on = choice.backgroundId === bg.id;
               return (

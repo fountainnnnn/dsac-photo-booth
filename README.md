@@ -37,12 +37,50 @@ only someone handed the QR code or the link can open it.
 The organiser's phone remote is at `<public URL>/remote`, and Settings shows a
 QR code for it.
 
+## Backgrounds and avatars
+
+On the capture screen a guest picks an **avatar** — a face filter that
+follows every face — and, once background removal is on, a **background** to
+stand in. Settings > Background chooses how the room is taken away:
+
+- **Green screen**: keyed by colour on the laptop's graphics chip. Capture the
+  empty screen once with nobody in front of it ("Capture empty screen"); every
+  pixel is then judged against its own spot, so shadows and uneven light key
+  cleanly, and the key colour is set from it. Tune tolerance, edge softness and
+  green cast with the live preview on the same card.
+- **No green screen**: MediaPipe's multiclass segmenter finds the people. Best
+  with a plain wall and guests near the camera. The **edge clean-up pass**
+  re-cuts each photo with MODNet at the shutter for cleaner hair and edges, at
+  the cost of a second or so per photo.
+
+If an OpenRouter API key is set on the Environment tab (`OPENROUTER_API_KEY`),
+guests can also **type a background** ("a beach at sunset") and an image model
+draws it — Gemini 3.1 Flash Image by default, about US$0.10 each at 2K, three
+tries per guest. Only the background is generated: the guests are cut out on the
+laptop and drawn on top, so no model ever redraws a face. The guest's words are
+checked against a short blocked-word list and wrapped in the booth's own prompt
+(no people, no text) in `server/backgrounds.mjs`. Each picture is kept in
+`data/backgrounds/` by its prompt, so the same words are only paid for once.
+Without a key, guests see only the ready-made backgrounds.
+
+Everything else runs on the laptop's CPU, offline. The models live in
+`public/vision/` (MediaPipe face mesh and segmenter) and `public/matting/`
+(MODNet); MediaPipe's runtime is copied there at build time. The backgrounds in
+`public/backgrounds/` and avatars in `public/avatars/` are placeholder SVGs in
+the format the final artwork should use; each avatar's anchor, size and lift are
+set in `types/scene.ts`.
+
+On the day: leave headroom above guests' heads, or hats and ears are cut off by
+the frame. Faces are found best within a few metres of the camera; groups
+standing further back are found by searching the picture in tiles.
+
 ## Settings the app keeps for itself
 
-The password, the public URL, the port and the storage folder live in `.env` in
-the data folder, which the **Environment** tab in Settings edits. The password
-and the public URL take effect the moment they are saved; ports and folders are
-read while the server starts, so those rows say "restart to apply".
+The password, the public URL, the OpenRouter key, the port and the storage
+folder live in `.env` in the data folder, which the **Environment** tab in
+Settings edits. The password, the key and the public URL take effect the moment
+they are saved; ports and folders are read while the server starts, so those
+rows say "restart to apply".
 
 A checkout also reads the repository's own `.env`. Where both exist the
 data-folder one wins, because it is the one the person at the booth can change.

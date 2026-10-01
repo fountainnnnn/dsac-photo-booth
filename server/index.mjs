@@ -12,6 +12,7 @@ import { openDatabase } from './db.mjs';
 import { createAuth } from './auth.mjs';
 import { createRemoteHub } from './remote.mjs';
 import { startTunnel } from './tunnel.mjs';
+import { BackgroundError, DEFAULT_MODEL, createBackgrounds } from './backgrounds.mjs';
 import {
   ENV_FIELDS, applyToProcessEnv, parseEnv, pickEditable, readEnvFile, writeEnvFile,
 } from './env-file.mjs';
@@ -91,6 +92,8 @@ const DATA_DIR = process.env.STORAGE_DIR
   : path.join(ROOT_DIR, 'data');
 const store = openDatabase(DATA_DIR);
 const remote = createRemoteHub();
+// Typed backgrounds, kept by prompt so the same words are only paid for once.
+const backgrounds = createBackgrounds(path.join(DATA_DIR, 'backgrounds'));
 
 /**
  * The organiser's own copy of the event, as ordinary files.
@@ -595,6 +598,10 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // When the empty green screen was last captured; empty means never. The
   // kiosk refetches the plate whenever this changes.
   cleanPlateAt: '',
+  // Let guests type a background for an image model to draw. Only does
+  // anything once OPENROUTER_API_KEY is set; this is the way to turn it off
+  // without deleting the key.
+  promptBackgrounds: true,
 };
 
 /**
@@ -630,6 +637,51 @@ app.put('/api/settings/capture', booth, (req, res) => {
   // Nudge the kiosk so a settings change takes effect without a reload.
   remote.command('settings-changed', { settings: merged });
   return res.json({ settings: merged });
+});
+
+// ── Typed backgrounds ────────────────────────────────────────────────────────
+// See server/backgrounds.mjs. The key is read per request, so saving it on the
+// Environment tab turns typing on without a restart.
+
+function typedBackgroundsOn() {
+  const settings = store.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS);
+  return Boolean(process.env.OPENROUTER_API_KEY) && settings.promptBackgrounds !== false;
+}
+
+app.get('/api/backgrounds/status', booth, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    available: typedBackgroundsOn(),
+    configured: Boolean(process.env.OPENROUTER_API_KEY),
+    model: process.env.OPENROUTER_IMAGE_MODEL || DEFAULT_MODEL,
+  });
+});
+
+const BACKGROUND_STATUS = {
+  'not-configured': 503, empty: 400, blocked: 422, refused: 422, busy: 429, failed: 502,
+};
+
+app.post('/api/backgrounds/generate', booth, async (req, res, next) => {
+  if (!typedBackgroundsOn()) {
+    return res.status(503).json({
+      code: 'not-configured', error: 'Typed backgrounds are not set up on this booth.',
+    });
+  }
+  try {
+    const image = await backgrounds.generate(req.body?.text, {
+      apiKey: process.env.OPENROUTER_API_KEY,
+      model: process.env.OPENROUTER_IMAGE_MODEL || DEFAULT_MODEL,
+    });
+    res.setHeader('Content-Type', image.mime);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Background-Cached', image.cached ? '1' : '0');
+    return res.send(image.bytes);
+  } catch (err) {
+    if (err instanceof BackgroundError) {
+      return res.status(BACKGROUND_STATUS[err.code] ?? 500).json({ code: err.code, error: err.message });
+    }
+    return next(err);
+  }
 });
 
 // ── Clean plate ──────────────────────────────────────────────────────────────

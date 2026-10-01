@@ -125,6 +125,22 @@ export const ENV_FIELDS = [
     restart: true,
   },
   {
+    key: 'OPENROUTER_API_KEY',
+    label: 'OpenRouter API key',
+    help: 'Lets guests type a background, which an image model draws (about US$0.10 each). '
+      + 'Empty hides the typing box; the ready-made backgrounds still work.',
+    placeholder: 'sk-or-…',
+    secret: true,
+    restart: false,
+  },
+  {
+    key: 'OPENROUTER_IMAGE_MODEL',
+    label: 'Background image model',
+    help: 'Which OpenRouter image model draws typed backgrounds. Leave empty for Gemini 3.1 Flash Image.',
+    placeholder: 'google/gemini-3.1-flash-image',
+    restart: false,
+  },
+  {
     key: 'CLOUDFLARED_PROTOCOL',
     label: 'Tunnel protocol',
     help: 'http2 gets through school and corporate networks that block QUIC. Change only if the tunnel will not start.',

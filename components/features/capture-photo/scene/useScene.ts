@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AVATARS, BACKGROUNDS, type BgRemoval, type ChromaKeySettings, type SceneChoice,
+  AVATARS, BACKGROUNDS, TYPED_BACKGROUND_ID,
+  type BgRemoval, type ChromaKeySettings, type SceneChoice,
 } from '@/types/scene';
 import type { SceneLayers } from '../useLivePreview';
 import { ChromaKeyer } from './chromaKey';
@@ -172,9 +173,13 @@ export function useScene(config: SceneConfig) {
 
   const pictures = useCallback(() => {
     const c = configRef.current;
-    const bg = BACKGROUNDS.find(b => b.id === c.choice.backgroundId) ?? BACKGROUNDS[0];
+    const typed = c.choice.backgroundId === TYPED_BACKGROUND_ID ? c.choice.typed : null;
+    const src = typed?.src
+      ?? (BACKGROUNDS.find(b => b.id === c.choice.backgroundId) ?? BACKGROUNDS[0]).src;
+    // A typed background arrives as an object URL after the page loaded.
+    if (!images.current.has(src)) images.current.set(src, loadImage(src));
     const option = AVATARS.find(a => a.id === c.choice.avatarId) ?? null;
-    const bgImg = images.current.get(bg.src);
+    const bgImg = images.current.get(src);
     const avatarImg = option ? images.current.get(option.src) : undefined;
     return {
       background: ready(bgImg) ? bgImg : null,
