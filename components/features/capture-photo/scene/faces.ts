@@ -70,9 +70,10 @@ const TILE_MAX_AGE_MS = 1500;
 /**
  * How much of a new position is taken each update. Below 1 so a face that
  * jitters by a pixel does not make its hat shake; high enough that a guest
- * who moves is followed rather than chased.
+ * who moves is followed rather than chased. (0.6 left glasses visibly behind
+ * a guest walking across the frame.)
  */
-const FOLLOW = 0.6;
+const FOLLOW = 0.8;
 
 /** Faces closer than this (fraction of the frame) are the same face, for smoothing. */
 const SAME_FACE = 0.04;
@@ -128,6 +129,27 @@ export function dedupe(faces: FacePoints[]): FacePoints[] {
     boxes.push(b);
   }
   return out;
+}
+
+/**
+ * Whether a tile's face is an older sighting of someone the whole-region pass
+ * is following: about the same size, and within two face widths. A tile runs
+ * only every few updates, so a guest walking across left a second pair of
+ * glasses where the tile last saw them. People standing further back are
+ * smaller and stay; so does anyone the whole-region pass has not found.
+ * Exported for tests.
+ */
+export function followedElsewhere(tileFace: FacePoints, whole: FacePoints[]): boolean {
+  const t = box(tileFace);
+  const tw = t.x1 - t.x0;
+  return whole.some((face) => {
+    const b = box(face);
+    const w = b.x1 - b.x0;
+    const ratio = tw / Math.max(w, 1e-6);
+    if (ratio < 0.6 || ratio > 1.6) return false;
+    const d = Math.hypot(tileFace[NOSE].x - face[NOSE].x, tileFace[NOSE].y - face[NOSE].y);
+    return d < 2 * Math.max(tw, w);
+  });
 }
 
 /** Whether a face a tile found is too big to be one the tiles are for. Exported for tests. */
@@ -206,6 +228,7 @@ class Pass {
 export class FaceTracker {
   private lastRun = -Infinity;
   private next = 0;
+  private step = 0;
   /** The faces as last seen, smoothed. Empty until the first detection. */
   faces: FacePoints[] = [];
 
@@ -224,9 +247,10 @@ export class FaceTracker {
     // A tile's answer stands until it comes round again (it is replaced then),
     // or until it is too old to trust.
     const fresh = (p: Pass) => now - p.at < TILE_MAX_AGE_MS;
+    const whole = this.whole.faces;
     return dedupe([
-      ...this.whole.faces,
-      ...this.tiles.filter(fresh).flatMap(p => p.faces),
+      ...whole,
+      ...this.tiles.filter(fresh).flatMap(p => p.faces).filter(f => !followedElsewhere(f, whole)),
     ]);
   }
 
@@ -241,9 +265,16 @@ export class FaceTracker {
     this.lastRun = now;
     const r = region ?? WHOLE;
     try {
-      this.whole.run(video, r, now);
-      this.tiles[this.next].run(video, r, now);
-      this.next = (this.next + 1) % this.tiles.length;
+      // One search per update, not two: the whole region every other update,
+      // so a guest close to the camera is followed closely, and a tile in
+      // between. Two at once was the largest single cost of a preview frame.
+      if (this.step % 2 === 0) {
+        this.whole.run(video, r, now);
+      } else {
+        this.tiles[this.next].run(video, r, now);
+        this.next = (this.next + 1) % this.tiles.length;
+      }
+      this.step += 1;
       this.faces = smooth(this.faces, this.merged(now));
     } catch (err) {
       console.warn('[booth] Face tracking failed on a frame:', err);

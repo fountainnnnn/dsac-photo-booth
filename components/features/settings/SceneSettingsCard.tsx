@@ -325,7 +325,7 @@ function SpeedReadout() {
 
   const rows: [string, string][] = [];
   if (speeds.segment !== undefined) {
-    const perSecond = Math.max(1, Math.round(1000 / Math.max(33, speeds.segment * 2)));
+    const perSecond = Math.max(1, Math.round(1000 / Math.max(33, speeds.segment * 1.5)));
     rows.push(['Cut-out, live', `${speeds.segment} ms each, about ${perSecond} a second`]);
   }
   if (speeds.faces !== undefined) rows.push(['Face tracking, live', `${speeds.faces} ms each`]);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cutByTileEdge, dedupe, tooBigForTile, type FacePoints } from './faces';
+import { cutByTileEdge, dedupe, followedElsewhere, tooBigForTile, type FacePoints } from './faces';
 
 /** A face as a square of points, centred at (cx, cy), `size` across. */
 function face(cx: number, cy: number, size: number): FacePoints {
@@ -21,6 +21,18 @@ describe('dedupe', () => {
     const a = face(0.4, 0.4, 0.06);
     const b = face(0.5, 0.4, 0.06);
     expect(dedupe([a, b])).toHaveLength(2);
+  });
+});
+
+describe('followedElsewhere', () => {
+  it('drops a tile\'s old sighting of a guest the whole pass now sees nearby', () => {
+    expect(followedElsewhere(face(0.40, 0.4, 0.1), [face(0.52, 0.4, 0.1)])).toBe(true);
+  });
+
+  it('keeps smaller faces further back, and anyone the whole pass has not found', () => {
+    expect(followedElsewhere(face(0.45, 0.3, 0.05), [face(0.5, 0.4, 0.1)])).toBe(false);
+    expect(followedElsewhere(face(0.1, 0.4, 0.1), [face(0.8, 0.4, 0.1)])).toBe(false);
+    expect(followedElsewhere(face(0.4, 0.4, 0.06), [])).toBe(false);
   });
 });
 

@@ -68,9 +68,10 @@ Without a key, guests see only the ready-made backgrounds.
 Everything else runs on the laptop, offline, on its graphics chip where the
 browser allows and its CPU otherwise. The **Speed on this laptop** box on the
 same Settings card shows how long each step takes on the machine running the
-booth. On a recent Mac: the live cut-out takes about 50 ms, the preview runs at
-about 28 frames a second with it (43 with a green screen or avatars only), and
-shutter to QR code is under a second, about 2 s with the clean-up pass. A slow
+booth. On a recent Mac the preview runs at about 50–60 frames a second with no
+green screen (about 30 with the CPU slowed four times, as a stand-in for a weak
+laptop), and shutter to QR code is under a second, about 2 s with the clean-up
+pass. A slow
 laptop will be several times slower; if the readout says so, use a green screen. The models live in
 `public/vision/` (MediaPipe face mesh and segmenter) and `public/matting/`
 (MODNet); MediaPipe's runtime is copied there at build time. The backgrounds in

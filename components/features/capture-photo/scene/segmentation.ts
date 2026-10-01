@@ -13,9 +13,9 @@ import { recordSpeed } from './speed';
  * hair, skin and clothes apart, kept every face whole.
  *
  * It only ever sees 256x256 pixels, so over a whole frame a group's arms are a
- * few of its pixels wide and came out cut short. So it runs twice: once over
- * the whole frame, about once a second, to find where the people are; and
- * every update over just that area, so the people fill its view. On a test
+ * few of its pixels wide and came out cut short. So it runs twice: every third
+ * update over the whole frame, to find where the people are; and every update
+ * over just that area, so the people fill its view. On a test
  * group that gave whole arms and hands and complete legs, for the price of a
  * second pass. Both passes are fed small copies — MediaPipe returns the mask
  * at the size of its input, and a full 4K mask was all cost and no detail.
@@ -27,11 +27,21 @@ import { recordSpeed } from './speed';
 /** Width of the whole-frame copy. Twice the model's own input: enough. */
 const INPUT_WIDTH = 512;
 
-/** Longest side of the close-up copy. */
-const ZOOM_SIZE = 768;
+/**
+ * Longest side of the close-up copy. The model looks at 256x256 whatever it
+ * is given, and returns its mask at the size of the copy, so a bigger copy
+ * buys nothing but a bigger mask to read back.
+ */
+const ZOOM_SIZE = 384;
 
-/** How often the whole frame is looked at again, for people coming and going. */
-const FULL_EVERY_MS = 1000;
+/**
+ * How often the whole frame is looked at again, in updates. Once a second was
+ * too seldom: a guest walking across left the close-up's area within it, and
+ * outside that area the cut-out was up to a second old, so most of them
+ * vanished until it caught up. Every third update is about a tenth of a
+ * second on a laptop that keeps up.
+ */
+const WHOLE_EVERY = 3;
 
 /** Width of the combined mask, enough to keep the close-up's detail. */
 const MASK_WIDTH = 960;
@@ -39,8 +49,11 @@ const MASK_WIDTH = 960;
 /** Confidence at which a pixel counts towards where the people are. */
 const BOX_THRESHOLD = 0.5;
 
-/** Margin around the people for the close-up, as a share of their extent. */
-const BOX_PAD = 0.08;
+/**
+ * Margin around the people for the close-up, as a share of their extent:
+ * room for a guest to move between one look at the whole frame and the next.
+ */
+const BOX_PAD = 0.15;
 
 /**
  * How far past the whole-frame pass's people the close-up may add, as a share
@@ -52,8 +65,9 @@ const REACH = 0.02;
 
 /**
  * How often the model runs. It paces itself: never more than every 33ms, and
- * otherwise twice as long as it last took, so on a slow laptop it leaves half
- * the time to the preview instead of starving it.
+ * otherwise half as long again as it last took, so on a slow laptop it leaves
+ * a third of the time to the preview instead of starving it. (Twice as long
+ * left the cut-out trailing guests who moved.)
  */
 const MIN_INTERVAL_MS = 33;
 const MAX_INTERVAL_MS = 250;
@@ -63,7 +77,7 @@ const MAX_INTERVAL_MS = 250;
  * so an edge that flickers between frames settles instead of shimmering;
  * not much less, or a guest who moves leaves a ghost behind.
  */
-const BLEND = 0.65;
+const BLEND = 0.8;
 
 /** Confidence below LO is room, above HI person; between, a soft edge. */
 const LO = 0.3;
@@ -287,7 +301,7 @@ export function reachOf(whole: Mask, invert: boolean): Float32Array {
 
 export class PersonSegmenter {
   private lastRun = -Infinity;
-  private lastWhole = -Infinity;
+  private sinceWhole = Infinity;
   private interval = MIN_INTERVAL_MS;
   private wholeInput = document.createElement('canvas');
   private closeInput = document.createElement('canvas');
@@ -340,7 +354,7 @@ export class PersonSegmenter {
     this.lastRun = now;
 
     try {
-      if (!this.whole || !this.region || now - this.lastWhole > FULL_EVERY_MS) {
+      if (!this.whole || !this.region || this.sinceWhole >= WHOLE_EVERY - 1) {
         const scale = Math.min(1, INPUT_WIDTH / vw);
         const w = Math.max(1, Math.round(vw * scale));
         const h = Math.max(1, Math.round(vh * scale));
@@ -350,7 +364,9 @@ export class PersonSegmenter {
         this.whole = this.run(this.wholeInput) ?? this.whole;
         this.region = this.whole ? peopleRegion(this.whole, this.invert) : null;
         this.reach = this.whole ? reachOf(this.whole, this.invert) : null;
-        this.lastWhole = now;
+        this.sinceWhole = 0;
+      } else {
+        this.sinceWhole += 1;
       }
       if (!this.whole) return true;
 
@@ -387,7 +403,7 @@ export class PersonSegmenter {
     } finally {
       const took = performance.now() - now;
       recordSpeed('segment', took);
-      this.interval = Math.min(MAX_INTERVAL_MS, Math.max(MIN_INTERVAL_MS, took * 2));
+      this.interval = Math.min(MAX_INTERVAL_MS, Math.max(MIN_INTERVAL_MS, took * 1.5));
     }
     return true;
   }
