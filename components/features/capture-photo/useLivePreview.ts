@@ -5,6 +5,8 @@ import type { FrameWindow } from '@/types/frame';
 import type { AvatarOption } from '@/types/scene';
 import type { FacePoints } from './scene/faces';
 import { drawAvatars, type PhotoGeometry } from './scene/avatars';
+import { countPreviewFrame } from './scene/frameRate';
+import { drawTrackingOverlay, type OverlayFace } from './scene/overlay';
 
 /**
  * What goes around the people, for one draw. Absent, the photo is the plain
@@ -23,6 +25,11 @@ export interface SceneLayers {
   avatar?: { option: AvatarOption; image: HTMLImageElement } | null;
   /** Faces, in the raw camera's 0–1 coordinates. */
   faces?: FacePoints[] | null;
+  /**
+   * Boxes round every face the tracker found, for the live preview's
+   * tracking overlay. Only the preview's scene has them, so never a photo.
+   */
+  overlay?: OverlayFace[] | null;
 }
 
 export interface LivePreviewOptions {
@@ -215,12 +222,13 @@ export function drawPhoto(
     drawLookRamp(ctx, src, startEdge, filters, { sx, sy, sw, sh, dx, dy, dw, dh, rotationRad });
   }
 
+  const geometry: PhotoGeometry = {
+    sx, sy, sw, sh, srcW: vw, srcH: vh, dx, dy, dw, dh, rotationRad,
+  };
   if (scene?.avatar && scene.faces?.length) {
-    const geometry: PhotoGeometry = {
-      sx, sy, sw, sh, srcW: vw, srcH: vh, dx, dy, dw, dh, rotationRad,
-    };
     drawAvatars(ctx, scene.faces, scene.avatar.option, scene.avatar.image, geometry);
   }
+  if (scene?.overlay?.length) drawTrackingOverlay(ctx, scene.overlay, geometry);
 }
 
 /**
@@ -326,6 +334,7 @@ export function useLivePreview(
       w: canvas.width,
       h: canvas.height,
     });
+    countPreviewFrame();
 
     rafRef.current = requestAnimationFrame(drawFrame);
   }, [videoRef]);

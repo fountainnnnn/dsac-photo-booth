@@ -7,8 +7,12 @@ import type { SceneLayers } from '../useLivePreview';
 import { ChromaKeyer } from './chromaKey';
 import { PersonSegmenter, cutOut } from './segmentation';
 import { FaceTracker, type FacePoints, type Region } from './faces';
-import { faceBox, frontFaces } from './front';
+import {
+  faceBox, faceDistance, frontFaces, holdGroup, nearestDistance, type FaceBox, type Member,
+} from './front';
+import { DROP_LABEL, type OverlayFace } from './overlay';
 import { matte, preloadMatting } from './matting';
+import { noteFaces } from './frameRate';
 
 /**
  * Everything the camera needs to draw a scene: the keyer or the segmenter,
@@ -39,6 +43,15 @@ export interface SceneConfig {
    * green screen, only their shapes cut out. See `front.ts`.
    */
   focusFront?: boolean;
+  /** With `focusFront`, the distance line in metres: nearer is the group. See `front.ts`. */
+  frontLineM?: number;
+  /**
+   * Track faces even when nothing on screen needs them, so the distance to
+   * the nearest can be read off: the Settings preview, measuring the line.
+   */
+  trackFaces?: boolean;
+  /** Draw boxes round the faces on the preview (see `overlay.ts`). */
+  showTracking?: boolean;
 }
 
 export type PartStatus = 'off' | 'loading' | 'ready' | 'failed';
@@ -110,10 +123,13 @@ export function useScene(config: SceneConfig) {
   // Faces are wanted for avatars, and to tell the group from the crowd when a
   // model is finding the people.
   const wantsFaces = Boolean(config.choice.avatarId)
-    || (Boolean(config.focusFront) && bgRemoval === 'segment');
+    || (Boolean(config.focusFront) && bgRemoval === 'segment')
+    || Boolean(config.trackFaces);
 
   // The group as it was last frame, so membership is sticky (see front.ts).
   const lastFront = useRef<FacePoints[]>([]);
+  // ...and everyone in it lately, so a face missed for a moment keeps its body.
+  const held = useRef<Member[]>([]);
 
   // The keyer, and the clean plate it compares against.
   useEffect(() => {
@@ -201,9 +217,11 @@ export function useScene(config: SceneConfig) {
 
   /** The faces that count: everyone, or only the group at the front. */
   const focused = useCallback((faces: FacePoints[]): FacePoints[] => {
-    if (!configRef.current.focusFront) return faces;
-    const front = frontFaces(faces, lastFront.current);
+    const c = configRef.current;
+    if (!c.focusFront) return faces;
+    const front = frontFaces(faces, lastFront.current, c.frontLineM);
     lastFront.current = front;
+    held.current = holdGroup(front, held.current, performance.now());
     return front;
   }, []);
 
@@ -213,16 +231,22 @@ export function useScene(config: SceneConfig) {
     const { background, avatar } = pictures();
 
     const tracking = tracker.current
-      && (avatar || (c.focusFront && c.bgRemoval === 'segment'));
+      && (avatar || (c.focusFront && c.bgRemoval === 'segment') || c.trackFaces);
 
     let person: HTMLCanvasElement | null = null;
     let segmented = false;
     if (c.bgRemoval === 'key' && keyer.current) {
       person = keyer.current.process(video, c.chromaKey, PREVIEW_MAX_WIDTH);
     } else if (c.bgRemoval === 'segment' && segmenter.current) {
-      // The group as last tracked; until faces are known, everyone is kept.
-      const front = c.focusFront && tracking && lastFront.current.length ? lastFront.current : null;
-      segmented = segmenter.current.update(video, front ? front.map(faceBox) : null);
+      // The group as last tracked, with anyone just missed. Faces found but
+      // all beyond the line: nobody. No faces at all — guests facing away, or
+      // the tracker still loading — and everyone is kept.
+      let focus: FaceBox[] | null = null;
+      if (c.focusFront && tracking) {
+        if (held.current.length) focus = held.current.map(m => faceBox(m.face));
+        else if (tracker.current!.faces.length) focus = [];
+      }
+      segmented = segmenter.current.update(video, focus);
       const mask = segmenter.current.mask;
       if (mask) {
         person = cutOut(video, mask, PREVIEW_MAX_WIDTH, previewCut.current ?? undefined);
@@ -233,13 +257,27 @@ export function useScene(config: SceneConfig) {
     // Faces on a frame the segmenter did not run on: both at once stalled the
     // preview for a tenth of a second at a time.
     let faces: FacePoints[] | null = null;
+    let overlay: OverlayFace[] | null = null;
     if (tracking) {
-      if (!segmented) tracker.current!.update(video, c.region ?? null);
-      faces = focused(tracker.current!.faces);
+      const t = tracker.current!;
+      if (!segmented) t.update(video, c.region ?? null);
+      faces = focused(t.faces);
+      noteFaces(t.faces.length, faces.length, nearestDistance(t.faces));
+      if (c.showTracking) {
+        const inGroup = new Set(faces);
+        overlay = [
+          ...t.faces.map(face => ({
+            face,
+            state: inGroup.has(face) ? 'group' as const : 'beyond' as const,
+            label: `${faceDistance(face).toFixed(1)} m${inGroup.has(face) ? '' : ', beyond the line'}`,
+          })),
+          ...t.dropped.map(d => ({ face: d.face, state: 'dropped' as const, label: DROP_LABEL[d.why] })),
+        ];
+      }
     }
 
-    if (!person && !avatar) return null;
-    return { person, background, avatar, faces: avatar ? faces : null };
+    if (!person && !avatar && !overlay) return null;
+    return { person, background, avatar, faces: avatar ? faces : null, overlay };
   }, [pictures, focused]);
 
   /**

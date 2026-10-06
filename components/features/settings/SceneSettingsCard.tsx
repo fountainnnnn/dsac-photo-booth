@@ -7,6 +7,7 @@ import { useLivePreview } from '@/components/features/capture-photo/useLivePrevi
 import { CLEAN_PLATE_URL, useScene } from '@/components/features/capture-photo/scene/useScene';
 import { plateKeyColour } from '@/components/features/capture-photo/scene/chromaKey';
 import { readSpeeds } from '@/components/features/capture-photo/scene/speed';
+import { readFaces } from '@/components/features/capture-photo/scene/frameRate';
 import { unmirrorCrop } from '@/components/features/remote/useCaptureSettings';
 import { BACKGROUNDS, type BgRemoval, type ChromaKeySettings } from '@/types/scene';
 
@@ -55,6 +56,13 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
     edgeCleanup: false, // the clean-up pass only runs at the shutter
     cleanPlateAt: settings.cleanPlateAt,
     choice: { backgroundId: previewBg, avatarId: '' },
+    // Who counts as the group, as on the capture screen, so the distance line
+    // can be measured and tuned against this preview.
+    region: settings.cropEnabled ? unmirrorCrop(settings.crop) : null,
+    focusFront: settings.focusFront,
+    frontLineM: settings.frontLineM,
+    trackFaces: settings.focusFront,
+    showTracking: settings.showFaceBoxes,
   });
 
   const { canvasRef } = useLivePreview(videoRef, {
@@ -261,14 +269,20 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
         <span>
           <span className="block text-[0.8rem] font-semibold text-[var(--ink)]">Only the people at the front</span>
           <span className="mt-1 block text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
-            The group having their photo taken — however many — gets avatars and,
-            with no green screen, is kept in front of the background. People
-            further back, like a queue, are left out. Judged by how big faces are,
-            so guests should face the camera. Someone overlapping a guest in the
-            picture stays; a green screen avoids that.
+            Everyone nearer the camera than the distance line below — however
+            many — gets avatars and, with no green screen, is kept in front of the
+            background. People further back, like a queue, are left out. Distance
+            is judged by how big faces are, so guests should face the camera.
+            Someone overlapping a guest in the picture stays; a green screen
+            avoids that.
           </span>
         </span>
       </label>
+
+      {settings.focusFront && (
+        <DistanceLine value={settings.frontLineM} canMeasure={mode !== 'off'}
+          onChange={v => push({ ...settings, frontLineM: v })} />
+      )}
 
       {mode !== 'off' && (
         <label className="mt-6 flex items-start gap-3">
@@ -307,6 +321,37 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
           </span>
         </label>
       )}
+
+      <label className="mt-6 flex items-start gap-3">
+        <input type="checkbox" checked={settings.showFps}
+          onChange={e => push({ ...settings, showFps: e.target.checked })}
+          className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+        <span>
+          <span className="block text-[0.8rem] font-semibold text-[var(--ink)]">Show the frame rate</span>
+          <span className="mt-1 block text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+            A readout beside the stage on the capture screen: frames a second the
+            preview draws, new pictures from the camera, with no green screen how
+            often the cut-out keeps up, and the faces found. Guests see it too, so
+            turn it off before the doors open.
+          </span>
+        </span>
+      </label>
+
+      <label className="mt-6 flex items-start gap-3">
+        <input type="checkbox" checked={settings.showFaceBoxes}
+          onChange={e => push({ ...settings, showFaceBoxes: e.target.checked })}
+          className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+        <span>
+          <span className="block text-[0.8rem] font-semibold text-[var(--ink)]">Show face boxes (debug)</span>
+          <span className="mt-1 block text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+            A box round every face the tracker finds, on the previews only, never
+            in a photo: green is in the photo, amber is beyond the distance line,
+            red dashed was found and then set aside, with why. Someone with no box
+            was never found. Guests see it too, so turn it off before the doors
+            open.
+          </span>
+        </span>
+      </label>
     </section>
   );
 }
@@ -354,15 +399,100 @@ function SpeedReadout() {
   );
 }
 
-function Slider({ label, value, min, max, step, help, onChange }: {
+/** Seconds between pressing Measure and the measurement: time to walk to the line. */
+const MEASURE_DELAY_S = 5;
+const MIN_LINE_M = 0.5;
+const MAX_LINE_M = 5;
+
+/**
+ * Where "the front" ends. Set at the venue by standing at the far edge of
+ * where guests should be and letting the preview above measure the nearest
+ * face. The metres are a rough guess from face size, but a line measured this
+ * way is exactly where the person stood, because it is checked with the same
+ * guess. The slider nudges it after.
+ */
+function DistanceLine({ value, canMeasure, onChange }: {
+  value: number;
+  /** Whether the preview above is running, so there is a face to measure. */
+  canMeasure: boolean;
+  onChange: (metres: number) => void;
+}) {
+  const [nearest, setNearest] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // The latest, for a measurement that lands seconds after the click: the
+  // settings it was made with may have changed meanwhile.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNearest(readFaces()?.nearestM ?? null), 300);
+    return () => {
+      clearInterval(id);
+      if (timer.current) clearInterval(timer.current);
+    };
+  }, []);
+
+  const measure = () => {
+    if (timer.current) clearInterval(timer.current);
+    setNote(null);
+    let left = MEASURE_DELAY_S;
+    setCountdown(left);
+    timer.current = setInterval(() => {
+      left -= 1;
+      if (left > 0) { setCountdown(left); return; }
+      if (timer.current) clearInterval(timer.current);
+      timer.current = null;
+      setCountdown(null);
+      const m = readFaces()?.nearestM ?? null;
+      if (m === null) {
+        setNote('No face found. Stand at the line facing the camera, and try again.');
+        return;
+      }
+      // A little past where they stood, so the person who stood there is inside it.
+      const line = Math.round(Math.min(MAX_LINE_M, Math.max(MIN_LINE_M, m * 1.1)) * 10) / 10;
+      onChangeRef.current(line);
+      setNote(`Set to about ${line.toFixed(1)} m.`);
+    }, 1000);
+  };
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 pl-7">
+      <Slider label="Distance line" value={value} min={MIN_LINE_M} max={MAX_LINE_M} step={0.1}
+        format={v => `about ${v.toFixed(1)} m`}
+        help="Anyone nearer the camera than this is in the photo; anyone further back is left out. The metres are approximate, so measure it rather than guess."
+        onChange={onChange} />
+      {canMeasure ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" size="sm" variant="secondary" onClick={measure} disabled={countdown !== null}>
+            {countdown !== null ? `Measuring in ${countdown}…` : 'Measure from where I stand'}
+          </Button>
+          <span className="font-mono text-[0.72rem] text-[var(--ink-3)]">
+            {nearest === null ? 'No face in view' : `Nearest face: about ${nearest.toFixed(1)} m`}
+          </span>
+        </div>
+      ) : (
+        <p className="text-[0.72rem] text-[var(--ink-3)]">
+          Turn background removal on to measure the line against the camera.
+        </p>
+      )}
+      <p className="text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+        {note ?? `Press Measure, walk to the far edge of where guests should stand, and face the camera. It measures after ${MEASURE_DELAY_S} seconds.`}
+      </p>
+    </div>
+  );
+}
+
+function Slider({ label, value, min, max, step, help, format, onChange }: {
   label: string; value: number; min: number; max: number; step: number;
-  help: string; onChange: (v: number) => void;
+  help: string; format?: (v: number) => string; onChange: (v: number) => void;
 }) {
   return (
     <label className="block">
       <span className="flex items-baseline justify-between text-[0.78rem] font-semibold text-[var(--ink-2)]">
         {label}
-        <span className="font-mono text-[0.72rem] font-normal text-[var(--ink-3)]">{value.toFixed(2)}</span>
+        <span className="font-mono text-[0.72rem] font-normal text-[var(--ink-3)]">{format ? format(value) : value.toFixed(2)}</span>
       </span>
       <input type="range" min={min} max={max} step={step} value={value}
         onChange={e => onChange(Number(e.target.value))}

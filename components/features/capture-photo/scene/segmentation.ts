@@ -3,6 +3,7 @@ import { createSegmenter } from './vision';
 import type { FaceBox } from './front';
 import type { Region } from './faces';
 import { recordSpeed } from './speed';
+import { countCutout } from './frameRate';
 
 /**
  * Finding the people without a green screen.
@@ -309,6 +310,8 @@ export class PersonSegmenter {
   private reach: Float32Array | null = null;
   private region: Region | null = null;
   private running: Float32Array | null = null;
+  /** An all-room mask, for when faces were found but nobody is in the group. */
+  private empty: Float32Array | null = null;
   private maskW = 0;
   private maskH = 0;
   /** Whether the first mask is "background", to be inverted into the person. */
@@ -343,8 +346,9 @@ export class PersonSegmenter {
   /**
    * Run the model on this frame, unless it ran recently enough. With
    * `focus`, only the people whose shape holds one of those faces are kept
-   * (see `keepPeopleWith`); null keeps everyone. True when it ran, so the
-   * caller can leave other heavy work to the next frame.
+   * (see `keepPeopleWith`), and an empty `focus` keeps nobody: faces were
+   * found, all of them beyond the line. Null keeps everyone. True when it ran,
+   * so the caller can leave other heavy work to the next frame.
    */
   update(video: HTMLVideoElement, focus: FaceBox[] | null = null, now = performance.now()): boolean {
     if (now - this.lastRun < this.interval) return false;
@@ -395,8 +399,15 @@ export class PersonSegmenter {
           invert: this.invert, into: this.running, blend: BLEND, reach: this.reach ?? undefined,
         });
       }
-      const shown = focus ? keepPeopleWith(this.running, mw, mh, focus) : this.running;
+      let shown = this.running;
+      if (focus?.length) {
+        shown = keepPeopleWith(this.running, mw, mh, focus);
+      } else if (focus) {
+        if (this.empty?.length !== mw * mh) this.empty = new Float32Array(mw * mh);
+        shown = this.empty;
+      }
       this.mask = alphaMaskCanvas(shown, mw, mh, this.mask ?? undefined);
+      countCutout();
     } catch (err) {
       // One bad frame must not stop the preview; the last mask stands.
       console.warn('[booth] Segmentation failed on a frame:', err);

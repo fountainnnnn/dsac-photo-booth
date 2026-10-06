@@ -37,6 +37,12 @@ import { recordSpeed } from './speed';
 export interface FacePoint { x: number; y: number }
 export type FacePoints = FacePoint[];
 
+/** Why a face a pass found was set aside. */
+export type DropReason = 'edge' | 'big' | 'ghost' | 'duplicate';
+
+/** A face found and set aside, for the tracking overlay. */
+export interface DroppedFace { face: FacePoints; why: DropReason }
+
 /** A rectangle as fractions of whatever contains it. */
 export interface Region { x: number; y: number; w: number; h: number }
 
@@ -189,6 +195,8 @@ class Pass {
   private canvas = document.createElement('canvas');
   /** Its last faces, in camera coordinates, and when it found them. */
   faces: FacePoints[] = [];
+  /** Faces it found and set aside itself, in camera coordinates. */
+  rejected: DroppedFace[] = [];
   at = -Infinity;
 
   /** `follows`: VIDEO mode, tracking between frames, for the whole region. */
@@ -214,9 +222,17 @@ class Pass {
     const result = this.follows
       ? this.landmarker.detectForVideo(this.canvas, this.clock())
       : this.landmarker.detect(this.canvas);
-    this.faces = result.faceLandmarks
-      .filter(face => this.follows || (!cutByTileEdge(face, this.tile) && !tooBigForTile(face, this.tile)))
-      .map(face => face.map(({ x, y }) => ({ x: fx + x * fw, y: fy + y * fh })));
+    this.faces = [];
+    this.rejected = [];
+    for (const face of result.faceLandmarks) {
+      const why: DropReason | null = this.follows ? null
+        : cutByTileEdge(face, this.tile) ? 'edge'
+          : tooBigForTile(face, this.tile) ? 'big'
+            : null;
+      const placed = face.map(({ x, y }) => ({ x: fx + x * fw, y: fy + y * fh }));
+      if (why) this.rejected.push({ face: placed, why });
+      else this.faces.push(placed);
+    }
     this.at = now;
   }
 
@@ -231,6 +247,11 @@ export class FaceTracker {
   private step = 0;
   /** The faces as last seen, smoothed. Empty until the first detection. */
   faces: FacePoints[] = [];
+  /**
+   * Faces found and set aside on the last update that are not the same as
+   * any face kept — the ones that might be a person lost — for the overlay.
+   */
+  dropped: DroppedFace[] = [];
 
   private constructor(private whole: Pass, private tiles: Pass[]) {}
 
@@ -246,12 +267,23 @@ export class FaceTracker {
   private merged(now: number): FacePoints[] {
     // A tile's answer stands until it comes round again (it is replaced then),
     // or until it is too old to trust.
-    const fresh = (p: Pass) => now - p.at < TILE_MAX_AGE_MS;
+    const fresh = this.tiles.filter(p => now - p.at < TILE_MAX_AGE_MS);
     const whole = this.whole.faces;
-    return dedupe([
-      ...whole,
-      ...this.tiles.filter(fresh).flatMap(p => p.faces).filter(f => !followedElsewhere(f, whole)),
-    ]);
+    const tileFaces = fresh.flatMap(p => p.faces);
+    const ghosts = tileFaces.filter(f => followedElsewhere(f, whole));
+    const candidates = [...whole, ...tileFaces.filter(f => !ghosts.includes(f))];
+    const kept = dedupe(candidates);
+
+    // What was set aside, minus anything that is plainly someone kept: every
+    // tile sees the front guest too, and says so.
+    const keptBoxes = kept.map(box);
+    const someoneKept = (f: FacePoints) => keptBoxes.some(b => overlap(b, box(f)) > SAME_PERSON_OVERLAP);
+    this.dropped = [
+      ...fresh.flatMap(p => p.rejected),
+      ...ghosts.map(face => ({ face, why: 'ghost' as const })),
+      ...candidates.filter(f => !kept.includes(f)).map(face => ({ face, why: 'duplicate' as const })),
+    ].filter(d => !someoneKept(d.face));
+    return kept;
   }
 
   /**

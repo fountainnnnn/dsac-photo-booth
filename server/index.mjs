@@ -605,6 +605,14 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // Only the group at the front gets avatars and, with no green screen, is
   // cut out; people further back are left alone. Judged by face size.
   focusFront: true,
+  // Where "the front" ends, in metres from the camera (roughly; it is judged
+  // by face size). Set at the venue from Settings by measuring.
+  frontLineM: 2,
+  // A frame-rate readout beside the stage, for judging the laptop. Off, so
+  // guests never see it unless the operator asks for it.
+  showFps: false,
+  // Debug boxes round the faces on the previews, for the same reason off.
+  showFaceBoxes: false,
 };
 
 /**

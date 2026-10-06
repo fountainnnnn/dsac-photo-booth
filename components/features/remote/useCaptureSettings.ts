@@ -127,6 +127,23 @@ export interface CaptureSettings {
    * left alone. Judged by face size, so it needs the face tracker running.
    */
   focusFront: boolean;
+  /**
+   * With `focusFront`, the distance line in metres: anyone nearer the camera
+   * is in the group, anyone further back is left out. Approximate metres,
+   * judged by face size, and set at the venue by measuring (see `front.ts`).
+   */
+  frontLineM: number;
+  /**
+   * Show how many frames a second the capture screen manages, beside the
+   * stage. For judging a laptop before the doors open; guests see it too.
+   */
+  showFps: boolean;
+  /**
+   * Debug: a box round every face the tracker finds, on the previews only,
+   * coloured by whether it is in the group. For working out at the venue why
+   * someone is or is not cut out; guests see it too.
+   */
+  showFaceBoxes: boolean;
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -149,6 +166,9 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   cleanPlateAt: '',
   promptBackgrounds: true,
   focusFront: true,
+  frontLineM: 2,
+  showFps: false,
+  showFaceBoxes: false,
 };
 
 export function useCaptureSettings() {

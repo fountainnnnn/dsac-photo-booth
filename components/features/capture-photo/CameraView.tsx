@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import {
   ArrowClockwise,
   Camera,
@@ -13,6 +13,7 @@ import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useLivePreview, drawPhoto } from './useLivePreview';
 import { useScene, type SceneStatus } from './scene/useScene';
 import { recordSpeed } from './scene/speed';
+import { useFrameRates } from './scene/frameRate';
 import type { TypedBackgroundState } from './scene/useTypedBackground';
 import {
   AVATARS, BACKGROUNDS, DEFAULT_SCENE_CHOICE, TYPED_BACKGROUND_ID, type SceneChoice,
@@ -132,6 +133,8 @@ export default function CameraView({
     choice,
     region: crop,
     focusFront: captureSettings.focusFront,
+    frontLineM: captureSettings.frontLineM,
+    showTracking: captureSettings.showFaceBoxes,
   });
 
   const updateCaptureSettings = useCallback((patch: Partial<typeof captureSettings>) => {
@@ -698,6 +701,10 @@ export default function CameraView({
         {/* Capture rail */}
         <aside data-testid="capture-controls"
           className="flex max-h-full w-[220px] shrink-0 flex-col self-center overflow-y-auto rounded-[20px] border border-[var(--border)] px-5 py-6">
+          {captureSettings.showFps && (
+            <FrameRateReadout videoRef={videoRef} cutout={captureSettings.bgRemoval === 'segment'} />
+          )}
+
           <p className="text-center text-[1.05rem] font-semibold text-[var(--ink)]">Capture</p>
 
           <div className="mt-5 flex justify-center">
@@ -740,6 +747,60 @@ export default function CameraView({
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+/**
+ * Frames a second, in the rail beside the stage rather than on it, so it is
+ * never in the photo. Its own component: the rates change twice a second, and
+ * that should not redraw the whole capture screen.
+ */
+function FrameRateReadout({ videoRef, cutout }: {
+  videoRef: RefObject<HTMLVideoElement | null>;
+  /** Whether the segmenter is running, so its rate means something. */
+  cutout: boolean;
+}) {
+  const rates = useFrameRates(true, videoRef);
+  const n = (v: number | null | undefined) => (v === null || v === undefined ? '–' : String(Math.round(v)));
+  // Below this the preview visibly judders.
+  const slow = rates !== null && rates.preview < 24;
+  return (
+    <div data-testid="capture-fps"
+      className="mb-5 rounded-xl border border-dashed border-[var(--border)] px-3 py-2.5 font-mono text-[0.68rem] tabular-nums text-[var(--ink-3)]">
+      <p className="flex items-baseline justify-between">
+        <span>preview</span>
+        <span>
+          <strong data-testid="capture-fps-preview"
+            className={`text-[1.15rem] font-semibold ${slow ? 'text-[var(--accent)]' : 'text-[var(--ink)]'}`}>
+            {n(rates?.preview)}
+          </strong> fps
+        </span>
+      </p>
+      <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+        <dt title="New pictures from the camera, a second">camera</dt>
+        <dd data-testid="capture-fps-camera" className="text-right">{n(rates?.camera)} fps</dd>
+        {cutout && (
+          <>
+            <dt title="How often the cut-out's shape moves, a second">cut-out</dt>
+            <dd data-testid="capture-fps-cutout" className="text-right">{n(rates?.cutout)} /s</dd>
+          </>
+        )}
+        <dt title="The longest gap between two preview frames in the last half second">slowest</dt>
+        <dd data-testid="capture-fps-slowest" className="text-right">{n(rates?.slowestMs)} ms</dd>
+        {rates?.faces && (
+          <>
+            <dt title="Faces inside the distance line, of the faces found">faces</dt>
+            <dd data-testid="capture-fps-faces" className="text-right">
+              {rates.faces.group} of {rates.faces.found}
+            </dd>
+            <dt title="Roughly how far the nearest face is from the camera">nearest</dt>
+            <dd data-testid="capture-fps-nearest" className="text-right">
+              {rates.faces.nearestM === null ? '–' : `${rates.faces.nearestM.toFixed(1)} m`}
+            </dd>
+          </>
+        )}
+      </dl>
+    </div>
+  );
+}
 
 /**
  * Type a place, get a background. The text goes to an online image service,

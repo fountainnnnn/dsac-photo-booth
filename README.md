@@ -80,11 +80,13 @@ the format the final artwork should use; each avatar's anchor, size and lift are
 set in `types/scene.ts`.
 
 "Only the people at the front" (on by default) keeps a queue or passers-by out
-of the photo: the nearest face sets the scale, and everyone with a face nearly as
-big — standing about as close, however many of them — counts as the group having
-their photo taken. Only they get avatars, and with no green screen only their
-shapes are cut out. Someone who overlaps a guest in the picture stays with them;
-a green screen avoids that.
+of the photo: everyone nearer the camera than a distance line — however many of
+them — counts as the group having their photo taken. Only they get avatars, and
+with no green screen only their shapes are cut out. Distance is judged by face
+size, so the metres are approximate; set the line at the venue with **Measure
+from where I stand** on the same Settings card (it waits five seconds, so one
+person can press it and walk to the spot), then nudge it with the slider. Someone
+who overlaps a guest in the picture stays with them; a green screen avoids that.
 
 On the day: leave headroom above guests' heads, or hats and ears are cut off by
 the frame. Faces are found best within a few metres of the camera; groups

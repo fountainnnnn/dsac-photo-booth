@@ -126,7 +126,16 @@ export default function StudioShell({ active, onNavigate, children, scroll = fal
         }`}
       >
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3 pl-2'}`}>
-          <img src="/sp-dsac-logo.png" alt="SP DSAC" className="h-9 w-auto" />
+          {collapsed ? (
+            // The whole wordmark does not fit a collapsed rail, and squeezed
+            // into it the letters went thin. Show only the "SP", which is the
+            // left 43% of the artwork: 46px of a 106px-wide mark at this height.
+            <div className="h-7 w-[46px] overflow-hidden">
+              <img src="/sp-dsac-logo.png" alt="SP DSAC" className="h-7 w-auto max-w-none" />
+            </div>
+          ) : (
+            <img src="/sp-dsac-logo.png" alt="SP DSAC" className="h-9 w-auto" />
+          )}
           {!collapsed && (
             <>
               <span className="text-[0.9rem] font-semibold leading-[1.15] tracking-tight text-[var(--ink)]">
