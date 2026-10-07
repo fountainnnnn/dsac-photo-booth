@@ -6,8 +6,6 @@ import {
   Gear,
   Prohibit,
   Timer as TimerIcon,
-  WifiHigh,
-  WifiSlash,
 } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 import { useLivePreview, drawPhoto } from './useLivePreview';
@@ -25,7 +23,6 @@ import {
   useCaptureSettings, unmirrorCrop, FULL_FRAME, type CameraCrop,
 } from '@/components/features/remote/useCaptureSettings';
 import { clampZoom } from '@/components/features/remote/CameraCropCard';
-import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
 import type { FrameConfig, EventDetails } from '@/types/frame';
 import {
   FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
@@ -39,8 +36,6 @@ type PermissionStatus = 'prompt' | 'granted' | 'denied' | 'unsupported';
 export interface CameraViewProps {
   onCapture: (blob: Blob, dataUrl: string) => void;
   onError?: (error: Error) => void;
-  /** Fired when the phone remote asks to retake, so the flow can reset. */
-  onRetake?: () => void;
   /**
    * The guest's background and avatar. Held by the page rather than here, so
    * a retake — which remounts this view — keeps what they picked.
@@ -76,7 +71,7 @@ function isDrawable(img: HTMLImageElement | undefined): img is HTMLImageElement 
 }
 
 export default function CameraView({
-  onCapture, onError, onRetake, choice = DEFAULT_SCENE_CHOICE, onChoiceChange, typing,
+  onCapture, onError, choice = DEFAULT_SCENE_CHOICE, onChoiceChange, typing,
 }: CameraViewProps) {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
@@ -143,7 +138,7 @@ export default function CameraView({
 
   // ── Pinch / scroll zoom ──────────────────────────────────────────────────────
   // Gesture zoom on the stage itself, so a finger (or a trackpad) does the same
-  // thing the operator's remote-panel slider does: crop the camera tighter,
+  // thing the zoom slider in Settings does: crop the camera tighter,
   // never a CSS scale on the video. Kept as its own debounced writer, not
   // `updateCaptureSettings`, because a pinch fires far too often for a raw PUT
   // per event — the same 350ms coalescing `useCaptureSettingsControl` already
@@ -522,39 +517,22 @@ export default function CameraView({
 
   useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current); }, []);
 
-  // ── Phone remote ─────────────────────────────────────────────────────────────
-  // The organiser stands with the guests, so the phone drives the shutter.
-  // Handlers are held in a ref: the SSE subscription must not be torn down and
-  // rebuilt every time a dependency of doCapture changes.
-  const actionsRef = useRef({ doCapture, handleCapturePress, reloadSettings });
-  actionsRef.current = { doCapture, handleCapturePress, reloadSettings };
-
-  const { connected: remoteConnected, publish: publishRemote } = useRemote({
-    onCommand: useCallback((cmd: RemoteCommand) => {
-      const a = actionsRef.current;
-      switch (cmd.action) {
-        case 'capture': a.handleCapturePress(); break;
-        case 'retake':  onRetake?.(); break;
-        case 'cancel':
-          if (countdownRef.current) clearInterval(countdownRef.current);
-          countdownRef.current = null;
-          setCountdown(null);
-          break;
-        case 'settings-changed': void a.reloadSettings(); break;
-      }
-    }, [onRetake]),
-  });
-
-  // Mirror what the booth is doing so the phone can render it.
+  // ── Settings changed elsewhere ───────────────────────────────────────────────
+  // Settings are changed on their own page, often in a second window on the
+  // same laptop. Read them again whenever this screen comes back into view, so
+  // a change applies before the next guest without anyone reloading.
   useEffect(() => {
-    void publishRemote({
-      phase: countdown !== null ? 'counting' : 'idle',
-      countdown,
-      frameLabel: activeFrame?.label ?? null,
-      timer: timerSecs,
-      streaming: isStreaming,
-    });
-  }, [countdown, activeFrame, timerSecs, isStreaming, publishRemote]);
+    const onFocus = () => { void reloadSettings(); };
+    const onShown = () => {
+      if (document.visibilityState === 'visible') void reloadSettings();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onShown);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onShown);
+    };
+  }, [reloadSettings]);
 
   // ── Navigation ───────────────────────────────────────────────────────────────
 
@@ -599,17 +577,6 @@ export default function CameraView({
               <option value={10}>10s</option>
             </select>
           </label>
-          <span
-            title={remoteConnected ? 'A phone remote is connected' : 'No phone remote connected'}
-            className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[0.8rem] font-semibold ${
-              remoteConnected
-                ? 'border-[color-mix(in_srgb,var(--accent)_35%,transparent)] text-[var(--accent)]'
-                : 'border-[var(--border)] text-[var(--ink-3)]'
-            }`}
-          >
-            {remoteConnected ? <WifiHigh size={16} weight="fill" /> : <WifiSlash size={16} />}
-            Remote
-          </span>
         </div>
       </header>
 

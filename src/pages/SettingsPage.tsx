@@ -12,7 +12,6 @@ import {
 import CameraCropCard from '@/components/features/remote/CameraCropCard';
 import CameraPickerCard from '@/components/features/remote/CameraPickerCard';
 import PresetsCard from '@/components/features/remote/PresetsCard';
-import RemoteAccessCard from '@/components/features/remote/RemoteAccessCard';
 import PasswordsCard from '@/components/features/auth/PasswordsCard';
 import EnvironmentCard from '@/components/features/settings/EnvironmentCard';
 import SceneSettingsCard from '@/components/features/settings/SceneSettingsCard';
@@ -393,8 +392,7 @@ export default function SettingsPage() {
       )}
 
       {tab === 'access' && (
-        <div className="mt-8 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-8">
-          <RemoteAccessCard />
+        <div className="mt-8 flex max-w-[46rem] flex-col gap-8">
           <PasswordsCard />
         </div>
       )}

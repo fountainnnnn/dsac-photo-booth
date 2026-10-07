@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 
 /**
- * One shared password, for the interface: capture, settings, gallery, and the
- * phone remote. Whoever runs the event enters it once per device.
+ * One shared password, for the interface: capture, settings and gallery.
+ * Whoever runs the event enters it once per device.
  *
  * Guests' photos have no password. A photo's link carries a random UUID, so
  * only someone handed the QR code or the link can open it.

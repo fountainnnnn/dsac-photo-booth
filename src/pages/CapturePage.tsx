@@ -1,15 +1,14 @@
 import { useCallback, useState } from 'react';
 import CameraView from '@/components/features/capture-photo/CameraView';
 import QrDownloadScreen from '@/components/features/qr-download/QrDownloadScreen';
-import { useRemote, type RemoteCommand } from '@/components/features/remote/useRemote';
 import type { ComposedUploadResponse } from '@/types/download';
 import { DEFAULT_SCENE_CHOICE, type SceneChoice } from '@/types/scene';
 import { useTypedBackground } from '@/components/features/capture-photo/scene/useTypedBackground';
 
 /**
- * There is no confirmation step. A guest is standing at the booth and the
- * organiser is holding the remote, so the photo goes straight to its QR code —
- * a retake is one tap away on the phone if it is wanted.
+ * There is no confirmation step. A guest is standing at the booth, so the
+ * photo goes straight to its QR code — a retake is one tap away on that
+ * screen if it is wanted.
  */
 type Step = 'camera' | 'uploading' | 'qr-download';
 
@@ -63,15 +62,7 @@ export default function CapturePage() {
     }
   }, []);
 
-  // Tell the phone the booth is free again whenever we return to the camera.
-  const handleRetake = useCallback(() => {
-    void fetch('/api/remote/command', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'reset' }),
-    }).catch(() => {});
-    resetFlow();
-  }, [resetFlow]);
+  const handleRetake = resetFlow;
 
   // The next guest starts from scratch: their own background, avatar and
   // tries. A retake (above) keeps all three.
@@ -80,14 +71,6 @@ export default function CapturePage() {
     typing.reset();
     handleRetake();
   }, [handleRetake, typing]);
-
-  // Retake is the only control the phone offers once a photo has landed, and
-  // by then CameraView is unmounted — so the page itself has to listen for it.
-  useRemote({
-    onCommand: useCallback((cmd: RemoteCommand) => {
-      if (cmd.action === 'retake') resetFlow();
-    }, [resetFlow]),
-  });
 
   return (
     // A plain div, not <main>: StudioShell renders the page's <main>, and
@@ -100,7 +83,6 @@ export default function CapturePage() {
         <>
           <CameraView
             onCapture={handleCapture}
-            onRetake={handleRetake}
             choice={choice}
             onChoiceChange={setChoice}
             typing={typing}

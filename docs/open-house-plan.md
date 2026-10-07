@@ -17,8 +17,9 @@ What changed from the plan while building, after testing on real photos:
 - Typed backgrounds use OpenRouter's `/api/v1/images` endpoint
   (`resolution: 2K`, `aspect_ratio: 16:9`), are cached by prompt, and are
   capped at three per guest.
-- Open question 1 settled on the local matting model. The phone remote stays
-  (booth password kept).
+- Open question 1 settled on the local matting model. The phone remote stayed
+  at first (booth password kept), and was removed on 2026-10-07: Open House
+  does not need it. The booth password stays.
 
 Still to do: real avatar and background artwork; the OpenRouter key; a run on
 the actual booth laptop to see how the live preview copes with segmentation

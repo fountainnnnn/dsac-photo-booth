@@ -35,7 +35,7 @@ export default function PasswordsCard() {
           required ? 'text-[var(--ink-3)]' : 'font-medium text-[var(--accent-ink)]'
         }`}>
           {required
-            ? 'Locks capture, gallery, settings and the phone remote.'
+            ? 'Locks capture, gallery and settings.'
             : 'Not set — anyone with the link can open this interface and take photos.'}
         </p>
         <p className="mt-2 rounded-xl border border-dashed border-[var(--border)] px-3.5 py-2.5 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">

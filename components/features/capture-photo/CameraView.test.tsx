@@ -46,12 +46,7 @@ function mockSettings(timerSecs: number) {
       return new Response(JSON.stringify({ settings: {}, custom: [] }),
         { headers: { 'Content-Type': 'application/json' } });
     }
-    if (url.includes('/api/remote/poll')) {
-      // The real endpoint holds the request open. Never resolve, so the poll
-      // loop stays parked instead of spinning through the test.
-      return new Promise<Response>(() => {});
-    }
-    // Remote state publishing and anything else — accepted and ignored.
+    // Anything else — accepted and ignored.
     return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
   }));
 }

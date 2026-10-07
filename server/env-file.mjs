@@ -93,7 +93,7 @@ export const ENV_FIELDS = [
   {
     key: 'BOOTH_PASSWORD',
     label: 'Booth password',
-    help: 'Locks capture, gallery, settings and the phone remote. Empty leaves the booth open.',
+    help: 'Locks capture, gallery and settings. Empty leaves the booth open.',
     secret: true,
     restart: false,
   },

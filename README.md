@@ -1,8 +1,7 @@
 # Open House Photo Booth
 
 A photo booth for Open House, run on the booth laptop. Guests pose, and scan a
-QR code to get their photo. The organiser can drive the shutter from their
-phone.
+QR code to get their photo.
 
 This is the `open-house` branch. The DSAC booth it was split from lives on
 `main`; see `CLAUDE.md` before changing anything.
@@ -29,13 +28,14 @@ Photos are kept on the laptop, in the `data/` folder of the checkout (the
 SQLite database plus a `photos/` folder of plain files the Gallery's "Open
 folder" button reveals). Nothing is uploaded anywhere.
 
-One password guards the booth: capture, gallery, settings and the phone remote.
-Set it on the Environment tab in Settings, as `BOOTH_PASSWORD`; unset leaves the
-booth open. Guests need no password: each photo link carries a random UUID, so
-only someone handed the QR code or the link can open it.
+One password guards the booth: capture, gallery and settings. Set it on the
+Environment tab in Settings, as `BOOTH_PASSWORD`; unset leaves the booth open.
+Guests need no password: each photo link carries a random UUID, so only someone
+handed the QR code or the link can open it.
 
-The organiser's phone remote is at `<public URL>/remote`, and Settings shows a
-QR code for it.
+There is no phone remote: the shutter is the button on the capture screen.
+Settings changed in another window reach the capture screen the next time it is
+shown or clicked.
 
 ## Backgrounds and avatars
 

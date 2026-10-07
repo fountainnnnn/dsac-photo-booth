@@ -10,7 +10,6 @@ import multer from 'multer';
 import QRCode from 'qrcode';
 import { openDatabase } from './db.mjs';
 import { createAuth } from './auth.mjs';
-import { createRemoteHub } from './remote.mjs';
 import { startTunnel } from './tunnel.mjs';
 import { BackgroundError, DEFAULT_MODEL, createBackgrounds } from './backgrounds.mjs';
 import {
@@ -91,7 +90,6 @@ const DATA_DIR = process.env.STORAGE_DIR
   ? path.resolve(process.env.STORAGE_DIR)
   : path.join(ROOT_DIR, 'data');
 const store = openDatabase(DATA_DIR);
-const remote = createRemoteHub();
 // Typed backgrounds, kept by prompt so the same words are only paid for once.
 const backgrounds = createBackgrounds(path.join(DATA_DIR, 'backgrounds'));
 
@@ -165,9 +163,9 @@ function getLocalNetworkIP() {
 }
 
 /**
- * The origin baked into QR codes and the remote-control link. Guests and the
- * organiser scan on mobile data, not the venue Wi-Fi, so this can never be
- * localhost and a LAN address is only a last resort.
+ * The origin baked into QR codes. Guests scan on mobile data, not the venue
+ * Wi-Fi, so this can never be localhost and a LAN address is only a last
+ * resort.
  *
  * 1. PUBLIC_URL      — explicit override, wins everywhere.
  * 2. Cloudflare tunnel — the normal case for the local app.
@@ -348,14 +346,6 @@ app.post('/api/photos/composed', booth, upload.single('file'), validateImage, as
     // Second copy, on disk, outliving the row above.
     archivePhoto(token, req.file.mimetype, req.file.buffer, createdAt);
 
-    // Tell the organiser's phone the shot has landed, so it can offer a retake.
-    remote.setState({
-      phase: 'captured',
-      countdown: null,
-      photoToken: token,
-      downloadUrl: photoDownloadUrl,
-    });
-
     res.status(201).json({
       token,
       downloadUrl: photoDownloadUrl,
@@ -512,53 +502,6 @@ app.post('/api/gallery/open-folder', booth, (_req, res) => {
   return res.json({ ok: true, dir: PHOTOS_DIR });
 });
 
-// ── Remote control ───────────────────────────────────────────────────────────
-// The organiser drives the shutter from their phone while standing away from
-// the kiosk. See server/remote.mjs for why this is SSE rather than WebSockets.
-
-app.get('/api/remote/poll', booth, async (req, res) => {
-  const since = Number.parseInt(String(req.query.since ?? '0'), 10);
-  const clientId = String(req.query.client ?? '');
-  try {
-    const payload = await remote.poll(since, clientId);
-    // A held response must not be cached anywhere along the way.
-    res.setHeader('Cache-Control', 'no-store, no-transform');
-    res.json(payload);
-  } catch {
-    res.status(500).json({ error: 'Poll failed' });
-  }
-});
-
-app.get('/api/remote/state', booth, (_req, res) => {
-  res.json({
-    state: remote.getState(),
-    version: remote.currentVersion(),
-    listeners: remote.clientCount(),
-  });
-});
-
-app.post('/api/remote/state', booth, (req, res) => {
-  if (!req.body || typeof req.body !== 'object') {
-    return res.status(400).json({ error: 'Expected a state object' });
-  }
-  return res.json({ state: remote.setState(req.body) });
-});
-
-const REMOTE_ACTIONS = new Set([
-  'capture', 'cancel', 'retake', 'reset',
-]);
-
-app.post('/api/remote/command', booth, (req, res) => {
-  const action = req.body?.action;
-  if (!REMOTE_ACTIONS.has(action)) {
-    return res.status(400).json({
-      error: `Unknown action. Expected one of: ${[...REMOTE_ACTIONS].join(', ')}`,
-    });
-  }
-  if (action === 'reset') return res.json({ state: remote.reset() });
-  return res.json({ command: remote.command(action, req.body?.payload ?? {}) });
-});
-
 // ── Capture settings ─────────────────────────────────────────────────────────
 // Timer and image adjustments live in Settings now, so the kiosk reads them
 // from here rather than owning them.
@@ -640,13 +583,12 @@ app.put('/api/settings/capture', booth, (req, res) => {
   }
   // Layer the stored settings between the defaults and the write. A client
   // running an older bundle sends the fields it knows about; without this, a
-  // stale settings page (or a phone remote that has not been reloaded) would
+  // stale settings page (or a second window that has not been reloaded) would
   // silently wipe every field added since it loaded.
   const stored = store.kv.get('captureSettings', {});
   const merged = { ...DEFAULT_CAPTURE_SETTINGS, ...stored, ...incoming };
   store.kv.set('captureSettings', merged);
-  // Nudge the kiosk so a settings change takes effect without a reload.
-  remote.command('settings-changed', { settings: merged });
+  // The capture screen reads them again when it is next shown.
   return res.json({ settings: merged });
 });
 
@@ -703,12 +645,14 @@ app.post('/api/backgrounds/generate', booth, async (req, res, next) => {
 
 const CLEAN_PLATE_FILE = path.join(DATA_DIR, 'clean-plate.png');
 
-/** Record when the plate changed, and nudge the kiosk to fetch it again. */
+/**
+ * Record when the plate changed. The capture screen fetches the plate again
+ * when it next reads its settings and sees the new time.
+ */
 function touchCleanPlate(at) {
   const stored = store.kv.get('captureSettings', {});
   const merged = { ...DEFAULT_CAPTURE_SETTINGS, ...stored, cleanPlateAt: at };
   store.kv.set('captureSettings', merged);
-  remote.command('settings-changed', { settings: merged });
   return merged;
 }
 
@@ -1045,7 +989,6 @@ const server = app.listen(port, '0.0.0.0', async () => {
       tunnelOrigin = url;
       console.log('');
       banner('Public URL', url);
-      banner('Remote control', `${url}/remote`);
     } else {
       console.log('');
       console.error(`  No public tunnel (${error}).`);
