@@ -134,6 +134,17 @@ export interface CaptureSettings {
    */
   frontLineM: number;
   /**
+   * With `focusFront`, how many people are posing: at most this many, the
+   * nearest, are in the photo, however many more stand inside the line.
+   * 0 for no limit.
+   */
+  maxPeople: number;
+  /**
+   * The correction that makes face distances true metres for this camera, set
+   * by calibrating at a measured distance in Settings. 1 until calibrated.
+   */
+  distanceScale: number;
+  /**
    * Show how many frames a second the capture screen manages, beside the
    * stage. For judging a laptop before the doors open; guests see it too.
    */
@@ -167,6 +178,8 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   promptBackgrounds: true,
   focusFront: true,
   frontLineM: 2,
+  maxPeople: 0,
+  distanceScale: 1,
   showFps: false,
   showFaceBoxes: false,
 };

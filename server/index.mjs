@@ -551,6 +551,12 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // Where "the front" ends, in metres from the camera (roughly; it is judged
   // by face size). Set at the venue from Settings by measuring.
   frontLineM: 2,
+  // How many people are posing: at most this many, the nearest, get in. 0 for
+  // no limit.
+  maxPeople: 0,
+  // The correction that makes face distances true metres for this camera,
+  // from calibrating in Settings. 1 until calibrated.
+  distanceScale: 1,
   // A frame-rate readout beside the stage, for judging the laptop. Off, so
   // guests never see it unless the operator asks for it.
   showFps: false,

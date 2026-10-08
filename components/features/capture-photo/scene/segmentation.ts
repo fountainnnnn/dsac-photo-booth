@@ -148,21 +148,62 @@ const SHAPE_THRESHOLD = 0.25;
 const FACE_REACH = 0.25;
 
 /**
- * Only the people whose shape holds one of `faces`; everyone else is zeroed.
+ * Where one person is, roughly, from their face: the face box widened for
+ * hair and ears, and below the chin a body that widens to the shoulders. In
+ * mask pixels. Only for sharing out a shape two people make together (see
+ * `keepPeopleWith`), so a rough figure is enough.
+ */
+interface Figure { cx: number; fw: number; chin: number; fh: number; headX0: number; headX1: number; headY0: number }
+
+function figureOf(b: FaceBox, w: number, h: number): Figure {
+  const x0 = b.x0 * w, x1 = b.x1 * w, y0 = b.y0 * h, y1 = b.y1 * h;
+  const fw = Math.max(1, x1 - x0);
+  const fh = Math.max(1, y1 - y0);
+  return {
+    cx: (x0 + x1) / 2, fw, chin: y1, fh,
+    headX0: x0 - fw * 0.35, headX1: x1 + fw * 0.35, headY0: y0 - fh * 0.5,
+  };
+}
+
+/** How far a mask pixel is from a figure, in pixels; 0 inside it. */
+function distanceToFigure(f: Figure, x: number, y: number): number {
+  if (y < f.headY0) {
+    const dx = x < f.headX0 ? f.headX0 - x : x > f.headX1 ? x - f.headX1 : 0;
+    return Math.hypot(dx, f.headY0 - y);
+  }
+  let left = f.headX0, right = f.headX1;
+  if (y > f.chin) {
+    // Neck at the chin, shoulders a little under a face's height below it.
+    const t = Math.min(1, (y - f.chin) / (0.8 * f.fh));
+    const half = f.fw * (0.5 + 1.3 * t);
+    left = f.cx - half;
+    right = f.cx + half;
+  }
+  return x < left ? left - x : x > right ? x - right : 0;
+}
+
+/**
+ * Only the people whose shape holds one of `keep`'s faces; everyone else is
+ * zeroed.
  *
  * The mask is split into separate shapes (pixels above SHAPE_THRESHOLD that
- * touch), and a shape is kept if any of it lies within a face's box. People
- * at the back who stand apart from the group drop out. Someone who overlaps a
- * guest in the picture is part of that guest's shape and stays — the camera
- * has no depth to separate them.
+ * touch), and a shape is kept if any of it lies within a kept face's box.
+ * People at the back who stand apart from the group drop out.
+ *
+ * Someone left out who overlaps a guest in the picture makes one shape with
+ * them, and the camera has no depth to part them; kept whole, half of the
+ * person behind showed through. So a shape holding a face from `drop` as well
+ * is shared out: each pixel goes to the person whose figure (see `figureOf`)
+ * it is in, or nearest to, and the ones that go to a dropped face are zeroed.
+ * Where figures overlap, the kept one wins: the nearer person is in front.
  *
  * With no faces at all the mask is returned whole: guests facing away, or a
  * face tracker still loading, must not cut everybody out. Exported for tests.
  */
 export function keepPeopleWith(
-  values: Float32Array, w: number, h: number, faces: FaceBox[],
+  values: Float32Array, w: number, h: number, keep: FaceBox[], drop: FaceBox[] = [],
 ): Float32Array {
-  if (!faces.length) return values;
+  if (!keep.length && !drop.length) return values;
   // Runs every few frames on a 512-wide mask, so no allocation per pixel.
   const size = w * h;
   const labels = new Int32Array(size);
@@ -184,24 +225,47 @@ export function keepPeopleWith(
     }
   }
 
-  const keep = new Set<number>();
-  for (const b of faces) {
-    const padX = (b.x1 - b.x0) * FACE_REACH;
-    const padY = (b.y1 - b.y0) * FACE_REACH;
-    const x0 = Math.max(0, Math.floor((b.x0 - padX) * w));
-    const x1 = Math.min(w - 1, Math.ceil((b.x1 + padX) * w));
-    const y0 = Math.max(0, Math.floor((b.y0 - padY) * h));
-    const y1 = Math.min(h - 1, Math.ceil((b.y1 + padY) * h));
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        const l = labels[y * w + x];
-        if (l) keep.add(l);
+  /** The shapes that lie within any of these faces' boxes. */
+  const shapesHolding = (faces: FaceBox[]) => {
+    const found = new Set<number>();
+    for (const b of faces) {
+      const padX = (b.x1 - b.x0) * FACE_REACH;
+      const padY = (b.y1 - b.y0) * FACE_REACH;
+      const x0 = Math.max(0, Math.floor((b.x0 - padX) * w));
+      const x1 = Math.min(w - 1, Math.ceil((b.x1 + padX) * w));
+      const y0 = Math.max(0, Math.floor((b.y0 - padY) * h));
+      const y1 = Math.min(h - 1, Math.ceil((b.y1 + padY) * h));
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const l = labels[y * w + x];
+          if (l) found.add(l);
+        }
       }
     }
-  }
+    return found;
+  };
+  const kept = shapesHolding(keep);
+  const shared = drop.length ? shapesHolding(drop) : new Set<number>();
+
+  const keepFigures = keep.map(b => figureOf(b, w, h));
+  const dropFigures = drop.map(b => figureOf(b, w, h));
+  const nearest = (figures: Figure[], x: number, y: number) => {
+    let best = Infinity;
+    for (const f of figures) best = Math.min(best, distanceToFigure(f, x, y));
+    return best;
+  };
 
   const out = new Float32Array(values.length);
-  for (let i = 0; i < out.length; i++) out[i] = keep.has(labels[i]) ? values[i] : 0;
+  for (let i = 0; i < out.length; i++) {
+    const l = labels[i];
+    if (!kept.has(l)) continue;
+    if (shared.has(l)) {
+      const x = i % w;
+      const y = (i - x) / w;
+      if (nearest(dropFigures, x, y) < nearest(keepFigures, x, y)) continue;
+    }
+    out[i] = values[i];
+  }
   return out;
 }
 
@@ -345,12 +409,17 @@ export class PersonSegmenter {
 
   /**
    * Run the model on this frame, unless it ran recently enough. With
-   * `focus`, only the people whose shape holds one of those faces are kept
-   * (see `keepPeopleWith`), and an empty `focus` keeps nobody: faces were
-   * found, all of them beyond the line. Null keeps everyone. True when it ran,
-   * so the caller can leave other heavy work to the next frame.
+   * `focus`, only the people whose shape holds one of the `keep` faces are
+   * kept, minus whatever of a shared shape belongs to a `drop` face (see
+   * `keepPeopleWith`); no `keep` faces keeps nobody, since faces were found and
+   * none of them is in the group. Null keeps everyone. True when it ran, so the
+   * caller can leave other heavy work to the next frame.
    */
-  update(video: HTMLVideoElement, focus: FaceBox[] | null = null, now = performance.now()): boolean {
+  update(
+    video: HTMLVideoElement,
+    focus: { keep: FaceBox[]; drop: FaceBox[] } | null = null,
+    now = performance.now(),
+  ): boolean {
     if (now - this.lastRun < this.interval) return false;
     const vw = video.videoWidth;
     const vh = video.videoHeight;
@@ -400,8 +469,8 @@ export class PersonSegmenter {
         });
       }
       let shown = this.running;
-      if (focus?.length) {
-        shown = keepPeopleWith(this.running, mw, mh, focus);
+      if (focus?.keep.length) {
+        shown = keepPeopleWith(this.running, mw, mh, focus.keep, focus.drop);
       } else if (focus) {
         if (this.empty?.length !== mw * mh) this.empty = new Float32Array(mw * mh);
         shown = this.empty;

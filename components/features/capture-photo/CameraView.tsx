@@ -129,6 +129,8 @@ export default function CameraView({
     region: crop,
     focusFront: captureSettings.focusFront,
     frontLineM: captureSettings.frontLineM,
+    maxPeople: captureSettings.maxPeople,
+    distanceScale: captureSettings.distanceScale,
     showTracking: captureSettings.showFaceBoxes,
   });
 

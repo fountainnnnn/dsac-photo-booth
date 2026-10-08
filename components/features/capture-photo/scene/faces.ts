@@ -34,7 +34,12 @@ import { recordSpeed } from './speed';
  * frame, before any crop or mirror. `avatars.ts` maps them onto the photo.
  */
 
-export interface FacePoint { x: number; y: number }
+/**
+ * A face-mesh point in the camera frame: `x` and `y` are shares of its width
+ * and height. `z` is depth, in shares of the width like `x` (MediaPipe's own
+ * scale), smaller nearer the camera; absent where nothing measured it.
+ */
+export interface FacePoint { x: number; y: number; z?: number }
 export type FacePoints = FacePoint[];
 
 /** Why a face a pass found was set aside. */
@@ -185,6 +190,7 @@ function smooth(prev: FacePoints[], next: FacePoints[]): FacePoints[] {
     return face.map((pt, i) => ({
       x: was[i].x + (pt.x - was[i].x) * FOLLOW,
       y: was[i].y + (pt.y - was[i].y) * FOLLOW,
+      z: pt.z === undefined || was[i].z === undefined ? pt.z : was[i].z + (pt.z - was[i].z) * FOLLOW,
     }));
   });
 }
@@ -229,7 +235,8 @@ class Pass {
         : cutByTileEdge(face, this.tile) ? 'edge'
           : tooBigForTile(face, this.tile) ? 'big'
             : null;
-      const placed = face.map(({ x, y }) => ({ x: fx + x * fw, y: fy + y * fh }));
+      // Depth is in shares of the pass's own width, so it scales with x.
+      const placed = face.map(({ x, y, z }) => ({ x: fx + x * fw, y: fy + y * fh, z: z * fw }));
       if (why) this.rejected.push({ face: placed, why });
       else this.faces.push(placed);
     }
