@@ -157,14 +157,38 @@ function getLocalNetworkIP() {
  * Wi-Fi, so this can never be localhost and a LAN address is only a last
  * resort.
  *
- * 1. PUBLIC_URL      — explicit override, wins everywhere.
+ * 1. PUBLIC_URL      — explicit override, unless it is this laptop (below).
  * 2. Cloudflare tunnel — the normal case for the local app.
  * 3. LAN IP          — same-network fallback when no tunnel came up.
  */
 function getPublicOrigin() {
-  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '');
+  const fixed = fixedPublicUrl();
+  if (fixed) return fixed;
   if (tunnelOrigin) return tunnelOrigin;
   return `http://${getLocalNetworkIP()}:${SERVES_FRONTEND ? port : frontendPort}`;
+}
+
+/** Whether an address names this machine itself, which no phone can reach. */
+function isLoopback(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^\[|\]$/g, '');
+    return host === 'localhost' || host.endsWith('.localhost') || host === '::1' || /^127\./.test(host);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * PUBLIC_URL, when it is somewhere a phone can reach. One pointing at this
+ * laptop (localhost) once turned the tunnel off for a test and stayed there,
+ * and every QR code after it pointed at a page no guest could open; so such a
+ * value is set aside, with a warning at start-up, and the tunnel opens as if
+ * it were empty.
+ */
+function fixedPublicUrl() {
+  const raw = (process.env.PUBLIC_URL ?? '').trim();
+  if (!raw || isLoopback(raw)) return null;
+  return raw.replace(/\/$/, '');
 }
 
 function url(pathname) {
@@ -281,6 +305,11 @@ app.put('/api/settings/env', booth, (req, res) => {
 
   if (values.PUBLIC_URL && !/^https?:\/\//i.test(values.PUBLIC_URL)) {
     return res.status(400).json({ error: 'Public URL must start with http:// or https://' });
+  }
+  if (values.PUBLIC_URL && isLoopback(values.PUBLIC_URL)) {
+    return res.status(400).json({
+      error: 'Phones cannot reach this laptop at localhost. Leave Public URL empty to use the Cloudflare tunnel.',
+    });
   }
 
   try {
@@ -958,9 +987,13 @@ const server = app.listen(port, '0.0.0.0', async () => {
   // the only way a guest's phone reaches it, so it always starts — there is
   // no "skip the tunnel" mode, because a booth without one cannot hand out a
   // single photo.
-  if (process.env.PUBLIC_URL) {
+  if (fixedPublicUrl()) {
     banner('Public URL', `${getPublicOrigin()}  (PUBLIC_URL)`);
   } else {
+    if (process.env.PUBLIC_URL) {
+      console.warn(`\n  PUBLIC_URL is ${process.env.PUBLIC_URL}, which only this laptop can open;`);
+      console.warn('  ignoring it so the QR codes work. Clear it on the Environment tab.');
+    }
     console.log('\n  Opening a public tunnel…');
     const { url, error } = await openTunnelWithRetries(SERVES_FRONTEND ? port : frontendPort);
     if (url) {

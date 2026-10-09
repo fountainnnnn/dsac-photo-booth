@@ -100,7 +100,7 @@ export const ENV_FIELDS = [
   {
     key: 'PUBLIC_URL',
     label: 'Public URL',
-    help: 'A fixed address to bake into QR codes instead of the Cloudflare tunnel. Leave empty to use the tunnel.',
+    help: 'A fixed address to bake into QR codes instead of the Cloudflare tunnel; it must be one a phone can reach, not localhost. Leave empty to use the tunnel.',
     placeholder: 'https://booth.example.com',
     restart: false,
   },
