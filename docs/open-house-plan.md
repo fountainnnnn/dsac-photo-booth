@@ -123,7 +123,9 @@ the camera zoom/crop and stays.
 - [ ] `sweepGallery` in `server/index.mjs`: drop the Drive branch. Photos
       stay in the local `data/` folder. Gallery auto-delete
       (`galleryTtlHours`) keeps its default of 0, meaning keep forever; link
-      expiry (`linkTtlHours`) stays as it is.
+      expiry (`linkTtlHours`) stays as it is. *Later (2026-10-09): both were
+      replaced by `photoMinutes`, default 10 — each photo is deleted from the
+      laptop ten minutes after its QR code goes up.*
 
 ### 0.6 Housekeeping
 

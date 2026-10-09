@@ -68,20 +68,10 @@ const ACCEPTED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 // fixed artboard: a 4K webcam writes a ~4600px JPEG, which 10 MB would reject
 // and the guest would watch the upload fail after the shutter had already gone.
 const MAX_BYTES = 64 * 1024 * 1024;
-// How long a guest's download link stays live, when nothing in Settings says
-// otherwise. It is only the fallback now: link validity is a capture setting
-// (`linkTtlHours`), so an operator can change it mid-event without a restart.
-// It has never meant "delete the photo" and no longer looks like it might.
-const PHOTO_TTL_DAYS = Number.parseFloat(process.env.PHOTO_TTL_DAYS ?? '7');
-const FALLBACK_TTL_HOURS = (Number.isFinite(PHOTO_TTL_DAYS) ? PHOTO_TTL_DAYS : 7) * 24;
-
-/**
- * A link that never lapses still needs a timestamp: `expires_at` is NOT NULL in
- * both stores, and making it nullable is a migration on two databases to
- * express something a date already can. So "never" is a date no event will
- * outlive, and every expiry check is an ordinary comparison.
- */
-const NEVER_EXPIRES = '9999-12-31T23:59:59.999Z';
+// How long a photo is kept, from the moment its QR code goes up, when Settings
+// has never said (`photoMinutes`). Then the photo is deleted: the guest's link,
+// the row and the copy in the photo folder all go together.
+const DEFAULT_PHOTO_MINUTES = 10;
 
 const hasExpired = (expiresAt) => Date.now() > new Date(expiresAt).getTime();
 
@@ -284,11 +274,6 @@ app.put('/api/settings/env', booth, (req, res) => {
    */
   const values = { ...readEnvFile(SETTINGS_ENV_FILE), ...pickEditable(req.body?.values) };
 
-  const ttl = values.PHOTO_TTL_DAYS;
-  if (ttl && !(Number.parseFloat(ttl) > 0)) {
-    return res.status(400).json({ error: 'Link validity must be a positive number of days.' });
-  }
-
   const portValue = values.PORT;
   if (portValue && !(Number.isInteger(Number(portValue)) && Number(portValue) > 0 && Number(portValue) < 65536)) {
     return res.status(400).json({ error: 'Port must be a whole number between 1 and 65535.' });
@@ -333,7 +318,7 @@ app.post('/api/photos/composed', booth, upload.single('file'), validateImage, as
     });
 
     const createdAt = new Date();
-    const expiresAt = linkExpiresAt(createdAt);
+    const expiresAt = photoExpiresAt(createdAt);
     store.photos.put({
       token,
       mime: req.file.mimetype,
@@ -343,8 +328,10 @@ app.post('/api/photos/composed', booth, upload.single('file'), validateImage, as
       expiresAt,
     });
 
-    // Second copy, on disk, outliving the row above.
+    // Second copy, on disk, for the gallery's "Open folder"; it goes when the
+    // row does.
     archivePhoto(token, req.file.mimetype, req.file.buffer, createdAt);
+    deleteWhenDue(token, expiresAt);
 
     res.status(201).json({
       token,
@@ -363,17 +350,17 @@ app.post('/api/photos/composed', booth, upload.single('file'), validateImage, as
  *
  * Both routes below admit two kinds of caller: the guest who scanned the QR,
  * who needs no password, and the operator paging through the gallery, who is
- * signed in to the booth. The photo itself is kept either way — expiry only
- * retires the link — so the guest gets a plain 410 while the booth is waved
- * through on the same URL. Returns a truthy reason when the request must be
- * refused.
+ * signed in to the booth. Expiry and deletion are moments apart (see
+ * `deleteWhenDue`); in between, the guest gets a plain 410 while the booth is
+ * waved through on the same URL. Returns a truthy reason when the request must
+ * be refused.
  */
 function expiredForGuest(req, photo) {
   if (!hasExpired(photo.expiresAt)) return false;
   return !auth.isAuthed(req, 'booth');
 }
 
-const GONE = { error: 'This download link has expired. Ask the booth crew for a new one.' };
+const GONE = { error: 'This photo is no longer available: the booth deletes photos a few minutes after they are taken.' };
 
 app.get('/api/download/:token', (req, res) => {
   const photo = store.photos.get(req.params.token);
@@ -522,14 +509,9 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // region is kept either way so switching back does not lose the framing.
   cropEnabled: false,
   crop: { x: 0, y: 0, w: 1, h: 1 },
-  // How long a guest's download link stays good for. 0 means it never lapses.
-  // This is about the link only — the photo outlives it.
-  linkTtlHours: 168,
-  // How long the photo itself is kept, counted from when it was taken. 0 means
-  // forever, which is what the booth did before this existed — nobody should
-  // lose an event to an upgrade. Deliberately unrelated to the link's life: a
-  // link may die in an hour while the photo lives a month.
-  galleryTtlHours: 0,
+  // How long a photo is kept after its QR code goes up, in minutes. Then it is
+  // deleted — link, gallery entry and the file in the photo folder.
+  photoMinutes: DEFAULT_PHOTO_MINUTES,
   // How the room behind the guests is taken away: 'off', 'key' (a green
   // screen, keyed by colour) or 'segment' (no screen; a model finds the
   // people). Off is the booth as it always was.
@@ -564,18 +546,19 @@ const DEFAULT_CAPTURE_SETTINGS = {
   showFaceBoxes: false,
 };
 
-/**
- * When a link handed out right now should stop working, read from the setting
- * as it stands at this moment rather than from whatever the process booted
- * with. An operator who shortens the window mid-event means the next photo,
- * not the next restart.
- */
-function linkExpiresAt(createdAt) {
+/** The photo lifetime as Settings has it right now, in minutes. */
+function photoMinutes() {
   const stored = store.kv.get('captureSettings', {});
-  const hours = Number(stored?.linkTtlHours ?? FALLBACK_TTL_HOURS);
-  const usable = Number.isFinite(hours) && hours >= 0 ? hours : FALLBACK_TTL_HOURS;
-  if (usable === 0) return NEVER_EXPIRES;
-  return new Date(createdAt.getTime() + usable * 60 * 60 * 1000).toISOString();
+  const minutes = Number(stored?.photoMinutes ?? DEFAULT_PHOTO_MINUTES);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_PHOTO_MINUTES;
+}
+
+/**
+ * When a photo taken now is deleted, read from the setting as it stands at
+ * this moment, so an operator who changes it mid-event means the next photo.
+ */
+function photoExpiresAt(createdAt) {
+  return new Date(createdAt.getTime() + photoMinutes() * 60 * 1000).toISOString();
 }
 
 app.get('/api/settings/capture', booth, (_req, res) => {
@@ -876,29 +859,17 @@ app.use((err, _req, res, next) => {
 });
 
 /**
- * The automatic half of retention: photos past `galleryTtlHours` go for good.
- *
- * Measured from each photo's `createdAt` — the moment the shutter went — and
- * never from its link expiry. Those are two clocks the operator sets separately
- * and on purpose: a link may lapse within the hour while the photo it pointed
- * at lives a month, or a photo may be swept while its link would still have
- * worked. Only `createdAt` is asked about here.
- *
- * Zero means keep forever, and zero is the default, so a booth nobody has
- * configured leaves this function having touched nothing. That matters: the old
- * sweep deleted on link expiry and cost an event its pictures to a clock nobody
- * was watching. This one only ever does what was asked for in Settings.
- *
- * The setting is read on every run rather than at boot, so shortening the span
- * mid-event takes effect within the hour and not at the next restart.
+ * Deleting photos when their time is up. Each one is deleted on a timer set
+ * when it is taken (`deleteWhenDue`); this sweep is the safety net, for
+ * photos whose timer never fired — the booth was closed, or restarted, while
+ * they came due — and for any taken under a longer lifetime than Settings now
+ * says. A photo goes when its own expiry passes, or when it is older than the
+ * lifetime as set now, whichever comes first.
  */
-function sweepGallery() {
-  const stored = store.kv.get('captureSettings', {});
-  const hours = Number(stored?.galleryTtlHours ?? 0);
-  if (!Number.isFinite(hours) || hours <= 0) return;
-
-  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-  const tokens = store.photos.olderThan(cutoff);
+function sweepPhotos() {
+  const now = new Date();
+  const takenBefore = new Date(now.getTime() - photoMinutes() * 60 * 1000).toISOString();
+  const tokens = store.photos.dueBy(now.toISOString(), takenBefore);
   if (!tokens.length) return;
 
   // One photo at a time, each guarded: a single unreadable file must not
@@ -909,40 +880,45 @@ function sweepGallery() {
       deletePhoto(token);
       swept += 1;
     } catch (err) {
-      console.error(`  Gallery sweep could not delete ${token}: ${err.message}`);
+      console.error(`  Photo sweep could not delete ${token}: ${err.message}`);
     }
   }
-  console.log(`  Gallery sweep removed ${swept} of ${tokens.length} photo(s) older than ${hours}h`);
+  store.compact();
+  console.log(`  Deleted ${swept} of ${tokens.length} photo(s) past their lifetime`);
+}
+
+/** Delete this photo when its time is up, if the booth is still running then. */
+function deleteWhenDue(token, expiresAt) {
+  const ms = Math.max(0, new Date(expiresAt).getTime() - Date.now());
+  setTimeout(() => {
+    try {
+      if (!store.photos.get(token)) return; // deleted by hand already
+      deletePhoto(token);
+      store.compact();
+    } catch (err) {
+      console.error(`  Could not delete ${token} on time: ${err.message}`);
+    }
+  }, ms).unref();
 }
 
 const runSweep = () => {
   try {
-    sweepGallery();
+    sweepPhotos();
   } catch (err) {
-    console.error(`  Gallery sweep failed: ${err.message}`);
+    console.error(`  Photo sweep failed: ${err.message}`);
   }
 };
 
 /**
- * Once on the way up, then hourly.
- *
- * The hourly timer came from the Worker, where an always-on cron made "the
- * hour will come around" true. On a laptop it is not: a booth is opened for an
- * event and shut afterwards, and `setInterval` does not fire on start — so a
- * session shorter than an hour swept nothing at all, and photos that came due
- * while the app was closed were never noticed. With a week-long lifetime that
- * is most of them.
- *
- * Starting up is therefore the sweep's real trigger, and the interval is only
- * for a booth left running through a long event.
- *
- * The short delay is not timing anything — it just keeps the sweep off the
- * moment an operator is opening the app and waiting for a camera and a tunnel.
+ * Once on the way up, then every minute. Starting up catches whatever came
+ * due while the booth was closed; the minute is the slack on a timer that, for
+ * whatever reason, did not fire. The short delay just keeps the first run off
+ * the moment an operator is opening the app and waiting for a camera.
  */
-const GALLERY_SWEEP_MS = 60 * 60 * 1000;
-const SWEEP_ON_START_MS = 15 * 1000;
+const SWEEP_EVERY_MS = 60 * 1000;
+const SWEEP_ON_START_MS = 5 * 1000;
 setTimeout(runSweep, SWEEP_ON_START_MS).unref();
-setInterval(runSweep, GALLERY_SWEEP_MS).unref();
+setInterval(runSweep, SWEEP_EVERY_MS).unref();
 
 const banner = (label, value) => console.log(`  ${label.padEnd(20)} ${value}`);
 
@@ -975,11 +951,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
   banner('Database', store.file);
   banner('Photos stored', `${store.photos.count()}`);
   banner('Photo folder', PHOTOS_DIR);
-  banner('Link validity', `${FALLBACK_TTL_HOURS} hour(s) by default, set in Settings`);
-  const galleryTtl = Number(store.kv.get('captureSettings', {})?.galleryTtlHours ?? 0);
-  banner('Retention', galleryTtl > 0
-    ? `${galleryTtl} hour(s) from capture, swept hourly`
-    : 'photos are kept until deleted, set in Settings');
+  banner('Photo lifetime', `deleted ${photoMinutes()} minute(s) after the QR code, set in Settings`);
   banner('Frontend', SERVES_FRONTEND ? 'served from ./dist' : 'dev server (Vite)');
 
   // The booth runs on a laptop now, with nothing hosting it. The tunnel is

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowCounterClockwise, ArrowDown, ArrowLeft, ArrowRight, ArrowUp,
-  CircleHalf, Drop, LinkSimple, Palette, Sun, Timer as TimerIcon, Trash,
+  CircleHalf, Drop, Palette, Sun, Timer as TimerIcon, Trash,
 } from '@phosphor-icons/react';
 import { useCaptureSettings, type CaptureSettings } from './useCaptureSettings';
 import { formatEventDate, stampDate, todayIso } from '@/types/frame';
@@ -10,36 +10,13 @@ import type { LookRamp, ImageFilters } from '@/types/editor';
 
 const TIMER_OPTIONS = [0, 3, 5, 10] as const;
 
-/** Link lifetimes worth a button, shortest first, with 0 meaning never. */
-/** Quick picks. Any other number is typed in beside them. */
-const LINK_TTL_OPTIONS: { hours: number; label: string }[] = [
-  { hours: 6,   label: '6 hours' },
-  { hours: 24,  label: '1 day' },
-  { hours: 168, label: '7 days' },
-  { hours: 0,   label: 'Never' },
-];
-
 /**
- * How long the photos themselves are kept. Never comes first here, unlike the
- * link picks above: it is both the default and the safe answer, and an
- * operator skimming the row should meet it before they meet a number that
- * deletes things.
+ * How long a photo is kept, in minutes, from the moment its QR code goes up.
+ * Then the booth deletes it: the guest's link, the gallery entry and the copy
+ * in the photo folder. Long enough for a guest to scan and save; short enough
+ * that nobody's picture sits on the laptop after they have walked away.
  */
-export const GALLERY_TTL_OPTIONS: { hours: number; label: string }[] = [
-  { hours: 0,    label: 'Never' },
-  { hours: 168,  label: '7 days' },
-  { hours: 720,  label: '30 days' },
-  { hours: 2160, label: '90 days' },
-];
-
-/**
- * Show a span of hours in the largest unit that divides it exactly, so a
- * setting typed as "3 days" comes back as 3 days rather than 72 hours.
- */
-export function splitTtl(hours: number): { value: number; unit: 'hours' | 'days' } {
-  if (hours > 0 && hours % 24 === 0) return { value: hours / 24, unit: 'days' };
-  return { value: hours, unit: 'hours' };
-}
+export const PHOTO_MINUTE_OPTIONS = [5, 10, 15, 30, 60] as const;
 
 /** Which edge the ramp starts from, in the order they sit on screen. */
 /** The arrow points the way the effect fades: ↓ is strong at the top, gone at
@@ -192,93 +169,34 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
         </div>
       </div>
 
-      {/* Expiry and deletion are two different things, and an operator has no
-          reason to assume so — each helper line spends its one sentence on
-          that rather than on restating the buttons. */}
       <div className="mt-6">
         <p className="mb-1.5 flex items-center gap-1.5 text-[0.78rem] font-semibold text-[var(--ink-2)]">
-          <LinkSimple size={15} /> Download link
+          <Trash size={15} /> Photo lifetime
         </p>
         <p className="mb-3 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
-          How long a guest&rsquo;s QR link keeps working. This only retires the
-          link — the photo stays in the gallery.
+          How long a photo is kept after its QR code is shown. When the time is
+          up the booth <strong className="font-semibold text-[var(--ink)]">deletes
+          the photo</strong> — the guest&rsquo;s link stops working and the photo
+          is gone from the gallery and from this laptop, for good.
         </p>
-        <TtlPicks
-          options={LINK_TTL_OPTIONS} value={settings.linkTtlHours} loading={loading}
-          onPick={h => push({ ...settings, linkTtlHours: h })}
-        />
-
-        {/* The quick picks are the common cases, not the whole range. An event
-            that wants the link dead in 90 minutes should be able to say so
-            without one of us having guessed at it in advance. */}
-        <TtlCustom
-          value={settings.linkTtlHours} loading={loading}
-          label="Link lifetime" neverHint="links never expire"
-          onChange={h => push({ ...settings, linkTtlHours: h })}
-        />
-      </div>
-
-      {/* Deliberately the same shape as the block above, because the pair is
-          only understandable side by side: one span retires a link, the other
-          destroys the picture. The wording carries the whole difference. */}
-      <div className="mt-6">
-        <p className="mb-1.5 flex items-center gap-1.5 text-[0.78rem] font-semibold text-[var(--ink-2)]">
-          <Trash size={15} /> Gallery cleanup
-        </p>
-        <p className="mb-3 text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
-          How long a photo is kept after it is taken. When the time is up the
-          booth <strong className="font-semibold text-[var(--ink)]">deletes the photo
-          itself</strong> — out of the gallery and out of storage, permanently, with
-          no way back. Never keeps every photo until you delete it by hand.
-        </p>
-        <TtlPicks
-          options={GALLERY_TTL_OPTIONS} value={settings.galleryTtlHours} loading={loading}
-          onPick={h => push({ ...settings, galleryTtlHours: h })}
-        />
-        <TtlCustom
-          value={settings.galleryTtlHours} loading={loading}
-          label="Photo lifetime" neverHint="photos are kept forever"
-          onChange={h => push({ ...settings, galleryTtlHours: h })}
-        />
-
-        {/* Not an error — an operator may well want the photos gone before the
-            links lapse. But a guest holding a link to a photo that no longer
-            exists is worth hearing about before the event, not during it. A
-            link set to Never is infinite, so it outlives any cleanup at all. */}
-        {settings.galleryTtlHours > 0
-          && (settings.linkTtlHours === 0 || settings.galleryTtlHours < settings.linkTtlHours) && (
-          <p className="mt-2 text-[0.72rem] leading-[1.6] font-medium text-[var(--accent-ink)]">
-            Download links outlive the photos here, so a guest could scan a QR
-            code and find the picture already deleted.
-          </p>
-        )}
+        <div className="flex gap-2">
+          {PHOTO_MINUTE_OPTIONS.map(m => (
+            <button
+              key={m} type="button" disabled={loading}
+              aria-pressed={settings.photoMinutes === m}
+              onClick={() => push({ ...settings, photoMinutes: m })}
+              className={`min-h-11 flex-1 rounded-xl text-[0.82rem] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                settings.photoMinutes === m
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'border border-[var(--border)] bg-white text-[var(--ink-2)] hover:border-[var(--ink-3)]'
+              }`}
+            >
+              {m} min
+            </button>
+          ))}
+        </div>
       </div>
     </section>
-  );
-}
-
-/** The quick picks, shared so both spans stay one design rather than two. */
-function TtlPicks({ options, value, loading, onPick }: {
-  options: { hours: number; label: string }[];
-  value: number; loading: boolean; onPick: (hours: number) => void;
-}) {
-  return (
-    <div className="flex gap-2">
-      {options.map(o => (
-        <button
-          key={o.hours} type="button" disabled={loading}
-          aria-pressed={value === o.hours}
-          onClick={() => onPick(o.hours)}
-          className={`min-h-11 flex-1 rounded-xl text-[0.82rem] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-            value === o.hours
-              ? 'bg-[var(--accent)] text-white'
-              : 'border border-[var(--border)] bg-white text-[var(--ink-2)] hover:border-[var(--ink-3)]'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -356,80 +274,6 @@ export function LookSettingsCard({ settings, push }: CaptureSettingsControl) {
         )}
       </div>
     </section>
-  );
-}
-
-/**
- * A number and a unit, for any span the quick picks above do not cover.
- *
- * Deliberately knows nothing about which setting it is editing — it takes a
- * number of hours and hands one back — so the link's life and the photo's are
- * typed into the same control and cannot drift into behaving differently.
- */
-function TtlCustom({ value: hours, onChange, loading, label, neverHint }: {
-  value: number;
-  onChange: (hours: number) => void;
-  loading: boolean;
-  /** Names the pair of fields for screen readers, e.g. "Link lifetime". */
-  label: string;
-  /** What 0 means for this particular span, said in the operator's words. */
-  neverHint: string;
-}) {
-  const never = hours === 0;
-  const { value, unit } = splitTtl(hours);
-  // Held locally while typing: pushing every keystroke would turn "12" into a
-  // one-hour setting the moment the "1" landed.
-  const [draft, setDraft] = useState(String(value));
-  const [draftUnit, setDraftUnit] = useState<'hours' | 'days'>(unit);
-
-  // Follow the buttons when they are used, but never fight the operator's
-  // own typing — only resync when the stored value is not what we last sent.
-  useEffect(() => {
-    const next = splitTtl(hours);
-    const asHours = draftUnit === 'days' ? Number(draft) * 24 : Number(draft);
-    if (asHours !== hours) {
-      setDraft(String(next.value));
-      setDraftUnit(next.unit);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hours]);
-
-  const commit = (raw: string, u: 'hours' | 'days') => {
-    const n = Math.max(0, Math.floor(Number(raw)));
-    if (!Number.isFinite(n)) return;
-    onChange(u === 'days' ? n * 24 : n);
-  };
-
-  return (
-    <div className="mt-3 flex items-center gap-2">
-      <span className="text-[0.72rem] text-[var(--ink-3)]">or</span>
-      <input
-        type="number" min={0} step={1} inputMode="numeric"
-        value={never ? '' : draft}
-        placeholder={never ? '—' : ''}
-        disabled={loading}
-        aria-label={label}
-        onChange={(e) => { setDraft(e.target.value); commit(e.target.value, draftUnit); }}
-        className="w-20 rounded-xl border border-[var(--border)] px-3 py-2 text-[0.82rem] text-[var(--ink)] outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
-      />
-      <select
-        value={draftUnit}
-        disabled={loading}
-        aria-label={`${label} unit`}
-        onChange={(e) => {
-          const u = e.target.value as 'hours' | 'days';
-          setDraftUnit(u);
-          commit(draft, u);
-        }}
-        className="rounded-xl border border-[var(--border)] px-3 py-2 text-[0.82rem] font-medium text-[var(--ink)] outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
-      >
-        <option value="hours">hours</option>
-        <option value="days">days</option>
-      </select>
-      <span className="text-[0.72rem] text-[var(--ink-3)]">
-        {never ? neverHint : '0 also means never'}
-      </span>
-    </div>
   );
 }
 

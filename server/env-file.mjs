@@ -105,13 +105,6 @@ export const ENV_FIELDS = [
     restart: false,
   },
   {
-    key: 'PHOTO_TTL_DAYS',
-    label: 'Default link validity (days)',
-    help: 'Only used until Settings saves a link validity of its own; that one then wins.',
-    placeholder: '7',
-    restart: true,
-  },
-  {
     key: 'PORT',
     label: 'Server port',
     help: 'The port the booth serves on. Change it only if something else on the laptop already holds 3001.',

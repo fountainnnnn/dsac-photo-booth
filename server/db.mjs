@@ -16,6 +16,7 @@ import { DatabaseSync } from 'node:sqlite';
 const SCHEMA = `
   PRAGMA journal_mode = WAL;
   PRAGMA foreign_keys = ON;
+  PRAGMA secure_delete = ON;
 
   CREATE TABLE IF NOT EXISTS photos (
     token      TEXT PRIMARY KEY,
@@ -148,16 +149,17 @@ export function openDatabase(dir) {
     },
 
     /**
-     * Tokens of every photo taken before `iso`, for the gallery sweep.
+     * Tokens of every photo whose expiry has passed by `nowIso`, or that was
+     * taken before `takenBeforeIso`, for the sweep.
      *
      * Tokens only: the sweep has a row and an archive file to remove and needs
      * nothing else to find either. Oldest first, so a run cut short has at
      * least cleared the photos furthest past their span.
      */
-    olderThan(iso) {
+    dueBy(nowIso, takenBeforeIso) {
       return db.prepare(
-        'SELECT token FROM photos WHERE created_at < ? ORDER BY created_at',
-      ).all(iso).map(r => r.token);
+        'SELECT token FROM photos WHERE expires_at <= ? OR created_at < ? ORDER BY created_at',
+      ).all(nowIso, takenBeforeIso).map(r => r.token);
     },
 
     count() {
@@ -349,5 +351,19 @@ export function openDatabase(dir) {
     },
   };
 
-  return { file, db, photos, frames, kv, derivatives, close: () => db.close() };
+  /**
+   * After deleting photos: fold the write-ahead journal back into the file
+   * and empty it. With secure_delete the freed pages are already zeroed, but
+   * the journal still holds the frames the photo was written in until it is
+   * checkpointed; a deleted photo should not live on in the -wal file.
+   */
+  const compact = () => {
+    try {
+      db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    } catch (err) {
+      console.error(`  Could not compact the database: ${err.message}`);
+    }
+  };
+
+  return { file, db, photos, frames, kv, derivatives, compact, close: () => db.close() };
 }

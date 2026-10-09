@@ -24,9 +24,12 @@ venue Wi-Fi, so a LAN address is no use to them. If the tunnel cannot start the
 booth still runs and falls back to the LAN address — taking photos matters more
 than handing them out.
 
-Photos are kept on the laptop, in the `data/` folder of the checkout (the
-SQLite database plus a `photos/` folder of plain files the Gallery's "Open
-folder" button reveals). Nothing is uploaded anywhere.
+Photos are kept on the laptop only briefly, in the `data/` folder of the
+checkout (the SQLite database plus a `photos/` folder of plain files the
+Gallery's "Open folder" button reveals), and nothing is uploaded anywhere. Ten
+minutes after a photo's QR code goes up, the booth deletes it: the guest's link
+stops working and the photo leaves the gallery, the database and the folder for
+good. Settings > Event changes the span (5 to 60 minutes).
 
 One password guards the booth: capture, gallery and settings. Set it on the
 Environment tab in Settings, as `BOOTH_PASSWORD`; unset leaves the booth open.
@@ -124,7 +127,7 @@ only route a guest's phone has to the laptop. It retries a few times before
 falling back to the LAN address.
 
 Useful environment variables: `PORT`, `PUBLIC_URL` (use a fixed origin you
-already have, instead of a quick tunnel), `STORAGE_DIR`, `PHOTO_TTL_DAYS`.
+already have, instead of a quick tunnel), `STORAGE_DIR`.
 
 `npm run app` and `npm run package` still build the Electron desktop app, under
 its own name (Open House Photo Booth) and with no updater, so it cannot pick up
@@ -133,11 +136,11 @@ the DSAC booth's releases.
 ## How it fits together
 
 One SQLite file (via `node:sqlite`, hence Node 22+) holds photos, uploaded
-frames, and every setting. Download links expire after the `linkTtlHours`
-capture setting (default 168, i.e. 7 days; 0 means never), falling back to
-`PHOTO_TTL_DAYS` when that setting has never been written. Expiry only retires
-the guest's link — photos are kept until an operator deletes one from the
-gallery, or until the gallery cleanup setting (off by default) does.
+frames, and every setting. Each photo is deleted `photoMinutes` after it is
+taken (a capture setting, default 10): on a timer set at the shutter, with a
+sweep every minute (and on start-up) for any whose timer never fired. SQLite's
+`secure_delete` is on and the journal is checkpointed after each deletion, so
+a deleted photo does not linger inside the database file either.
 
 The only built-in frame is the doodle one, in `public/frames/` at 1921x1201
 with a transparent cut-out the photo is drawn into. Its caption geometry is

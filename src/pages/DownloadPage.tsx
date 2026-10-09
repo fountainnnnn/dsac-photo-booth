@@ -21,6 +21,10 @@ export default function DownloadPage({ token }: DownloadPageProps) {
   const previewHref = `/api/preview/${encodeURIComponent(token)}`;
 
   const [copied, setCopied] = useState(false);
+  // The booth deletes each photo a few minutes after its QR code goes up, so
+  // a guest who scans late finds nothing. Say so, rather than show a broken
+  // picture and a Save button that downloads an error.
+  const [gone, setGone] = useState(false);
   /**
    * The caption is a starting point, not a script. Guests were copying it
    * verbatim or not at all; letting them edit it in place is the difference
@@ -41,12 +45,19 @@ export default function DownloadPage({ token }: DownloadPageProps) {
       className="grid min-h-dvh bg-[#f6f6f7] text-[#18181b] md:grid-cols-[1fr_400px]"
     >
       <section className="flex items-center justify-center bg-[#0a0a0b] p-4 md:p-6">
-        <img
-          data-testid="download-page-photo"
-          src={previewHref}
-          alt="Your event photo"
-          className="max-h-[86dvh] max-w-full rounded-lg object-contain shadow-[0_20px_70px_rgba(0,0,0,0.4)]"
-        />
+        {gone ? (
+          <p data-testid="download-page-gone" className="max-w-[30ch] text-center text-sm leading-6 text-white/70">
+            This photo has been deleted.
+          </p>
+        ) : (
+          <img
+            data-testid="download-page-photo"
+            src={previewHref}
+            alt="Your event photo"
+            onError={() => setGone(true)}
+            className="max-h-[86dvh] max-w-full rounded-lg object-contain shadow-[0_20px_70px_rgba(0,0,0,0.4)]"
+          />
+        )}
       </section>
 
       <aside className="flex flex-col overflow-y-auto border-l border-[#e5e5e8] bg-white">
@@ -59,9 +70,11 @@ export default function DownloadPage({ token }: DownloadPageProps) {
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a1a1aa]">Your photo</p>
             <h1 className="mt-1 text-2xl font-semibold leading-tight tracking-tight">Save your DSAC photo.</h1>
             <p className="mt-1.5 text-sm leading-6 text-[#52525b]">
-              Download your composed event photo. Links are temporary for event use.
+              {gone
+                ? 'This photo is no longer available: the booth deletes photos a few minutes after they are taken.'
+                : 'Download your composed event photo. Save it now: the booth deletes it a few minutes after it is taken.'}
             </p>
-            <a
+            {!gone && <a
               data-testid="download-page-save-btn"
               href={downloadHref}
               // No `download` value: a bare attribute lets the server's
@@ -73,7 +86,7 @@ export default function DownloadPage({ token }: DownloadPageProps) {
             >
               <DownloadSimple className="h-4 w-4" />
               Save photo
-            </a>
+            </a>}
           </section>
 
           <div className="h-px bg-[#ececee]" />

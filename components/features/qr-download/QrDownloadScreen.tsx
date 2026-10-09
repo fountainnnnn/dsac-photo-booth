@@ -18,21 +18,23 @@ export interface QrDownloadScreenProps {
   onRetake: () => void;
 }
 
-/** The sentinel a never-expiring link carries — a date no event outlives. */
-const NEVER_EXPIRES = '9999-12-31T23:59:59.999Z';
-
 /**
  * How long the link has left, said the way a guest would say it. Rounded up:
- * "6 days" on a link with six and a half left is a promise the booth keeps,
- * where rounding down invites someone back to a dead page.
+ * "10 minutes" on a link with nine and a half left is a promise the booth
+ * keeps, where rounding down invites someone back to a dead page. The photo is
+ * deleted when the link lapses, so the copy says so.
  */
 function linkLifetime(expiresAt: string | undefined): string {
   if (!expiresAt) return '';
-  if (expiresAt === NEVER_EXPIRES) return 'The link does not expire.';
 
   const ms = new Date(expiresAt).getTime() - Date.now();
   if (!Number.isFinite(ms)) return '';
   if (ms <= 0) return 'The link has already expired.';
+
+  const minutes = Math.ceil(ms / 60_000);
+  if (minutes < 60) {
+    return `Save it within ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}: then the photo is deleted from the booth.`;
+  }
 
   const hours = Math.ceil(ms / 3_600_000);
   if (hours < 2) return 'The link is available for an hour.';

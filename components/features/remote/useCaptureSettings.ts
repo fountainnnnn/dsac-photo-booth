@@ -79,26 +79,13 @@ export interface CaptureSettings {
    */
   rotationDeg: number;
   /**
-   * How long a guest's download link keeps working, with 0 meaning never
-   * expires. Hours rather than days because the shortest useful setting is
-   * shorter than a day — a company that wants the links dead by the time the
-   * afternoon's event is packed up cannot say that in whole days.
-   *
-   * This governs the link only. The photo itself stays in the gallery until an
-   * operator deletes it — or until `galleryTtlHours` below comes for it.
+   * How long a photo is kept, in minutes, from the moment its QR code goes
+   * up. Then the booth deletes it: the guest's link stops working, and the
+   * photo leaves the gallery and the laptop for good. Open House keeps
+   * nobody's picture after they have walked away; the DSAC booth's link and
+   * gallery lifetimes, in hours and days, are not here on purpose.
    */
-  linkTtlHours: number;
-  /**
-   * How long the photo itself is kept before the booth deletes it on its own,
-   * with 0 meaning kept forever. Measured from the moment the shutter went,
-   * never from the link's expiry: the two clocks are deliberately unrelated,
-   * so a link can lapse in an hour while the picture it pointed at lives a
-   * month, or the other way about.
-   *
-   * Defaults to 0 because that is what the booth did before this setting
-   * existed. Nobody should lose an event's photos to an upgrade.
-   */
-  galleryTtlHours: number;
+  photoMinutes: number;
   /**
    * How the room behind the guests is taken away: not at all, by keying out
    * a green screen, or by a model that finds the people. The guest then picks
@@ -169,8 +156,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   cropEnabled: false,
   crop: FULL_FRAME,
   rotationDeg: 0,
-  linkTtlHours: 168,
-  galleryTtlHours: 0,
+  photoMinutes: 10,
   bgRemoval: 'off',
   chromaKey: DEFAULT_CHROMA_KEY,
   edgeCleanup: false,

@@ -108,8 +108,9 @@ export default function GalleryPage() {
             Gallery<span className="text-[var(--accent)]">.</span>
           </h1>
           <p className="mt-1 text-[0.85rem] text-[var(--ink-2)]">
-            Every photo from this kiosk. They stay here until you delete one —
-            only the guest&rsquo;s QR link expires.
+            The photos from the last few minutes. Each is deleted from this
+            laptop a few minutes after its QR code is shown, as set in
+            Settings &gt; Event.
           </p>
         </div>
 
