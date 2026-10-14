@@ -71,7 +71,8 @@ export function useTypedBackground(refresh: unknown): TypedBackgroundState {
       }
       const src = URL.createObjectURL(await res.blob());
       urls.current.push(src);
-      setUsed(n => n + 1);
+      // A picture someone already asked for costs nothing, so it is not a try.
+      if (res.headers.get('X-Background-Cached') !== '1') setUsed(n => n + 1);
       return { src, text: clean };
     } catch {
       setError('Could not reach the booth. Pick one of ours for now.');

@@ -22,11 +22,13 @@ const chat = verdict => json({ choices: [{ message: { content: JSON.stringify(ve
 function fakeOpenRouter({
   screen = { allowed: true, place: 'a quiet beach at sunset' },
   image = () => json({ data: [{ b64_json: PNG.toString('base64'), media_type: 'image/png' }] }),
-  check = { safe: true, fills_frame: true, reason: 'fine' },
+  check = { safe: true, is_backdrop: false, reason: 'fine' },
+  lookup = () => json({ choices: [{ message: { content: 'UNKNOWN' } }] }),
 } = {}) {
   return vi.fn(async (url, init) => {
     const body = JSON.parse(init.body);
     if (url.endsWith('/images')) return image(body);
+    if (body.plugins) return lookup(body);
     const looking = Array.isArray(body.messages[1].content);
     const verdict = looking ? check : screen;
     return verdict instanceof Response ? verdict : chat(verdict);
@@ -74,9 +76,9 @@ describe('the prompt', () => {
     expect(cleanText('x'.repeat(500))).toHaveLength(MAX_TEXT);
   });
 
-  it('asks for one 2K 16:9 picture', () => {
+  it('asks for one 1K 16:9 picture from Flash Lite Image', () => {
     expect(requestBody('a forest')).toMatchObject({
-      model: 'google/gemini-3.1-flash-image', n: 1, resolution: '2K', aspect_ratio: '16:9',
+      model: 'google/gemini-3.1-flash-lite-image', n: 1, resolution: '1K', aspect_ratio: '16:9',
     });
   });
 
@@ -173,6 +175,42 @@ describe('createBackgrounds', () => {
     expect(calls(fetchImpl, '/images')).toHaveLength(2);
   });
 
+  it('looks up how a named meme looks, and tells the image model', async () => {
+    const fetchImpl = fakeOpenRouter({
+      screen: {
+        allowed: true,
+        place: 'the Tung Tung Tung Sahur meme character to one side of a bright street',
+        look_up: ['Tung Tung Tung Sahur'],
+      },
+      lookup: () => json({ choices: [{ message: {
+        content: 'A wooden stick figure with large staring eyes, holding a bat [knowyourmeme.com](https://knowyourmeme.com/x).',
+      } }] }),
+    });
+    const bg = createBackgrounds(tempDir(), { fetchImpl });
+    await bg.generate('tung tung tung sahur', { apiKey: 'k' });
+
+    const lookups = fetchImpl.mock.calls.filter(([, init]) => JSON.parse(init.body).plugins);
+    expect(lookups).toHaveLength(1);
+    expect(JSON.parse(lookups[0][1].body).plugins[0]).toMatchObject({ id: 'web', engine: 'exa' });
+    const prompt = JSON.parse(calls(fetchImpl, '/images')[0][1].body).prompt;
+    expect(prompt).toMatch(/WHAT TUNG TUNG TUNG SAHUR LOOKS LIKE: A wooden stick figure with large staring eyes, holding a bat/);
+    expect(prompt).not.toContain('knowyourmeme');
+  });
+
+  it('does not look anything up for a plain place, and carries on when a lookup fails', async () => {
+    const plain = fakeOpenRouter();
+    await createBackgrounds(tempDir(), { fetchImpl: plain }).generate('a beach', { apiKey: 'k' });
+    expect(plain.mock.calls.some(([, init]) => JSON.parse(init.body).plugins)).toBe(false);
+
+    const failing = fakeOpenRouter({
+      screen: { allowed: true, place: 'a meme scene', look_up: ['Some Meme'] },
+      lookup: () => json({ error: { message: 'search down' } }, 502),
+    });
+    const made = await createBackgrounds(tempDir(), { fetchImpl: failing }).generate('some meme', { apiKey: 'k' });
+    expect(made.cached).toBe(false);
+    expect(JSON.parse(calls(failing, '/images')[0][1].body).prompt).not.toMatch(/LOOKS LIKE/);
+  });
+
   it('turns away what the screen does not allow, without painting it', async () => {
     const fetchImpl = fakeOpenRouter({ screen: { allowed: false, place: '' } });
     const bg = createBackgrounds(tempDir(), { fetchImpl });
@@ -191,8 +229,8 @@ describe('createBackgrounds', () => {
 
   it('never hands out or keeps a picture the check turns away', async () => {
     const cases = [
-      [{ safe: false, fills_frame: true, reason: 'weapon' }, 'refused'],
-      [{ safe: true, fills_frame: false, reason: 'a banner in a room' }, 'failed'],
+      [{ safe: false, is_backdrop: false, reason: 'weapon' }, 'refused'],
+      [{ safe: true, is_backdrop: true, reason: 'a banner in a room' }, 'failed'],
       [json({}, 500), 'failed'],
     ];
     for (const [check, code] of cases) {

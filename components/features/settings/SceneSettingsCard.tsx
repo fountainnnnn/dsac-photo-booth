@@ -324,7 +324,7 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
             <span className="block text-[0.8rem] font-semibold text-[var(--ink)]">Let guests type a background</span>
             <span className="mt-1 block text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
               A guest types a place and an image model draws it, through OpenRouter:
-              about US$0.10 a background, three tries per guest, and the same words
+              about US$0.04 a background, three tries per guest, and the same words
               are only paid for once.{' '}
               {keySet === false && (
                 <strong className="font-semibold text-[var(--accent-ink)]">

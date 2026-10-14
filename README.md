@@ -60,8 +60,8 @@ stand in. Settings > Background chooses how the room is taken away:
 
 If an OpenRouter API key is set on the Environment tab (`OPENROUTER_API_KEY`),
 guests can also **type a background** ("a beach at sunset") and an image model
-draws it — Gemini 3.1 Flash Image by default, about US$0.10 each at 2K, three
-tries per guest. Only the background is generated: the guests are cut out on the
+draws it — Gemini 3.1 Flash Lite Image by default, about US$0.04 each in about
+five seconds, three tries per guest. Only the background is generated: the guests are cut out on the
 laptop and drawn on top, so no model ever redraws a face. The guest's words are
 checked against a short blocked-word list and wrapped in the booth's own prompt
 (no people, no text) in `server/backgrounds.mjs`. Each picture is kept in
