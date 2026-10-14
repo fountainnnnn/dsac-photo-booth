@@ -11,7 +11,9 @@ import QRCode from 'qrcode';
 import { openDatabase } from './db.mjs';
 import { createAuth } from './auth.mjs';
 import { startTunnel } from './tunnel.mjs';
-import { BackgroundError, DEFAULT_MODEL, createBackgrounds } from './backgrounds.mjs';
+import {
+  BackgroundError, DEFAULT_CHECK_MODEL, DEFAULT_MODEL, createBackgrounds,
+} from './backgrounds.mjs';
 import {
   ENV_FIELDS, applyToProcessEnv, parseEnv, pickEditable, readEnvFile, writeEnvFile,
 } from './env-file.mjs';
@@ -642,6 +644,10 @@ app.post('/api/backgrounds/generate', booth, async (req, res, next) => {
     const image = await backgrounds.generate(req.body?.text, {
       apiKey: process.env.OPENROUTER_API_KEY,
       model: process.env.OPENROUTER_IMAGE_MODEL || DEFAULT_MODEL,
+      checkModel: process.env.OPENROUTER_CHECK_MODEL || DEFAULT_CHECK_MODEL,
+      // How many are posing, as set on the capture screen or in Settings, so
+      // the picture leaves room for that many. 0 when nobody has said.
+      people: Number(store.kv.get('captureSettings', {})?.maxPeople ?? 0),
     });
     res.setHeader('Content-Type', image.mime);
     res.setHeader('Cache-Control', 'no-store');

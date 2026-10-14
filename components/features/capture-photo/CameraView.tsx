@@ -12,6 +12,7 @@ import { useLivePreview, drawPhoto } from './useLivePreview';
 import { useScene, type SceneStatus } from './scene/useScene';
 import { recordSpeed } from './scene/speed';
 import { useFrameRates } from './scene/frameRate';
+import { MAX_FACES } from './scene/vision';
 import type { TypedBackgroundState } from './scene/useTypedBackground';
 import {
   AVATARS, BACKGROUNDS, DEFAULT_SCENE_CHOICE, TYPED_BACKGROUND_ID, type SceneChoice,
@@ -707,6 +708,8 @@ export default function CameraView({
             showBackgrounds={captureSettings.bgRemoval !== 'off'}
             status={sceneStatus}
             typing={typing}
+            people={captureSettings.maxPeople}
+            onPeople={n => updateCaptureSettings({ maxPeople: n })}
           />
         </aside>
       </div>
@@ -828,16 +831,40 @@ function statusLine(status: SceneStatus, showBackgrounds: boolean, avatarOn: boo
  * The guest's choices, as pictures to tap. Large enough for a finger: this is
  * a kiosk, and whoever is choosing is standing a pace back from it.
  */
-function ScenePickers({ choice, onChange, showBackgrounds, status, typing }: {
+function ScenePickers({ choice, onChange, showBackgrounds, status, typing, people, onPeople }: {
   choice: SceneChoice;
   onChange: (choice: SceneChoice) => void;
   showBackgrounds: boolean;
   status: SceneStatus;
   typing?: TypedBackgroundState;
+  /** How many are posing; 0 for not said. The same setting as in Settings. */
+  people: number;
+  onPeople: (people: number) => void;
 }) {
   const note = statusLine(status, showBackgrounds, Boolean(choice.avatarId));
   return (
     <div className="mt-6 flex flex-col gap-5">
+      {/* How many are posing: keeps anyone more out of the photo (with "Only
+          the people at the front"), and a typed background leaves room for
+          that many. The same setting as Settings > Background. */}
+      <div>
+        <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">People</p>
+        <div className="mt-2 grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="People in the photo">
+          {[0, ...Array.from({ length: MAX_FACES }, (_, i) => i + 1)].map(n => (
+            <button key={n} type="button" role="radio" aria-checked={people === n}
+              data-testid={`people-${n}`}
+              onClick={() => onPeople(n)}
+              className={`min-h-10 rounded-lg border-2 text-[0.78rem] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                people === n
+                  ? "border-[var(--accent)] text-[var(--accent)]"
+                  : "border-[var(--border)] text-[var(--ink-2)] hover:border-[var(--ink-3)]"
+              }`}>
+              {n === 0 ? "Any" : n}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {showBackgrounds && (
         <div>
           <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">Background</p>
