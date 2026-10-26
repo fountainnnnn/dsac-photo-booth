@@ -59,7 +59,7 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
     chromaKey: key,
     edgeCleanup: false, // the clean-up pass only runs at the shutter
     cleanPlateAt: settings.cleanPlateAt,
-    choice: { backgroundId: previewBg, avatarId: '' },
+    choice: { backgroundId: previewBg, avatarIds: [] },
     // Who counts as the group, as on the capture screen, so the distance line
     // can be measured and tuned against this preview.
     region: settings.cropEnabled ? unmirrorCrop(settings.crop) : null,
@@ -267,6 +267,28 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
             onChange={v => setKey({ spill: v })} />
         </div>
       )}
+
+      <label className="mt-6 flex items-start gap-3">
+        <input type="checkbox" checked={settings.promptAvatars}
+          onChange={e => push({ ...settings, promptAvatars: e.target.checked })}
+          className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+        <span>
+          <span className="block text-[0.8rem] font-semibold text-[var(--ink)]">Let guests type an avatar</span>
+          <span className="mt-1 block text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
+            A guest types something to wear and an image model draws it, through
+            OpenRouter; the booth works out where on the face it goes and pins it
+            there, like the ready-made ones. About US$0.04 an avatar, three tries
+            per guest, and the same words are only paid for once. Works with
+            background removal off.{' '}
+            {keySet === false && (
+              <strong className="font-semibold text-[var(--accent-ink)]">
+                Needs an OpenRouter API key on the Environment tab; until then guests
+                only see the ready-made avatars.
+              </strong>
+            )}
+          </span>
+        </span>
+      </label>
 
       <label className="mt-6 flex items-start gap-3">
         <input type="checkbox" checked={settings.focusFront}

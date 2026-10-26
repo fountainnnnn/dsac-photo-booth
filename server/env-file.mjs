@@ -120,16 +120,16 @@ export const ENV_FIELDS = [
   {
     key: 'OPENROUTER_API_KEY',
     label: 'OpenRouter API key',
-    help: 'Lets guests type a background, which an image model draws (about US$0.04 each). '
-      + 'Empty hides the typing box; the ready-made backgrounds still work.',
+    help: 'Lets guests type a background or an avatar, which an image model draws (about US$0.04 each). '
+      + 'Empty hides the typing boxes; the ready-made backgrounds and avatars still work.',
     placeholder: 'sk-or-…',
     secret: true,
     restart: false,
   },
   {
     key: 'OPENROUTER_IMAGE_MODEL',
-    label: 'Background image model',
-    help: 'Which OpenRouter image model draws typed backgrounds. Leave empty for Gemini 3.1 Flash Lite Image.',
+    label: 'Image model',
+    help: 'Which OpenRouter image model draws typed backgrounds and avatars. Leave empty for Gemini 3.1 Flash Lite Image.',
     placeholder: 'google/gemini-3.1-flash-lite-image',
     restart: false,
   },

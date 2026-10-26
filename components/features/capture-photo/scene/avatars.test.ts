@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LANDMARK, placeAvatar, toPhoto, type PhotoGeometry } from './avatars';
+import { LANDMARK, drawAvatars, placeAvatar, toPhoto, type PhotoGeometry } from './avatars';
 import type { FacePoints } from './faces';
 import type { AvatarOption } from '@/types/scene';
 
@@ -17,11 +17,16 @@ function face(cx: number, cy: number): FacePoints {
   pts[LANDMARK.eyeInnerB] = { x: cx - 0.02, y: cy };
   pts[LANDMARK.eyeOuterB] = { x: cx - 0.05, y: cy };
   pts[LANDMARK.forehead] = { x: cx, y: cy - 0.08 };
+  pts[LANDMARK.mouthTop] = { x: cx, y: cy + 0.1 };
+  pts[LANDMARK.mouthBottom] = { x: cx, y: cy + 0.12 };
+  pts[LANDMARK.chin] = { x: cx, y: cy + 0.18 };
+  pts[LANDMARK.faceSideA] = { x: cx + 0.08, y: cy };
+  pts[LANDMARK.faceSideB] = { x: cx - 0.08, y: cy };
   return pts;
 }
 
 const glasses: AvatarOption = {
-  id: 'g', label: 'g', src: '', anchor: 'eyes', width: 2, lift: 0, pivot: { x: 0.5, y: 0.5 },
+  id: 'g', label: 'g', src: '', slot: 'eyes', anchor: 'eyes', width: 2, lift: 0, pivot: { x: 0.5, y: 0.5 },
 };
 
 describe('toPhoto', () => {
@@ -74,5 +79,43 @@ describe('placeAvatar', () => {
 
   it('skips a face without the points it needs', () => {
     expect(placeAvatar([{ x: 0.5, y: 0.5 }], glasses, 1, plain)).toBeNull();
+  });
+
+  it('sizes a typed avatar to the face, not the eyes', () => {
+    const mask: AvatarOption = { ...glasses, slot: 'face', per: 'face', width: 1.5 };
+    const place = placeAvatar(face(0.5, 0.4), mask, 1, plain)!;
+    expect(place.width).toBeCloseTo(1.5 * 0.16 * 1600, 6); // face sides 0.16 apart
+  });
+
+  it('pins to the mouth and the chin', () => {
+    const beard: AvatarOption = { ...glasses, slot: 'chin', anchor: 'mouth' };
+    const tie: AvatarOption = { ...glasses, slot: 'neck', anchor: 'chin' };
+    expect(placeAvatar(face(0.5, 0.4), beard, 1, plain)!.y).toBeCloseTo(0.51 * 900, 6);
+    expect(placeAvatar(face(0.5, 0.4), tie, 1, plain)!.y).toBeCloseTo(0.58 * 900, 6);
+  });
+});
+
+describe('drawAvatars', () => {
+  function recorder() {
+    const drawn: unknown[] = [];
+    const ctx = {
+      drawImage: (img: unknown) => { drawn.push(img); },
+      save() {}, restore() {}, translate() {}, rotate() {}, beginPath() {}, rect() {}, clip() {},
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, drawn };
+  }
+  const picture = (name: string) => ({ name, width: 100, height: 50 }) as unknown as HTMLCanvasElement;
+
+  it('draws everything worn on every face, back to front', () => {
+    const { ctx, drawn } = recorder();
+    const hat = picture('hat');
+    const mask = picture('mask');
+    const specs = picture('specs');
+    drawAvatars(ctx, [face(0.3, 0.4), face(0.7, 0.4)], [
+      { option: { ...glasses, id: 'h', slot: 'head', anchor: 'forehead' }, image: hat },
+      { option: { ...glasses, id: 's' }, image: specs },
+      { option: { ...glasses, id: 'm', slot: 'face' }, image: mask },
+    ], plain);
+    expect(drawn).toEqual([mask, specs, hat, mask, specs, hat]);
   });
 });

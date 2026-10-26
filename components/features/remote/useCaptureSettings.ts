@@ -109,6 +109,11 @@ export interface CaptureSettings {
    */
   promptBackgrounds: boolean;
   /**
+   * Let guests type an avatar for an image model to draw, pinned to their face
+   * like the ready-made ones. The same key; this switches it off on its own.
+   */
+  promptAvatars: boolean;
+  /**
    * Only the people at the front — the group having their photo taken — get
    * avatars and, with no green screen, are cut out; a queue behind them is
    * left alone. Judged by face size, so it needs the face tracker running.
@@ -162,6 +167,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   edgeCleanup: false,
   cleanPlateAt: '',
   promptBackgrounds: true,
+  promptAvatars: true,
   focusFront: true,
   frontLineM: 2,
   maxPeople: 0,

@@ -14,8 +14,9 @@ import { recordSpeed } from './scene/speed';
 import { useFrameRates } from './scene/frameRate';
 import { MAX_FACES } from './scene/vision';
 import type { TypedBackgroundState } from './scene/useTypedBackground';
+import type { TypedAvatarState } from './scene/useTypedAvatar';
 import {
-  AVATARS, BACKGROUNDS, DEFAULT_SCENE_CHOICE, TYPED_BACKGROUND_ID, type SceneChoice,
+  AVATARS, BACKGROUNDS, DEFAULT_SCENE_CHOICE, TYPED_BACKGROUND_ID, toggleAvatar, type SceneChoice,
 } from '@/types/scene';
 import { cameraConstraints, raiseToMaxResolution } from './cameras';
 import { photoOutputSize } from './outputSize';
@@ -45,6 +46,8 @@ export interface CameraViewProps {
   onChoiceChange?: (choice: SceneChoice) => void;
   /** Backgrounds from typed words; absent, typing is not offered. */
   typing?: TypedBackgroundState;
+  /** Avatars from typed words, the same way. */
+  typingAvatar?: TypedAvatarState;
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 0.92): Promise<Blob> {
@@ -72,7 +75,7 @@ function isDrawable(img: HTMLImageElement | undefined): img is HTMLImageElement 
 }
 
 export default function CameraView({
-  onCapture, onError, choice = DEFAULT_SCENE_CHOICE, onChoiceChange, typing,
+  onCapture, onError, choice = DEFAULT_SCENE_CHOICE, onChoiceChange, typing, typingAvatar,
 }: CameraViewProps) {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const streamRef     = useRef<MediaStream | null>(null);
@@ -708,6 +711,7 @@ export default function CameraView({
             showBackgrounds={captureSettings.bgRemoval !== 'off'}
             status={sceneStatus}
             typing={typing}
+            typingAvatar={typingAvatar}
             people={captureSettings.maxPeople}
             onPeople={n => updateCaptureSettings({ maxPeople: n })}
           />
@@ -775,13 +779,22 @@ function FrameRateReadout({ videoRef, cutout }: {
 }
 
 /**
- * Type a place, get a background. The text goes to an online image service,
- * so the box says so; the server wraps it in its own prompt and checks it
- * before anything is sent.
+ * Type something, get a picture: a background or an avatar. The text goes to
+ * an online image service, so the box says so; the server wraps it in its own
+ * prompt and checks it before anything is sent.
  */
-function TypeABackground({ typing, onMade }: {
-  typing: TypedBackgroundState;
-  onMade: (typed: { src: string; text: string }) => void;
+function TypeToMake<T>({ name, prompt, making, typing, onMade }: {
+  /** For the ids: `typed-background`, `typed-avatar`. */
+  name: string;
+  /** The question in the box. */
+  prompt: string;
+  /** What the button says while the picture is made. */
+  making: string;
+  typing: {
+    busy: boolean; error: string | null; left: number;
+    generate: (text: string) => Promise<T | null>;
+  };
+  onMade: (made: T) => void;
 }) {
   const [text, setText] = useState('');
   const spent = typing.left === 0;
@@ -793,16 +806,16 @@ function TypeABackground({ typing, onMade }: {
 
   return (
     <form className="mt-2" onSubmit={e => { e.preventDefault(); void submit(); }}>
-      <label className="sr-only" htmlFor="typed-background">Where do you want to be?</label>
-      <input id="typed-background" data-testid="typed-background-input"
+      <label className="sr-only" htmlFor={name}>{prompt}</label>
+      <input id={name} data-testid={`${name}-input`}
         value={text} onChange={e => setText(e.target.value)}
         maxLength={120} disabled={typing.busy || spent} autoComplete="off"
-        placeholder={spent ? 'No more tries — pick one below' : 'Where do you want to be?'}
+        placeholder={spent ? 'No more tries — pick one below' : prompt}
         className="min-h-11 w-full rounded-xl border border-[var(--border)] bg-transparent px-3 text-[0.8rem] text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:opacity-60" />
-      <button type="submit" data-testid="typed-background-go"
+      <button type="submit" data-testid={`${name}-go`}
         disabled={typing.busy || spent || !text.trim()}
         className="mt-2 min-h-10 w-full rounded-xl bg-[var(--ink)] px-3 text-[0.78rem] font-semibold text-white transition disabled:opacity-40">
-        {typing.busy ? 'Making your background…' : 'Make it'}
+        {typing.busy ? making : 'Make it'}
       </button>
       <p className="mt-1.5 text-[0.66rem] leading-[1.45] text-[var(--ink-3)]">
         {typing.error
@@ -831,17 +844,20 @@ function statusLine(status: SceneStatus, showBackgrounds: boolean, avatarOn: boo
  * The guest's choices, as pictures to tap. Large enough for a finger: this is
  * a kiosk, and whoever is choosing is standing a pace back from it.
  */
-function ScenePickers({ choice, onChange, showBackgrounds, status, typing, people, onPeople }: {
+function ScenePickers({ choice, onChange, showBackgrounds, status, typing, typingAvatar, people, onPeople }: {
   choice: SceneChoice;
   onChange: (choice: SceneChoice) => void;
   showBackgrounds: boolean;
   status: SceneStatus;
   typing?: TypedBackgroundState;
+  typingAvatar?: TypedAvatarState;
   /** How many are posing; 0 for not said. The same setting as in Settings. */
   people: number;
   onPeople: (people: number) => void;
 }) {
-  const note = statusLine(status, showBackgrounds, Boolean(choice.avatarId));
+  const note = statusLine(status, showBackgrounds, choice.avatarIds.length > 0);
+  // The guest's own avatars first, then the ready-made ones.
+  const avatarOptions = [...(choice.typedAvatars ?? []), ...AVATARS];
   return (
     <div className="mt-6 flex flex-col gap-5">
       {/* How many are posing: keeps anyone more out of the photo (with "Only
@@ -869,8 +885,8 @@ function ScenePickers({ choice, onChange, showBackgrounds, status, typing, peopl
         <div>
           <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">Background</p>
           {typing?.available && (
-            <TypeABackground
-              typing={typing}
+            <TypeToMake name="typed-background" prompt="Where do you want to be?"
+              making="Making your background…" typing={typing}
               onMade={typed => onChange({ ...choice, backgroundId: TYPED_BACKGROUND_ID, typed })}
             />
           )}
@@ -900,22 +916,37 @@ function ScenePickers({ choice, onChange, showBackgrounds, status, typing, peopl
         </div>
       )}
 
+      {/* As many as the guest likes, one per part of the face: picking a
+          second hat swaps it for the first (see toggleAvatar). */}
       <div>
-        <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">Avatar</p>
-        <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Avatar">
-          <button type="button" role="radio" aria-checked={!choice.avatarId}
-            data-testid="avatar-none" title="No avatar"
-            onClick={() => onChange({ ...choice, avatarId: '' })}
-            className={`${pickerClass(!choice.avatarId)} flex aspect-square items-center justify-center text-[var(--ink-3)]`}>
+        <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">Avatars</p>
+        <p className="mt-0.5 text-[0.66rem] leading-[1.45] text-[var(--ink-3)]">
+          Pick as many as you like, one for each part of the face.
+        </p>
+        {typingAvatar?.available && (
+          <TypeToMake name="typed-avatar" prompt="What do you want to wear?"
+            making="Making your avatar…" typing={typingAvatar}
+            onMade={made => onChange({
+              ...choice,
+              typedAvatars: [made, ...(choice.typedAvatars ?? [])],
+              avatarIds: toggleAvatar(choice.avatarIds, made, [made, ...avatarOptions]),
+            })}
+          />
+        )}
+        <div className="mt-2 grid grid-cols-3 gap-2" role="group" aria-label="Avatars">
+          <button type="button" aria-pressed={choice.avatarIds.length === 0}
+            data-testid="avatar-none" title="No avatars"
+            onClick={() => onChange({ ...choice, avatarIds: [] })}
+            className={`${pickerClass(choice.avatarIds.length === 0)} flex aspect-square items-center justify-center text-[var(--ink-3)]`}>
             <Prohibit size={22} />
-            <span className="sr-only">No avatar</span>
+            <span className="sr-only">No avatars</span>
           </button>
-          {AVATARS.map(a => {
-            const on = choice.avatarId === a.id;
+          {avatarOptions.map(a => {
+            const on = choice.avatarIds.includes(a.id);
             return (
-              <button key={a.id} type="button" role="radio" aria-checked={on}
+              <button key={a.id} type="button" aria-pressed={on}
                 data-testid={`avatar-${a.id}`} title={a.label}
-                onClick={() => onChange({ ...choice, avatarId: a.id })}
+                onClick={() => onChange({ ...choice, avatarIds: toggleAvatar(choice.avatarIds, a, avatarOptions) })}
                 className={`${pickerClass(on)} flex aspect-square items-center justify-center p-1.5`}>
                 <img src={a.src} alt={a.label} draggable={false} className="max-h-full max-w-full object-contain" />
               </button>

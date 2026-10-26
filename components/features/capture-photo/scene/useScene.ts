@@ -12,6 +12,7 @@ import {
   type CameraModel, type FaceBox, type Member,
 } from './front';
 import { DROP_LABEL, type OverlayFace } from './overlay';
+import type { WornAvatar } from './avatars';
 import { matte, preloadMatting } from './matting';
 import { noteFaces } from './frameRate';
 
@@ -133,7 +134,7 @@ export function useScene(config: SceneConfig) {
   const { bgRemoval, cleanPlateAt, edgeCleanup } = config;
   // Faces are wanted for avatars, and to tell the group from the crowd when a
   // model is finding the people.
-  const wantsFaces = Boolean(config.choice.avatarId)
+  const wantsFaces = config.choice.avatarIds.length > 0
     || (Boolean(config.focusFront) && bgRemoval === 'segment')
     || Boolean(config.trackFaces);
 
@@ -219,13 +220,19 @@ export function useScene(config: SceneConfig) {
       ?? (BACKGROUNDS.find(b => b.id === c.choice.backgroundId) ?? BACKGROUNDS[0]).src;
     // A typed background arrives as an object URL after the page loaded.
     if (!images.current.has(src)) images.current.set(src, loadImage(src));
-    const option = AVATARS.find(a => a.id === c.choice.avatarId) ?? null;
     const bgImg = images.current.get(src);
-    const avatarImg = option ? images.current.get(option.src) : undefined;
-    return {
-      background: ready(bgImg) ? bgImg : null,
-      avatar: option && ready(avatarImg) ? { option, image: avatarImg } : null,
-    };
+    // Every avatar worn, ready-made or typed (an object URL, like a typed
+    // background), once its picture has loaded.
+    const options = [...(c.choice.typedAvatars ?? []), ...AVATARS];
+    const avatars: WornAvatar[] = [];
+    for (const id of c.choice.avatarIds) {
+      const option = options.find(a => a.id === id);
+      if (!option) continue;
+      if (!images.current.has(option.src)) images.current.set(option.src, loadImage(option.src));
+      const image = images.current.get(option.src);
+      if (ready(image)) avatars.push({ option, image });
+    }
+    return { background: ready(bgImg) ? bgImg : null, avatars };
   }, []);
 
   /** The faces that count: everyone, or only the group at the front. */
@@ -242,7 +249,8 @@ export function useScene(config: SceneConfig) {
   const sceneFrame = useCallback((video: HTMLVideoElement): SceneLayers | null => {
     const c = configRef.current;
     camera.current = cameraOf(video, c);
-    const { background, avatar } = pictures();
+    const { background, avatars } = pictures();
+    const avatar = avatars.length > 0;
 
     const t = tracker.current
       && (avatar || (c.focusFront && c.bgRemoval === 'segment') || c.trackFaces)
@@ -305,7 +313,7 @@ export function useScene(config: SceneConfig) {
     }
 
     if (!person && !avatar && !overlay) return null;
-    return { person, background, avatar, faces: avatar ? faces : null, overlay };
+    return { person, background, avatars, faces: avatar ? faces : null, overlay };
   }, [pictures, focused]);
 
   /**
@@ -316,7 +324,8 @@ export function useScene(config: SceneConfig) {
   const captureScene = useCallback(async (video: HTMLVideoElement): Promise<SceneLayers | null> => {
     const c = configRef.current;
     camera.current = cameraOf(video, c);
-    const { background, avatar } = pictures();
+    const { background, avatars } = pictures();
+    const avatar = avatars.length > 0;
     const facesNow = avatar && tracker.current
       ? focused(tracker.current.detectNow(video, c.region ?? null))
       : null;
@@ -334,7 +343,7 @@ export function useScene(config: SceneConfig) {
     }
 
     if (!person && !avatar) return null;
-    return { person, background, avatar, faces: facesNow };
+    return { person, background, avatars, faces: facesNow };
   }, [pictures, focused]);
 
   const status: SceneStatus = { removal, faces };

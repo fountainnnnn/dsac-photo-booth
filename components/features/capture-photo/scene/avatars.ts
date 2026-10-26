@@ -1,4 +1,4 @@
-import type { AvatarAnchor, AvatarOption } from '@/types/scene';
+import { AVATAR_DRAW_ORDER, type AvatarAnchor, type AvatarOption } from '@/types/scene';
 import type { FacePoint, FacePoints } from './faces';
 
 /**
@@ -22,7 +22,15 @@ export const LANDMARK = {
   noseTip: 1,
   noseBottom: 2,
   upperLip: 0,
+  mouthTop: 13,
+  mouthBottom: 14,
+  chin: 152,
+  faceSideA: 234,
+  faceSideB: 454,
 } as const;
+
+/** The highest landmark index used here: a face needs at least this many points. */
+const LAST_LANDMARK = Math.max(...Object.values(LANDMARK));
 
 /**
  * Where the camera ends up in the photo, in the photo's pixels — the numbers
@@ -58,6 +66,10 @@ export function toPhoto(pt: FacePoint, g: PhotoGeometry): { x: number; y: number
   return { x: g.dx + g.dw - (rx + cx), y: g.dy + ry + cy };
 }
 
+function xy(a: { x: number; y: number }, b: { x: number; y: number }): [number, number] {
+  return [b.x - a.x, b.y - a.y];
+}
+
 function mid(a: { x: number; y: number }, b: { x: number; y: number }) {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
@@ -73,6 +85,8 @@ function anchorPoint(face: FacePoints, anchor: AvatarAnchor, g: PhotoGeometry) {
     case 'forehead': return p(LANDMARK.forehead);
     case 'nose': return p(LANDMARK.noseTip);
     case 'upperLip': return mid(p(LANDMARK.noseBottom), p(LANDMARK.upperLip));
+    case 'mouth': return mid(p(LANDMARK.mouthTop), p(LANDMARK.mouthBottom));
+    case 'chin': return p(LANDMARK.chin);
   }
 }
 
@@ -93,7 +107,7 @@ export interface AvatarPlacement {
 export function placeAvatar(
   face: FacePoints, avatar: AvatarOption, aspect: number, g: PhotoGeometry,
 ): AvatarPlacement | null {
-  if (face.length <= LANDMARK.eyeOuterB) return null;
+  if (face.length <= LAST_LANDMARK) return null;
   const a = toPhoto(face[LANDMARK.eyeOuterA], g);
   const b = toPhoto(face[LANDMARK.eyeOuterB], g);
   let vx = b.x - a.x;
@@ -109,7 +123,12 @@ export function placeAvatar(
   // "Up" the face: the eye line turned a quarter anticlockwise.
   const upX = Math.sin(angle);
   const upY = -Math.cos(angle);
-  const width = avatar.width * span;
+  // Typed avatars are sized to the face, which is what the server measures
+  // them against; the ready-made ones to the eyes.
+  const per = avatar.per === 'face'
+    ? Math.hypot(...xy(toPhoto(face[LANDMARK.faceSideA], g), toPhoto(face[LANDMARK.faceSideB], g)))
+    : span;
+  const width = avatar.width * per;
   return {
     x: anchor.x + upX * avatar.lift * span,
     y: anchor.y + upY * avatar.lift * span,
@@ -119,33 +138,51 @@ export function placeAvatar(
   };
 }
 
-/** Draw the avatar on every face, clipped to the photo's window. */
+type AvatarImage = CanvasImageSource & {
+  naturalWidth?: number; naturalHeight?: number; width: number; height: number;
+};
+
+/** An avatar the guest is wearing, with its picture loaded. */
+export interface WornAvatar {
+  option: AvatarOption;
+  image: AvatarImage;
+}
+
+/**
+ * Draw every avatar worn on every face, clipped to the photo's window, back
+ * to front (`AVATAR_DRAW_ORDER`): a hat goes over a mask, not under it.
+ */
 export function drawAvatars(
   ctx: CanvasRenderingContext2D,
   faces: FacePoints[],
-  avatar: AvatarOption,
-  image: CanvasImageSource & { naturalWidth?: number; naturalHeight?: number; width: number; height: number },
+  avatars: WornAvatar[],
   g: PhotoGeometry,
 ) {
-  const iw = image.naturalWidth || image.width;
-  const ih = image.naturalHeight || image.height;
-  if (!iw || !ih) return;
+  const order = (a: WornAvatar) => AVATAR_DRAW_ORDER.indexOf(a.option.slot);
+  const worn = avatars
+    .filter(a => (a.image.naturalWidth || a.image.width) && (a.image.naturalHeight || a.image.height))
+    .sort((a, b) => order(a) - order(b));
+  if (!worn.length) return;
   ctx.save();
   ctx.beginPath();
   ctx.rect(g.dx, g.dy, g.dw, g.dh);
   ctx.clip();
   for (const face of faces) {
-    const place = placeAvatar(face, avatar, ih / iw, g);
-    if (!place) continue;
-    ctx.save();
-    ctx.translate(place.x, place.y);
-    ctx.rotate(place.angle);
-    ctx.drawImage(
-      image,
-      -avatar.pivot.x * place.width, -avatar.pivot.y * place.height,
-      place.width, place.height,
-    );
-    ctx.restore();
+    for (const { option, image } of worn) {
+      const iw = image.naturalWidth || image.width;
+      const ih = image.naturalHeight || image.height;
+      const place = placeAvatar(face, option, ih / iw, g);
+      if (!place) continue;
+      ctx.save();
+      ctx.translate(place.x, place.y);
+      ctx.rotate(place.angle);
+      ctx.drawImage(
+        image,
+        -option.pivot.x * place.width, -option.pivot.y * place.height,
+        place.width, place.height,
+      );
+      ctx.restore();
+    }
   }
   ctx.restore();
 }

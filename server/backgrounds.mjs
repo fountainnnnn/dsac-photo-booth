@@ -48,13 +48,13 @@ import path from 'node:path';
 export const DEFAULT_MODEL = 'google/gemini-3.1-flash-lite-image';
 /** Reads text and pictures, and costs a fraction of a cent a check. */
 export const DEFAULT_CHECK_MODEL = 'google/gemini-3.1-flash-lite';
-const IMAGES_ENDPOINT = 'https://openrouter.ai/api/v1/images';
-const CHAT_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+export const IMAGES_ENDPOINT = 'https://openrouter.ai/api/v1/images';
+export const CHAT_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const RESOLUTION = '1K';
 const ASPECT_RATIO = '16:9';
 /** Long enough for a slow generation, short enough that a guest is not stranded. */
-const TIMEOUT_MS = 90_000;
-const CHECK_TIMEOUT_MS = 30_000;
+export const TIMEOUT_MS = 90_000;
+export const CHECK_TIMEOUT_MS = 30_000;
 /** What a guest may type. A place, not an essay. */
 export const MAX_TEXT = 120;
 /**
@@ -327,26 +327,10 @@ const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 const MIME = Object.fromEntries(Object.entries(EXT).map(([m, e]) => [e, m]));
 
 /**
- * The generator, bound to a folder for its cache. `fetchImpl` is for tests.
+ * Talking to OpenRouter: the same for backgrounds and for avatars (see
+ * avatars.mjs). `fetchImpl` is for tests.
  */
-export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
-  const recent = [];
-
-  function key(text, model, people) {
-    const norm = cleanText(text).toLowerCase();
-    return crypto.createHash('sha256')
-      .update(`v${PROMPT_VERSION}|${model}|${RESOLUTION}|${ASPECT_RATIO}|${people}|${norm}`)
-      .digest('hex').slice(0, 24);
-  }
-
-  function cached(id) {
-    for (const [ext, mime] of Object.entries(MIME)) {
-      const file = path.join(dir, `${id}.${ext}`);
-      if (fs.existsSync(file)) return { mime, bytes: fs.readFileSync(file) };
-    }
-    return null;
-  }
-
+export function openRouter(fetchImpl = fetch) {
   /** POST to OpenRouter; the parsed reply, or a BackgroundError with `failure` for the guest. */
   async function post(url, body, apiKey, timeoutMs, failure) {
     let res;
@@ -362,7 +346,7 @@ export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
-      console.error(`  Background request could not reach OpenRouter: ${err.message}`);
+      console.error(`  A request could not reach OpenRouter: ${err.message}`);
       throw new BackgroundError('failed', failure);
     }
     const json = await res.json().catch(() => null);
@@ -378,6 +362,51 @@ export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
       : res.status === 402 ? ' — the OpenRouter account is out of credit'
       : '';
     console.error(`  ${what} failed (${res.status}): ${detail}${hint}`);
+  }
+
+  /**
+   * How each meme or character named looks, from the web. Not a check: a
+   * lookup that fails or finds nothing just leaves that description out.
+   */
+  async function lookUp(lookFor, apiKey, checkModel) {
+    const names = (Array.isArray(lookFor) ? lookFor : [])
+      .map(cleanText).filter(Boolean).slice(0, MAX_LOOKUPS);
+    const looks = [];
+    for (const name of names) {
+      const found = await post(CHAT_ENDPOINT, lookupRequest(name, checkModel), apiKey, CHECK_TIMEOUT_MS, '')
+        .catch(() => null);
+      let text = found?.res.ok ? found.json?.choices?.[0]?.message?.content : null;
+      if (Array.isArray(text)) text = text.map(p => p?.text ?? '').join('');
+      const desc = cleanPlace(typeof text === 'string' ? text : '');
+      if (!desc || /UNKNOWN/.test(desc) || blockedWord(desc)) continue;
+      looks.push({ name, looks: desc });
+    }
+    return looks;
+  }
+
+  return { post, logFailure, lookUp };
+}
+
+/**
+ * The generator, bound to a folder for its cache. `fetchImpl` is for tests.
+ */
+export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
+  const recent = [];
+  const { post, logFailure, lookUp } = openRouter(fetchImpl);
+
+  function key(text, model, people) {
+    const norm = cleanText(text).toLowerCase();
+    return crypto.createHash('sha256')
+      .update(`v${PROMPT_VERSION}|${model}|${RESOLUTION}|${ASPECT_RATIO}|${people}|${norm}`)
+      .digest('hex').slice(0, 24);
+  }
+
+  function cached(id) {
+    for (const [ext, mime] of Object.entries(MIME)) {
+      const file = path.join(dir, `${id}.${ext}`);
+      if (fs.existsSync(file)) return { mime, bytes: fs.readFileSync(file) };
+    }
+    return null;
   }
 
   /**
@@ -430,20 +459,8 @@ export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
       throw new BackgroundError('blocked', 'Let’s pick somewhere else — try another place.');
     }
 
-    // How any meme or character named looks, from the web. Not a check: a
-    // lookup that fails or finds nothing just leaves the description out.
-    const names = (Array.isArray(verdict.look_up) ? verdict.look_up : [])
-      .map(cleanText).filter(Boolean).slice(0, MAX_LOOKUPS);
-    const looks = [];
-    for (const name of names) {
-      const found = await post(CHAT_ENDPOINT, lookupRequest(name, checkModel), apiKey, CHECK_TIMEOUT_MS, '')
-        .catch(() => null);
-      let text = found?.res.ok ? found.json?.choices?.[0]?.message?.content : null;
-      if (Array.isArray(text)) text = text.map(p => p?.text ?? '').join('');
-      const desc = cleanPlace(typeof text === 'string' ? text : '');
-      if (!desc || /UNKNOWN/.test(desc) || blockedWord(desc)) continue;
-      looks.push({ name, looks: desc });
-    }
+    // How any meme or character named looks, from the web.
+    const looks = await lookUp(verdict.look_up, apiKey, checkModel);
 
     // 3. The picture.
     const made = await post(

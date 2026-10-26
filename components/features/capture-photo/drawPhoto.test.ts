@@ -51,7 +51,7 @@ describe('drawPhoto with a scene', () => {
       scene: {
         person,
         background,
-        avatar: { option: AVATARS[0], image: avatarImage as unknown as HTMLImageElement },
+        avatars: [{ option: AVATARS[0], image: avatarImage as unknown as HTMLImageElement }],
         faces: [aFace()],
       },
     });
@@ -74,7 +74,7 @@ describe('drawPhoto with a scene', () => {
     drawPhoto(ctx, video, {
       w: 1600, h: 900, filters: neutral,
       scene: {
-        avatar: { option: AVATARS[0], image: avatarImage as unknown as HTMLImageElement },
+        avatars: [{ option: AVATARS[0], image: avatarImage as unknown as HTMLImageElement }],
         faces: [aFace(), aFace()],
       },
     });

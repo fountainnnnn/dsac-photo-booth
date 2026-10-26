@@ -4,6 +4,7 @@ import QrDownloadScreen from '@/components/features/qr-download/QrDownloadScreen
 import type { ComposedUploadResponse } from '@/types/download';
 import { DEFAULT_SCENE_CHOICE, type SceneChoice } from '@/types/scene';
 import { useTypedBackground } from '@/components/features/capture-photo/scene/useTypedBackground';
+import { useTypedAvatar } from '@/components/features/capture-photo/scene/useTypedAvatar';
 
 /**
  * There is no confirmation step. A guest is standing at the booth, so the
@@ -26,6 +27,7 @@ export default function CapturePage() {
   // Asked again each time the camera comes back, so a key saved in Settings
   // turns typing on for the next guest.
   const typing = useTypedBackground(step === 'camera');
+  const typingAvatar = useTypedAvatar(step === 'camera');
 
   const resetFlow = useCallback(() => {
     setUploadError(null);
@@ -69,8 +71,9 @@ export default function CapturePage() {
   const handleDone = useCallback(() => {
     setChoice(DEFAULT_SCENE_CHOICE);
     typing.reset();
+    typingAvatar.reset();
     handleRetake();
-  }, [handleRetake, typing]);
+  }, [handleRetake, typing, typingAvatar]);
 
   return (
     // A plain div, not <main>: StudioShell renders the page's <main>, and
@@ -86,6 +89,7 @@ export default function CapturePage() {
             choice={choice}
             onChoiceChange={setChoice}
             typing={typing}
+            typingAvatar={typingAvatar}
           />
           {uploadError && (
             <p

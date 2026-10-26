@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import type { LookRamp, ImageFilters } from '@/types/editor';
 import { filtersAreNeutral, filtersToCSS, rampStartEdge } from '@/types/editor';
 import type { FrameWindow } from '@/types/frame';
-import type { AvatarOption } from '@/types/scene';
 import type { FacePoints } from './scene/faces';
-import { drawAvatars, type PhotoGeometry } from './scene/avatars';
+import { drawAvatars, type PhotoGeometry, type WornAvatar } from './scene/avatars';
 import { countPreviewFrame } from './scene/frameRate';
 import { drawTrackingOverlay, type OverlayFace } from './scene/overlay';
 
@@ -21,8 +20,8 @@ export interface SceneLayers {
   person?: HTMLCanvasElement | null;
   /** Behind the people, filling the photo's window. Never mirrored. */
   background?: HTMLImageElement | HTMLCanvasElement | null;
-  /** Drawn on every face, upright, after the people. */
-  avatar?: { option: AvatarOption; image: HTMLImageElement } | null;
+  /** Drawn on every face, upright, after the people: everything the guest is wearing. */
+  avatars?: WornAvatar[] | null;
   /** Faces, in the raw camera's 0–1 coordinates. */
   faces?: FacePoints[] | null;
   /**
@@ -225,8 +224,8 @@ export function drawPhoto(
   const geometry: PhotoGeometry = {
     sx, sy, sw, sh, srcW: vw, srcH: vh, dx, dy, dw, dh, rotationRad,
   };
-  if (scene?.avatar && scene.faces?.length) {
-    drawAvatars(ctx, scene.faces, scene.avatar.option, scene.avatar.image, geometry);
+  if (scene?.avatars?.length && scene.faces?.length) {
+    drawAvatars(ctx, scene.faces, scene.avatars, geometry);
   }
   if (scene?.overlay?.length) drawTrackingOverlay(ctx, scene.overlay, geometry);
 }

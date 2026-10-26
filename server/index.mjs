@@ -14,6 +14,7 @@ import { startTunnel } from './tunnel.mjs';
 import {
   BackgroundError, DEFAULT_CHECK_MODEL, DEFAULT_MODEL, createBackgrounds,
 } from './backgrounds.mjs';
+import { createAvatars } from './avatars.mjs';
 import {
   ENV_FIELDS, applyToProcessEnv, parseEnv, pickEditable, readEnvFile, writeEnvFile,
 } from './env-file.mjs';
@@ -84,6 +85,8 @@ const DATA_DIR = process.env.STORAGE_DIR
 const store = openDatabase(DATA_DIR);
 // Typed backgrounds, kept by prompt so the same words are only paid for once.
 const backgrounds = createBackgrounds(path.join(DATA_DIR, 'backgrounds'));
+// Typed avatars, the same way.
+const avatars = createAvatars(path.join(DATA_DIR, 'avatars'));
 
 /**
  * The organiser's own copy of the event, as ordinary files.
@@ -558,6 +561,8 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // anything once OPENROUTER_API_KEY is set; this is the way to turn it off
   // without deleting the key.
   promptBackgrounds: true,
+  // Let guests type an avatar, drawn the same way and pinned to their face.
+  promptAvatars: true,
   // Only the group at the front gets avatars and, with no green screen, is
   // cut out; people further back are left alone. Judged by face size.
   focusFront: true,
@@ -653,6 +658,47 @@ app.post('/api/backgrounds/generate', booth, async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Background-Cached', image.cached ? '1' : '0');
     return res.send(image.bytes);
+  } catch (err) {
+    if (err instanceof BackgroundError) {
+      return res.status(BACKGROUND_STATUS[err.code] ?? 500).json({ code: err.code, error: err.message });
+    }
+    return next(err);
+  }
+});
+
+// ── Typed avatars ────────────────────────────────────────────────────────────
+// See server/avatars.mjs. The picture comes back on its flat colour; where it
+// goes on the face comes back in headers, for the capture screen to pin it by.
+
+function typedAvatarsOn() {
+  const settings = store.kv.get('captureSettings', DEFAULT_CAPTURE_SETTINGS);
+  return Boolean(process.env.OPENROUTER_API_KEY) && settings.promptAvatars !== false;
+}
+
+app.get('/api/avatars/status', booth, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ available: typedAvatarsOn(), configured: Boolean(process.env.OPENROUTER_API_KEY) });
+});
+
+app.post('/api/avatars/generate', booth, async (req, res, next) => {
+  if (!typedAvatarsOn()) {
+    return res.status(503).json({
+      code: 'not-configured', error: 'Typed avatars are not set up on this booth.',
+    });
+  }
+  try {
+    const avatar = await avatars.generate(req.body?.text, {
+      apiKey: process.env.OPENROUTER_API_KEY,
+      model: process.env.OPENROUTER_IMAGE_MODEL || DEFAULT_MODEL,
+      checkModel: process.env.OPENROUTER_CHECK_MODEL || DEFAULT_CHECK_MODEL,
+    });
+    res.setHeader('Content-Type', avatar.mime);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Avatar-Cached', avatar.cached ? '1' : '0');
+    res.setHeader('X-Avatar-Where', avatar.where);
+    res.setHeader('X-Avatar-Size', avatar.size);
+    if (avatar.fit) res.setHeader('X-Avatar-Fit', JSON.stringify(avatar.fit));
+    return res.send(avatar.bytes);
   } catch (err) {
     if (err instanceof BackgroundError) {
       return res.status(BACKGROUND_STATUS[err.code] ?? 500).json({ code: err.code, error: err.message });
