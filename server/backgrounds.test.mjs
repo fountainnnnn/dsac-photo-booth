@@ -77,6 +77,11 @@ describe('the prompt', () => {
     for (const word of ['elephant', 'tung', 'skibidi', 'beach', 'gun']) expect(told).not.toContain(word);
   });
 
+  it('keeps a character in its own look, even in a real place', () => {
+    // Winnie the Pooh came out as a real bear in a real wood.
+    expect(buildPrompt('a wood with a cartoon bear')).toMatch(/a cartoon character stays a cartoon/);
+  });
+
   it('makes room for the number of people posing', () => {
     expect(buildPrompt('a forest', 1)).toMatch(/for one person standing there/);
     expect(buildPrompt('a forest', 3)).toMatch(/wide enough for three people standing side by side/);

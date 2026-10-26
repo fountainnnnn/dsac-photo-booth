@@ -72,7 +72,7 @@ const MAX_PEOPLE = 6;
  * Part of every cached picture's name. Raised whenever the instructions
  * change, so a picture made under the old ones is never handed out again.
  */
-const PROMPT_VERSION = 7;
+const PROMPT_VERSION = 8;
 
 /**
  * A guard against a runaway, not a per-guest limit (the capture screen keeps
@@ -188,7 +188,7 @@ export function buildPrompt(place, people = 0, looks = []) {
     `COMPOSITION: Eye level, as seen by a camera about two metres in front of ${who}. ${room}`,
     'Put open ground or floor there, with nothing tall in the middle; let the interesting parts of the place sit around and behind them, at a natural scale for people standing in it.',
     '',
-    'LIGHT AND STYLE: Photorealistic unless the place asks for a style. Bright, soft, even light from the front, to match people lit indoors. Sharp throughout.',
+    'LIGHT AND STYLE: Photorealistic unless the place asks for a style. A character, mascot or meme in it keeps its own well-known look, even in a real place: a cartoon character stays a cartoon. Bright, soft, even light from the front, to match people lit indoors. Sharp throughout.',
     '',
     'SUBJECTS: Put any character, creature, animal, vehicle, mascot, meme or person the place names in the left or right third of the picture, never in the middle third, not even above the visitors\' heads: the visitors fill the middle.',
     '',
@@ -471,13 +471,13 @@ export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
       logFailure('Background generation', made.res, made.json);
       // A refusal on content is the guest's to fix; anything else is ours.
       if (made.res.status === 400 || made.res.status === 403) {
-        throw new BackgroundError('refused', 'The image service would not make that one. Try another place.');
+        throw new BackgroundError('refused', 'The image service would not draw that one; it turns down some well-known characters. Try another place.');
       }
       throw new BackgroundError('failed', 'The image service is not answering. Pick one of ours for now.');
     }
     const image = imageFrom(made.json);
     if (!image) {
-      throw new BackgroundError('refused', 'The image service would not make that one. Try another place.');
+      throw new BackgroundError('refused', 'The image service would not draw that one; it turns down some well-known characters. Try another place.');
     }
 
     // 4. Look at it before anyone else does.

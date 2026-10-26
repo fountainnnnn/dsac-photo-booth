@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { backdropOf, keyOut, typedAvatarOption, type Pixels } from './typedAvatar';
-import { AVATARS, TYPED_SLOTS, toggleAvatar, type AvatarOption } from '@/types/scene';
+import {
+  backdropOf, filterPieces, keyOut, solidBox, splitFilter, typedAvatarOption, type Pixels,
+} from './typedAvatar';
+import { AVATARS, HEAD_TOP_LIFT, TYPED_SLOTS, toggleAvatar, type AvatarOption } from '@/types/scene';
 
 const MAGENTA = [255, 0, 255];
 const BLUE = [20, 40, 200];
@@ -114,6 +116,58 @@ describe('typedAvatarOption', () => {
   it('treats an unknown part of the face as the head', () => {
     const option = typedAvatarOption({ ...base, where: 'elbow', fit: null, box: { x: 0, y: 0, w: 10, h: 10 } });
     expect(option.slot).toBe('head');
+  });
+});
+
+describe('face filters', () => {
+  // A bunny filter, 100 square: two ears from rows 10 to 39, a nose and
+  // whiskers from 60 to 74, nothing between.
+  const W = 100;
+  const bunny = picture(W, W, (x, y) => {
+    const ear = y >= 10 && y < 40 && ((x >= 25 && x < 35) || (x >= 65 && x < 75));
+    const face = y >= 60 && y < 75 && x >= 30 && x < 70;
+    return ear || face ? BLUE : MAGENTA;
+  });
+  const keyed = keyOut(bunny)!;
+
+  it('divides into what goes on the head and what goes on the face', () => {
+    const split = splitFilter(keyed.data, W, keyed.box, 66)!;
+    expect(split.upper).toEqual({ x: 25, y: 10, w: 50, h: 30 });
+    expect(split.lower).toEqual({ x: 30, y: 60, w: 40, h: 15 });
+  });
+
+  it('does not divide a mask, which has no gap above the nose', () => {
+    const mask = keyOut(picture(W, W, (x, y) => (x >= 20 && x < 80 && y >= 10 && y < 90 ? BLUE : MAGENTA)))!;
+    expect(splitFilter(mask.data, W, mask.box, 60)).toBeNull();
+  });
+
+  it('rests the head piece on the top of the head and pins the rest by the nose', () => {
+    const split = splitFilter(keyed.data, W, keyed.box, 66)!;
+    // The nose marked at (50, 66); the face 40 wide.
+    const [head, face] = filterPieces({
+      fit: { x: 0.5, y: 0.66, faceWidth: 0.4 }, split, width: W, height: W, upperSrc: 'u', lowerSrc: 'l',
+    });
+    expect(head).toMatchObject({ src: 'u', slot: 'top', anchor: 'forehead', lift: HEAD_TOP_LIFT, per: 'face' });
+    expect(head.width).toBeCloseTo(50 / 40);
+    expect(head.pivot.x).toBeCloseTo(0.5);
+    expect(head.pivot.y).toBeCloseTo(0.9);
+    expect(face).toMatchObject({ src: 'l', slot: 'filter', anchor: 'nose', per: 'face' });
+    expect(face.width).toBeCloseTo(1);
+    expect(face.pivot.y).toBeCloseTo(6 / 15);
+  });
+
+  it('takes the face piece as the face\'s width when the mark makes no sense', () => {
+    const split = splitFilter(keyed.data, W, keyed.box, 66)!;
+    const [head, face] = filterPieces({
+      fit: { x: 0.5, y: 0.66, faceWidth: 0.01 }, split, width: W, height: W, upperSrc: 'u', lowerSrc: 'l',
+    });
+    expect(face.width).toBeCloseTo(1);
+    expect(head.width).toBeCloseTo(50 / 40);
+  });
+
+  it('boxes what is solid in some rows', () => {
+    expect(solidBox(keyed.data, W, keyed.box, 0, 20)).toEqual({ x: 25, y: 10, w: 50, h: 11 });
+    expect(solidBox(keyed.data, W, keyed.box, 45, 55)).toBeNull();
   });
 });
 

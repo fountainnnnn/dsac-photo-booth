@@ -77,6 +77,17 @@ describe('the prompt', () => {
     }
   });
 
+  it('makes a face filter, the phone kind, of an animal or a character', () => {
+    const rules = avatarScreenRequest('a bunny').messages[0].content;
+    expect(rules).toMatch(/face filter like the ones on Snapchat or TikTok/);
+    expect(rules).toMatch(/Never the whole creature, and never anything sitting on top of the head/);
+    expect(rules).toContain('"filter"');
+    const p = buildAvatarPrompt('a filter', 'filter', 'magenta');
+    expect(p).toMatch(/do not draw the person/);
+    expect(p).toMatch(/a cartoon stays a cartoon/);
+    expect(p).not.toMatch(/Photorealistic/);
+  });
+
   it('asks where on the face each part is pinned, for every part', () => {
     for (const where of Object.keys(WHERE)) {
       expect(FIT_POINT[where]).toBeTruthy();

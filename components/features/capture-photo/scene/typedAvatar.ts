@@ -1,5 +1,5 @@
 import {
-  AVATAR_SIZE_SCALE, TYPED_SLOTS, type AvatarOption, type AvatarSlot,
+  AVATAR_SIZE_SCALE, HEAD_TOP_LIFT, TYPED_SLOTS, type AvatarOption, type AvatarPiece, type AvatarSlot,
 } from '@/types/scene';
 
 /**
@@ -170,11 +170,94 @@ export function typedAvatarOption({ id, label, src, where, size, fit, box, width
   return { ...base, per: 'eyes', width: place.width * scale, pivot: place.pivot };
 }
 
+/** The box round what is solid in rows `y0` to `y1` of `box`; null when nothing is. */
+export function solidBox(data: Uint8ClampedArray, width: number, box: Box, y0: number, y1: number): Box | null {
+  let x0 = Infinity; let x1 = -1; let top = Infinity; let bottom = -1;
+  for (let y = Math.max(y0, box.y); y <= Math.min(y1, box.y + box.h - 1); y++) {
+    for (let x = box.x; x < box.x + box.w; x++) {
+      if (data[(y * width + x) * 4 + 3] < 24) continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+    }
+  }
+  return x1 < 0 ? null : { x: x0, y: top, w: x1 - x0 + 1, h: bottom - top + 1 };
+}
+
+/** A gap narrower than this share of the item's height does not divide it. */
+const LEAST_GAP = 0.04;
+
+/**
+ * Where a face filter divides into what goes on the head and what goes on
+ * the face: the tallest band of empty rows above the nose, as between a
+ * bunny's ears and its nose. Null when nothing divides them, as in a mask.
+ */
+export function splitFilter(
+  data: Uint8ClampedArray, width: number, box: Box, noseY: number,
+): { upper: Box; lower: Box } | null {
+  let best = { from: 0, length: 0 };
+  let run = 0;
+  const end = Math.min(Math.round(noseY), box.y + box.h - 1);
+  for (let y = box.y; y <= end; y++) {
+    let empty = true;
+    for (let x = box.x; x < box.x + box.w && empty; x++) {
+      if (data[(y * width + x) * 4 + 3] >= 24) empty = false;
+    }
+    run = empty ? run + 1 : 0;
+    if (run > best.length) best = { from: y - run + 1, length: run };
+  }
+  if (best.length < box.h * LEAST_GAP) return null;
+  const cut = best.from + (best.length >> 1);
+  const upper = solidBox(data, width, box, box.y, cut);
+  const lower = solidBox(data, width, box, cut, box.y + box.h - 1);
+  return upper && lower ? { upper, lower } : null;
+}
+
+/**
+ * A face filter's two pieces, each pinned on its own, as phone filters do:
+ * what goes on the head rests on the top of the head by its bottom edge, and
+ * the rest is pinned by the nose the server marked. Both are sized to the
+ * face by the server's mark, or, when that makes no sense, by taking the
+ * piece on the face to be about as wide as the face.
+ */
+export function filterPieces({ fit, split, width, height, upperSrc, lowerSrc }: {
+  fit: AvatarFit;
+  split: { upper: Box; lower: Box };
+  width: number;
+  height: number;
+  upperSrc: string;
+  lowerSrc: string;
+}): AvatarPiece[] {
+  const { upper, lower } = split;
+  const marked = fit.faceWidth * width;
+  const faceWidth = lower.w / marked >= 0.3 && lower.w / marked <= 3 ? marked : lower.w;
+  const noseX = fit.x * width;
+  return [
+    {
+      src: upperSrc, slot: 'top', anchor: 'forehead', lift: HEAD_TOP_LIFT, per: 'face',
+      width: upper.w / faceWidth,
+      // Centred over the nose, and sunk a little into the hair.
+      pivot: { x: (noseX - upper.x) / upper.w, y: 0.9 },
+    },
+    {
+      src: lowerSrc, slot: 'filter', anchor: 'nose', lift: 0, per: 'face',
+      width: lower.w / faceWidth,
+      pivot: { x: (noseX - lower.x) / lower.w, y: (fit.y * height - lower.y) / lower.h },
+    },
+  ];
+}
+
 /**
  * The server's picture with its backdrop taken away and cut down to the
- * item, as a PNG; null when there is no plain backdrop to take away.
+ * item, as a PNG; null when there is no plain backdrop to take away. With
+ * the keyed pixels, and a way to cut out any part of them, for a filter's
+ * pieces.
  */
-export async function cutOutAvatar(blob: Blob): Promise<{ png: Blob; box: Box; width: number; height: number } | null> {
+export async function cutOutAvatar(blob: Blob): Promise<{
+  png: Blob; box: Box; width: number; height: number;
+  data: Uint8ClampedArray; crop: (box: Box) => Promise<Blob | null>;
+} | null> {
   const bitmap = await createImageBitmap(blob);
   const { width, height } = bitmap;
   const full = document.createElement('canvas');
@@ -190,11 +273,13 @@ export async function cutOutAvatar(blob: Blob): Promise<{ png: Blob; box: Box; w
   pixels.data.set(keyed.data);
   ctx.putImageData(pixels, 0, 0);
 
-  const { box } = keyed;
-  const cut = document.createElement('canvas');
-  cut.width = box.w;
-  cut.height = box.h;
-  cut.getContext('2d')!.drawImage(full, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
-  const png = await new Promise<Blob | null>(resolve => cut.toBlob(resolve, 'image/png'));
-  return png ? { png, box, width, height } : null;
+  const crop = (b: Box) => {
+    const cut = document.createElement('canvas');
+    cut.width = b.w;
+    cut.height = b.h;
+    cut.getContext('2d')!.drawImage(full, b.x, b.y, b.w, b.h, 0, 0, b.w, b.h);
+    return new Promise<Blob | null>(resolve => cut.toBlob(resolve, 'image/png'));
+  };
+  const png = await crop(keyed.box);
+  return png ? { png, box: keyed.box, width, height, data: keyed.data, crop } : null;
 }

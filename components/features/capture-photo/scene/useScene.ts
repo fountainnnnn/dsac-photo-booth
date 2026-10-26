@@ -228,9 +228,12 @@ export function useScene(config: SceneConfig) {
     for (const id of c.choice.avatarIds) {
       const option = options.find(a => a.id === id);
       if (!option) continue;
-      if (!images.current.has(option.src)) images.current.set(option.src, loadImage(option.src));
-      const image = images.current.get(option.src);
-      if (ready(image)) avatars.push({ option, image });
+      // A face filter is drawn as its pieces, each pinned on its own.
+      for (const piece of option.pieces ?? [option]) {
+        if (!images.current.has(piece.src)) images.current.set(piece.src, loadImage(piece.src));
+        const image = images.current.get(piece.src);
+        if (ready(image)) avatars.push({ option: { ...option, ...piece, pieces: undefined }, image });
+      }
     }
     return { background: ready(bgImg) ? bgImg : null, avatars };
   }, []);

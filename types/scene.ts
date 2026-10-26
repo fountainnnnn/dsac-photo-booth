@@ -65,7 +65,7 @@ export type AvatarAnchor = 'eyes' | 'forehead' | 'nose' | 'upperLip' | 'mouth' |
  * server/avatars.mjs).
  */
 export type AvatarSlot =
-  | 'head' | 'top' | 'eyes' | 'face' | 'nose' | 'cheeks' | 'mouth' | 'upperLip' | 'chin' | 'neck';
+  | 'head' | 'top' | 'eyes' | 'face' | 'filter' | 'nose' | 'cheeks' | 'mouth' | 'upperLip' | 'chin' | 'neck';
 
 export interface AvatarOption {
   id: string;
@@ -90,7 +90,16 @@ export interface AvatarOption {
    * width and height. The middle for glasses; the bottom edge for a hat.
    */
   pivot: { x: number; y: number };
+  /**
+   * A face filter's pieces, each pinned on its own: ears on the top of the
+   * head, a nose on the nose (see typedAvatar.ts). When set, these are what
+   * is drawn, and the option's own picture is only its tile.
+   */
+  pieces?: AvatarPiece[];
 }
+
+/** One piece of a face filter: an avatar of its own, without the name. */
+export type AvatarPiece = Omit<AvatarOption, 'id' | 'label' | 'pieces'>;
 
 /**
  * A fixed set, made in advance. Guests choose; they do not customise. These
@@ -163,6 +172,7 @@ export const TYPED_SLOTS: Record<AvatarSlot, {
   top:      { part: 'head',     fit: 'size',            anchor: 'forehead', lift: HEAD_TOP_LIFT, width: 2,    pivot: { x: 0.5, y: 0.97 } },
   eyes:     { part: 'eyes',     fit: 'all',             anchor: 'eyes',     lift: 0,             width: 1.8,  pivot: { x: 0.5, y: 0.45 } },
   face:     { part: 'face',     fit: 'all', grow: 1.15, anchor: 'eyes',     lift: 0,             width: 2.1,  pivot: { x: 0.5, y: 0.45 } },
+  filter:   { part: 'face',     fit: 'all',             anchor: 'nose',     lift: 0,             width: 2.4,  pivot: { x: 0.5, y: 0.75 } },
   nose:     { part: 'nose',     fit: 'none',            anchor: 'nose',     lift: 0,             width: 0.55, pivot: { x: 0.5, y: 0.55 } },
   cheeks:   { part: 'cheeks',   fit: 'all',             anchor: 'nose',     lift: 0,             width: 2,    pivot: { x: 0.5, y: 0.5 } },
   mouth:    { part: 'mouth',    fit: 'none',            anchor: 'mouth',    lift: 0,             width: 0.8,  pivot: { x: 0.5, y: 0.5 } },
@@ -179,7 +189,7 @@ export const AVATAR_SIZE_SCALE = { small: 0.75, normal: 1, large: 1.35 } as cons
  * beard under a moustache, a hat over everything.
  */
 export const AVATAR_DRAW_ORDER: AvatarSlot[] = [
-  'face', 'neck', 'chin', 'cheeks', 'mouth', 'upperLip', 'nose', 'eyes', 'head', 'top',
+  'face', 'filter', 'neck', 'chin', 'cheeks', 'mouth', 'upperLip', 'nose', 'eyes', 'head', 'top',
 ];
 
 /** The part of the face an avatar takes up; see TYPED_SLOTS. */

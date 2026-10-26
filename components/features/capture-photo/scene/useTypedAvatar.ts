@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AvatarOption } from '@/types/scene';
-import { cutOutAvatar, typedAvatarOption, type AvatarFit } from './typedAvatar';
+import { cutOutAvatar, filterPieces, splitFilter, typedAvatarOption, type AvatarFit } from './typedAvatar';
 
 /**
  * Having an avatar drawn from what a guest types: the capture page's side of
@@ -81,20 +81,37 @@ export function useTypedAvatar(refresh: unknown): TypedAvatarState {
         setError('That one did not come out right. Try again, or pick one of ours.');
         return null;
       }
-      const src = URL.createObjectURL(cut.png);
-      urls.current.push(src);
+      const keep = (png: Blob) => {
+        const url = URL.createObjectURL(png);
+        urls.current.push(url);
+        return url;
+      };
+      const fit = readFit(res.headers.get('X-Avatar-Fit'));
       made.current += 1;
-      return typedAvatarOption({
+      const option = typedAvatarOption({
         id: `typed-${made.current}`,
         label: clean,
-        src,
+        src: keep(cut.png),
         where: res.headers.get('X-Avatar-Where') ?? 'head',
         size: res.headers.get('X-Avatar-Size') ?? 'normal',
-        fit: readFit(res.headers.get('X-Avatar-Fit')),
+        fit,
         box: cut.box,
         width: cut.width,
         height: cut.height,
       });
+      // A face filter's ears go on the head and its nose on the nose, apart.
+      const split = option.slot === 'filter' && fit
+        ? splitFilter(cut.data, cut.width, cut.box, fit.y * cut.height)
+        : null;
+      if (!fit || !split) return option;
+      const [upper, lower] = await Promise.all([cut.crop(split.upper), cut.crop(split.lower)]);
+      if (!upper || !lower) return option;
+      return {
+        ...option,
+        pieces: filterPieces({
+          fit, split, width: cut.width, height: cut.height, upperSrc: keep(upper), lowerSrc: keep(lower),
+        }),
+      };
     } catch {
       setError('Could not reach the booth. Pick one of ours for now.');
       return null;
