@@ -3,10 +3,11 @@ import { faceBox } from './front';
 import type { DropReason, FacePoints } from './faces';
 
 /**
- * Boxes round the faces the tracker found, on the live preview only, for
+ * Boxes round the faces the tracker found, on the Settings preview only, for
  * working out at the venue why someone is or is not in the cut-out. A debug
- * switch of its own (Settings > Background > Show face boxes); never drawn
- * into a photo, because only the preview's scene carries them.
+ * switch of its own (Settings > Background > Show face boxes). Never on the
+ * guests' capture screen, and never drawn into a photo, because only the
+ * preview's scene carries them.
  *
  * Green: in the group, so cut out and given avatars. Amber: found, but beyond
  * the distance line. Red, dashed: found, then set aside by the tracker itself,

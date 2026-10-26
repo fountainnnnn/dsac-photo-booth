@@ -578,7 +578,8 @@ const DEFAULT_CAPTURE_SETTINGS = {
   // A frame-rate readout beside the stage, for judging the laptop. Off, so
   // guests never see it unless the operator asks for it.
   showFps: false,
-  // Debug boxes round the faces on the previews, for the same reason off.
+  // Debug boxes round the faces on the Settings preview (never the guests'
+  // screen), off until wanted.
   showFaceBoxes: false,
 };
 

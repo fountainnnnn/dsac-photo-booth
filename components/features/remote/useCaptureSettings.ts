@@ -142,9 +142,9 @@ export interface CaptureSettings {
    */
   showFps: boolean;
   /**
-   * Debug: a box round every face the tracker finds, on the previews only,
-   * coloured by whether it is in the group. For working out at the venue why
-   * someone is or is not cut out; guests see it too.
+   * Debug: a box round every face the tracker finds, on the Settings preview
+   * only, coloured by whether it is in the group. For working out at the
+   * venue why someone is or is not cut out; never on the guests' screen.
    */
   showFaceBoxes: boolean;
 }

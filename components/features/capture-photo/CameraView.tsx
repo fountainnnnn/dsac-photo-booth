@@ -143,7 +143,8 @@ export default function CameraView({
     frontLineM: captureSettings.frontLineM,
     maxPeople: captureSettings.maxPeople,
     distanceScale: captureSettings.distanceScale,
-    showTracking: captureSettings.showFaceBoxes,
+    // No face boxes here, whatever Settings says: this is the guests' screen.
+    // They show on the Settings preview, where the line is tuned.
   });
 
   const updateCaptureSettings = useCallback((patch: Partial<typeof captureSettings>) => {

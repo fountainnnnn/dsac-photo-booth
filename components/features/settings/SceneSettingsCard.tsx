@@ -397,11 +397,10 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
         <span>
           <span className="block text-[0.8rem] font-semibold text-[var(--ink)]">Show face boxes (debug)</span>
           <span className="mt-1 block text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
-            A box round every face the tracker finds, on the previews only, never
-            in a photo: green is in the photo, amber is beyond the distance line,
-            red dashed was found and then set aside, with why. Someone with no box
-            was never found. Guests see it too, so turn it off before the doors
-            open.
+            A box round every face the tracker finds, on the preview above only:
+            never on the capture screen guests use, and never in a photo. Green is
+            in the photo, amber is beyond the distance line, red dashed was found
+            and then set aside, with why. Someone with no box was never found.
           </span>
         </span>
       </label>
