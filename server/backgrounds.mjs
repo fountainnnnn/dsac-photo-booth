@@ -101,6 +101,41 @@ const BLOCKED = [
 /** Digits and symbols people use to dodge a word list, read back as letters. */
 const LOOKALIKES = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b', '@': 'a', $: 's', '!': 'i' };
 
+/**
+ * Characters the image services will not draw. Google blocks the finished
+ * picture of a character from these studios' films and shows, and so did
+ * every other model tried; it drew game, anime, Warner Bros and other
+ * cartoon characters (Mario, Pikachu, Batman, SpongeBob, Bluey) without
+ * complaint. Tried in October 2026: Mickey Mouse, Winnie the Pooh, Elsa,
+ * Buzz Lightyear, Iron Man, Spider-Man, Darth Vader, Shrek, Kung Fu Panda
+ * and the Minions were all blocked. The screen spots them, so a guest hears
+ * why in a second instead of after ten.
+ *
+ * The screen names each character's owner, and the booth decides. Asked
+ * instead whether a character was one of these studios', the model said yes
+ * to Mario, SpongeBob, Batman and "a castle like Disneyland", all of which
+ * Google draws.
+ */
+const FILM_OWNERS = /\b(disney|pixar|marvel|lucasfilm|dreamworks|universal|illumination)\b/i;
+export const FILM_RULE = [
+  'List every character, mascot or creature the visitor names in "characters", each with the company that owns it, as you know it.',
+  'Only characters: not places, buildings, rides, brands or logos, even ones a company owns.',
+];
+
+/** The first character the screen named that image services will not draw, or null. */
+export function filmCharacter(verdict) {
+  const named = Array.isArray(verdict?.characters) ? verdict.characters : [];
+  return named.find(c => FILM_OWNERS.test(String(c?.owner ?? ''))) ?? null;
+}
+
+/** What a guest is told when they ask for one of those characters. */
+export function filmMessage(character, tryAnother) {
+  // As the guest typed it, which is often all lower case.
+  const typed = cleanText(character?.name);
+  const name = typed ? typed[0].toUpperCase() + typed.slice(1) : 'That character';
+  return `${name} can’t be drawn: image services turn down Disney, Pixar, Marvel, Star Wars, DreamWorks and Universal characters. ${tryAnother}`;
+}
+
 export class BackgroundError extends Error {
   /**
    * @param {'not-configured'|'empty'|'blocked'|'busy'|'refused'|'failed'} code
@@ -235,8 +270,11 @@ const SCREEN_RULES = [
   'If only part of the request is not allowed, keep the rest, drop only that part, and allow it.',
   'Refuse only when nothing allowed is left.',
   '',
+  ...FILM_RULE,
+  '',
   'Reply with JSON only, no other text:',
-  '{"allowed": true or false, "place": "the scene to paint in at most 30 words; empty if not allowed",',
+  '{"allowed": true or false, "characters": [{"name": "as typed", "owner": "the company that owns it"}] or [] if none,',
+  ' "place": "the scene to paint in at most 30 words; empty if not allowed",',
   ' "look_up": ["the names of any memes, characters, creatures or mascots in the scene, as typed, whose look an image model might not know; at most 2; [] if none"]}',
 ].join('\n');
 
@@ -451,6 +489,8 @@ export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
       console.error('  Screening a typed background gave no verdict; turning it away.');
       throw new BackgroundError('failed', noCheck);
     }
+    const film = filmCharacter(verdict);
+    if (film) throw new BackgroundError('refused', filmMessage(film, 'Try another place.'));
     if (!verdict.allowed) {
       throw new BackgroundError('blocked', 'Let’s pick somewhere else — try another place.');
     }

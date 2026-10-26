@@ -150,6 +150,19 @@ describe('generate', () => {
     expect(calls(fetchImpl, '/images')).toHaveLength(1);
   });
 
+  it('turns away a film-studio character at the screen, before drawing anything', async () => {
+    const fetchImpl = fakeOpenRouter({
+      screen: {
+        allowed: true, item: 'a filter', where: 'filter', size: 'normal', backdrop: 'magenta', look_up: [],
+        characters: [{ name: 'Zorbo Mouse', owner: 'DreamWorks' }],
+      },
+    });
+    const err = await createAvatars(tempDir(), { fetchImpl }).generate('zorbo mouse', { apiKey: 'k' }).catch(e => e);
+    expect(err.code).toBe('refused');
+    expect(err.message).toMatch(/^Zorbo Mouse can’t be drawn: .* Try another idea\.$/);
+    expect(calls(fetchImpl, '/images')).toHaveLength(0);
+  });
+
   it('turns away blocked words before sending anything', async () => {
     const fetchImpl = fakeOpenRouter();
     const avatars = createAvatars(tempDir(), { fetchImpl });

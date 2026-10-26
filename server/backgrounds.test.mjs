@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  BackgroundError, MAX_TEXT, blockedWord, buildPrompt, checkRequest, cleanText, createBackgrounds,
+  BackgroundError, MAX_TEXT, blockedWord, buildPrompt, checkRequest, cleanText, createBackgrounds, filmCharacter,
   imageFrom, jsonFrom, peoplePhrase, requestBody, screenRequest,
 } from './backgrounds.mjs';
 
@@ -75,6 +75,29 @@ describe('the prompt', () => {
       checkRequest({ mime: 'image/png', bytes: PNG }, 'the himalayas').messages[0].content,
     ].join('\n').toLowerCase();
     for (const word of ['elephant', 'tung', 'skibidi', 'beach', 'gun']) expect(told).not.toContain(word);
+  });
+
+  it('turns away a film-studio character at the screen, before drawing anything', async () => {
+    const fetchImpl = fakeOpenRouter({ screen: {
+      allowed: true, place: 'a bear in the sea',
+      characters: [{ name: 'Zorbo Bear', owner: 'The Walt Disney Company' }],
+    } });
+    const backgrounds = createBackgrounds(tempDir(), { fetchImpl });
+    const err = await backgrounds.generate('zorbo bear in the sea', { apiKey: 'k' }).catch(e => e);
+    expect(err.code).toBe('refused');
+    expect(err.message).toMatch(/^Zorbo Bear can’t be drawn: .*Disney, Pixar, Marvel, Star Wars, DreamWorks and Universal/);
+    expect(calls(fetchImpl, '/images')).toHaveLength(0);
+    expect(screenRequest('x').messages[0].content).toMatch(/"characters"/);
+  });
+
+  it('decides by who owns a character, not by the model\'s guess', () => {
+    const owned = owner => filmCharacter({ characters: [{ name: 'x', owner }] });
+    for (const owner of ['Disney', 'Pixar Animation Studios', 'Marvel Entertainment', 'Lucasfilm',
+      'DreamWorks Animation', 'Universal Pictures', 'Illumination']) expect(owned(owner)).toBeTruthy();
+    for (const owner of ['Nintendo', 'Nickelodeon', 'DC Comics / Warner Bros.', 'Sanrio', 'The Pokémon Company', ''])
+      expect(owned(owner)).toBeNull();
+    expect(filmCharacter({})).toBeNull();
+    expect(filmCharacter({ characters: 'Mickey' })).toBeNull();
   });
 
   it('keeps a character in its own look, even in a real place', () => {

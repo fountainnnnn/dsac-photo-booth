@@ -2,8 +2,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  BackgroundError, CHAT_ENDPOINT, CHECK_TIMEOUT_MS, DEFAULT_CHECK_MODEL, DEFAULT_MODEL,
-  IMAGES_ENDPOINT, TIMEOUT_MS, blockedWord, cleanPlace, cleanText, imageFrom, jsonFrom, openRouter,
+  BackgroundError, CHAT_ENDPOINT, CHECK_TIMEOUT_MS, DEFAULT_CHECK_MODEL, DEFAULT_MODEL, FILM_RULE,
+  IMAGES_ENDPOINT, TIMEOUT_MS, blockedWord, cleanPlace, cleanText, filmMessage, imageFrom, jsonFrom, openRouter,
+  filmCharacter,
 } from './backgrounds.mjs';
 
 /**
@@ -119,8 +120,11 @@ const SCREEN_RULES = [
   'If only part of the request is not allowed, keep the rest, drop only that part, and allow it.',
   'Refuse only when nothing allowed is left.',
   '',
+  ...FILM_RULE,
+  '',
   'Reply with JSON only, no other text:',
-  '{"allowed": true or false, "item": "the thing or the filter to draw, in at most 30 words, with any character named as typed; empty if not allowed",',
+  '{"allowed": true or false, "characters": [{"name": "as typed", "owner": "the company that owns it"}] or [] if none,',
+  ' "item": "the thing or the filter to draw, in at most 30 words, with any character named as typed; empty if not allowed",',
   ` "where": one of ${Object.keys(WHERE).map(k => `"${k}"`).join(', ')}, "size": "small", "normal" or "large", "backdrop": "magenta" or "green",`,
   ' "look_up": ["the names of any memes, characters, creatures or mascots in the item, as typed, whose look an image model might not know; at most 2; [] if none"]}',
 ].join('\n');
@@ -345,6 +349,8 @@ export function createAvatars(dir, { fetchImpl = fetch } = {}) {
       console.error('  Screening a typed avatar gave no verdict; turning it away.');
       throw new BackgroundError('failed', noCheck);
     }
+    const film = filmCharacter(verdict);
+    if (film) throw new BackgroundError('refused', filmMessage(film, 'Try another idea.'));
     if (!verdict.allowed) throw new BackgroundError('blocked', again);
     const item = cleanPlace(verdict.item) || clean;
     if (blockedWord(item)) throw new BackgroundError('blocked', again);
