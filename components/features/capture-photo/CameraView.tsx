@@ -791,13 +791,12 @@ function TypeToMake<T>({ name, prompt, making, typing, onMade }: {
   /** What the button says while the picture is made. */
   making: string;
   typing: {
-    busy: boolean; error: string | null; left: number;
+    busy: boolean; error: string | null;
     generate: (text: string) => Promise<T | null>;
   };
   onMade: (made: T) => void;
 }) {
   const [text, setText] = useState('');
-  const spent = typing.left === 0;
 
   const submit = async () => {
     const made = await typing.generate(text);
@@ -809,17 +808,16 @@ function TypeToMake<T>({ name, prompt, making, typing, onMade }: {
       <label className="sr-only" htmlFor={name}>{prompt}</label>
       <input id={name} data-testid={`${name}-input`}
         value={text} onChange={e => setText(e.target.value)}
-        maxLength={120} disabled={typing.busy || spent} autoComplete="off"
-        placeholder={spent ? 'No more tries — pick one below' : prompt}
+        maxLength={120} disabled={typing.busy} autoComplete="off"
+        placeholder={prompt}
         className="min-h-11 w-full rounded-xl border border-[var(--border)] bg-transparent px-3 text-[0.8rem] text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:opacity-60" />
       <button type="submit" data-testid={`${name}-go`}
-        disabled={typing.busy || spent || !text.trim()}
+        disabled={typing.busy || !text.trim()}
         className="mt-2 min-h-10 w-full rounded-xl bg-[var(--ink)] px-3 text-[0.78rem] font-semibold text-white transition disabled:opacity-40">
         {typing.busy ? making : 'Make it'}
       </button>
       <p className="mt-1.5 text-[0.66rem] leading-[1.45] text-[var(--ink-3)]">
-        {typing.error
-          ?? (spent ? null : `${typing.left} ${typing.left === 1 ? 'try' : 'tries'} left. What you type is sent to an online image service.`)}
+        {typing.error ?? 'What you type is sent to an online image service.'}
       </p>
     </form>
   );

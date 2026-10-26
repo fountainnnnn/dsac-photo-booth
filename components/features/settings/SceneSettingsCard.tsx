@@ -277,9 +277,9 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
           <span className="mt-1 block text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
             A guest types something to wear and an image model draws it, through
             OpenRouter; the booth works out where on the face it goes and pins it
-            there, like the ready-made ones. About US$0.04 an avatar, three tries
-            per guest, and the same words are only paid for once. Works with
-            background removal off.{' '}
+            there, like the ready-made ones. About US$0.04 an avatar, and the
+            same words are only paid for once. Works with background removal
+            off.{' '}
             {keySet === false && (
               <strong className="font-semibold text-[var(--accent-ink)]">
                 Needs an OpenRouter API key on the Environment tab; until then guests
@@ -346,8 +346,8 @@ export default function SceneSettingsCard({ settings, push, saved, loading }: Ca
             <span className="block text-[0.8rem] font-semibold text-[var(--ink)]">Let guests type a background</span>
             <span className="mt-1 block text-[0.72rem] leading-[1.6] text-[var(--ink-3)]">
               A guest types a place and an image model draws it, through OpenRouter:
-              about US$0.04 a background, three tries per guest, and the same words
-              are only paid for once.{' '}
+              about US$0.04 a background, and the same words are only paid for
+              once.{' '}
               {keySet === false && (
                 <strong className="font-semibold text-[var(--accent-ink)]">
                   Needs an OpenRouter API key on the Environment tab; until then guests

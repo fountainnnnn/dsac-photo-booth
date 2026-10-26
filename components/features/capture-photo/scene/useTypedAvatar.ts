@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TYPED_AVATARS_PER_GUEST, type AvatarOption } from '@/types/scene';
+import type { AvatarOption } from '@/types/scene';
 import { cutOutAvatar, typedAvatarOption, type AvatarFit } from './typedAvatar';
 
 /**
@@ -8,8 +8,8 @@ import { cutOutAvatar, typedAvatarOption, type AvatarFit } from './typedAvatar';
  * comes back on a flat colour, which is taken away here, with where on the
  * face it goes.
  *
- * Lives on the capture page, so a retake keeps the guest's avatars and their
- * count; `reset` is for the next guest.
+ * Lives on the capture page, so a retake keeps the guest's avatars; `reset`
+ * is for the next guest.
  */
 
 export interface TypedAvatarState {
@@ -17,7 +17,6 @@ export interface TypedAvatarState {
   available: boolean;
   busy: boolean;
   error: string | null;
-  left: number;
   generate: (text: string) => Promise<AvatarOption | null>;
   reset: () => void;
 }
@@ -38,7 +37,6 @@ export function useTypedAvatar(refresh: unknown): TypedAvatarState {
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [used, setUsed] = useState(0);
   const urls = useRef<string[]>([]);
   const made = useRef(0);
 
@@ -54,7 +52,6 @@ export function useTypedAvatar(refresh: unknown): TypedAvatarState {
   const reset = useCallback(() => {
     for (const u of urls.current) URL.revokeObjectURL(u);
     urls.current = [];
-    setUsed(0);
     setError(null);
   }, []);
 
@@ -75,14 +72,10 @@ export function useTypedAvatar(refresh: unknown): TypedAvatarState {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null) as { error?: string; code?: string } | null;
-        // A guest who was turned away for their words has not used a try.
-        if (data?.code !== 'blocked' && data?.code !== 'empty') setUsed(n => n + 1);
         if (data?.code === 'not-configured') setAvailable(false);
         setError(data?.error ?? 'Could not make that avatar. Pick one of ours for now.');
         return null;
       }
-      // An avatar someone already asked for costs nothing, so it is not a try.
-      if (res.headers.get('X-Avatar-Cached') !== '1') setUsed(n => n + 1);
       const cut = await cutOutAvatar(await res.blob());
       if (!cut) {
         setError('That one did not come out right. Try again, or pick one of ours.');
@@ -114,7 +107,6 @@ export function useTypedAvatar(refresh: unknown): TypedAvatarState {
     available,
     busy,
     error,
-    left: Math.max(0, TYPED_AVATARS_PER_GUEST - used),
     generate,
     reset,
   };

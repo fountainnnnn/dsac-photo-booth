@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TYPED_PER_GUEST, type TypedBackground } from '@/types/scene';
+import type { TypedBackground } from '@/types/scene';
 
 /**
  * Having a background drawn from what a guest types. The server does the
  * work (see server/backgrounds.mjs); this keeps the capture page's side:
- * whether typing is offered at all, the wait, the error, and how many tries
- * the current guest has left.
+ * whether typing is offered at all, the wait and the error. A guest may make
+ * as many as they like; the server only guards against a runaway.
  *
  * Lives on the capture page rather than the camera view, so a retake keeps
- * the guest's picture and their count; `reset` is for the next guest.
+ * the guest's picture; `reset` is for the next guest.
  */
 
 export interface TypedBackgroundState {
@@ -16,7 +16,6 @@ export interface TypedBackgroundState {
   available: boolean;
   busy: boolean;
   error: string | null;
-  left: number;
   generate: (text: string) => Promise<TypedBackground | null>;
   reset: () => void;
 }
@@ -26,7 +25,6 @@ export function useTypedBackground(refresh: unknown): TypedBackgroundState {
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [used, setUsed] = useState(0);
   // Every picture made for the current guest, so they can all be let go.
   const urls = useRef<string[]>([]);
 
@@ -42,7 +40,6 @@ export function useTypedBackground(refresh: unknown): TypedBackgroundState {
   const reset = useCallback(() => {
     for (const u of urls.current) URL.revokeObjectURL(u);
     urls.current = [];
-    setUsed(0);
     setError(null);
   }, []);
 
@@ -63,16 +60,12 @@ export function useTypedBackground(refresh: unknown): TypedBackgroundState {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null) as { error?: string; code?: string } | null;
-        // A guest who was turned away for their words has not used a try.
-        if (data?.code !== 'blocked' && data?.code !== 'empty') setUsed(n => n + 1);
         if (data?.code === 'not-configured') setAvailable(false);
         setError(data?.error ?? 'Could not make that background. Pick one of ours for now.');
         return null;
       }
       const src = URL.createObjectURL(await res.blob());
       urls.current.push(src);
-      // A picture someone already asked for costs nothing, so it is not a try.
-      if (res.headers.get('X-Background-Cached') !== '1') setUsed(n => n + 1);
       return { src, text: clean };
     } catch {
       setError('Could not reach the booth. Pick one of ours for now.');
@@ -86,7 +79,6 @@ export function useTypedBackground(refresh: unknown): TypedBackgroundState {
     available,
     busy,
     error,
-    left: Math.max(0, TYPED_PER_GUEST - used),
     generate,
     reset,
   };

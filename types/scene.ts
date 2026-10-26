@@ -201,9 +201,6 @@ export function toggleAvatar(ids: string[], option: AvatarOption, options: Avata
   return [...others, option.id];
 }
 
-/** Typed avatars per guest, as for backgrounds. */
-export const TYPED_AVATARS_PER_GUEST = 3;
-
 /** The background id that means "the one the guest typed". */
 export const TYPED_BACKGROUND_ID = 'typed';
 
@@ -231,6 +228,3 @@ export const DEFAULT_SCENE_CHOICE: SceneChoice = {
   typed: null,
   typedAvatars: [],
 };
-
-/** Backgrounds a guest may have made, before they have to pick a ready one. */
-export const TYPED_PER_GUEST = 3;

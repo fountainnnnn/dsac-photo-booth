@@ -66,8 +66,8 @@ export default function CapturePage() {
 
   const handleRetake = resetFlow;
 
-  // The next guest starts from scratch: their own background, avatar and
-  // tries. A retake (above) keeps all three.
+  // The next guest starts from scratch: their own background and avatars. A
+  // retake (above) keeps both.
   const handleDone = useCallback(() => {
     setChoice(DEFAULT_SCENE_CHOICE);
     typing.reset();
