@@ -35,6 +35,8 @@ import {
 
 type PermissionStatus = 'prompt' | 'granted' | 'denied' | 'unsupported';
 
+type ChoiceUpdate = SceneChoice | ((current: SceneChoice) => SceneChoice);
+
 export interface CameraViewProps {
   onCapture: (blob: Blob, dataUrl: string) => void;
   onError?: (error: Error) => void;
@@ -43,7 +45,13 @@ export interface CameraViewProps {
    * a retake — which remounts this view — keeps what they picked.
    */
   choice?: SceneChoice;
-  onChoiceChange?: (choice: SceneChoice) => void;
+  /**
+   * A new choice, or how to change the current one. A typed picture finishes
+   * seconds after it was asked for, so it changes whatever the guest has
+   * picked by then: given the choice from when it was asked, a background
+   * finishing during an avatar was put back by the avatar.
+   */
+  onChoiceChange?: (update: ChoiceUpdate) => void;
   /** Backgrounds from typed words; absent, typing is not offered. */
   typing?: TypedBackgroundState;
   /** Avatars from typed words, the same way. */
@@ -844,7 +852,7 @@ function statusLine(status: SceneStatus, showBackgrounds: boolean, avatarOn: boo
  */
 function ScenePickers({ choice, onChange, showBackgrounds, status, typing, typingAvatar, people, onPeople }: {
   choice: SceneChoice;
-  onChange: (choice: SceneChoice) => void;
+  onChange: (update: ChoiceUpdate) => void;
   showBackgrounds: boolean;
   status: SceneStatus;
   typing?: TypedBackgroundState;
@@ -885,7 +893,7 @@ function ScenePickers({ choice, onChange, showBackgrounds, status, typing, typin
           {typing?.available && (
             <TypeToMake name="typed-background" prompt="Where do you want to be?"
               making="Making your background…" typing={typing}
-              onMade={typed => onChange({ ...choice, backgroundId: TYPED_BACKGROUND_ID, typed })}
+              onMade={typed => onChange(c => ({ ...c, backgroundId: TYPED_BACKGROUND_ID, typed }))}
             />
           )}
           <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Background">
@@ -924,10 +932,13 @@ function ScenePickers({ choice, onChange, showBackgrounds, status, typing, typin
         {typingAvatar?.available && (
           <TypeToMake name="typed-avatar" prompt="What do you want to wear?"
             making="Making your avatar…" typing={typingAvatar}
-            onMade={made => onChange({
-              ...choice,
-              typedAvatars: [made, ...(choice.typedAvatars ?? [])],
-              avatarIds: toggleAvatar(choice.avatarIds, made, [made, ...avatarOptions]),
+            onMade={made => onChange((c) => {
+              const typedAvatars = [made, ...(c.typedAvatars ?? [])];
+              return {
+                ...c,
+                typedAvatars,
+                avatarIds: toggleAvatar(c.avatarIds, made, [...typedAvatars, ...AVATARS]),
+              };
             })}
           />
         )}
