@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* The hook: a question the visitor answers in their head. Built at frame 0. One line, centred on (960,540): 104px on a 112px line box, top 484. */
+    [data-composition-id="s01"] .s01-line { position: absolute; left: 0; top: 484px; width: 1920px; font-size: 104px; line-height: 112px; white-space: nowrap; }
+  </style>
+  <div id="s01-root" class="rk-scene" data-composition-id="s01" data-width="1920" data-height="1080" data-duration="3.5" data-qa-center="x">
+    <div id="s01-ground" class="rk-ground clip" data-start="0" data-duration="3.5" data-track-index="0"></div>
+    <div id="s01-world" class="rk-world" data-qa-camera>
+      <div id="s01-line" class="s01-line t-hero">Want a photo to remember today?</div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+      // 0.00 — the question builds word by word, its first word already landing on frame 0.
+      RK.words(tl, $("s01-line"), 0.0, { stagger: 0.07 });
+      // The frame drifts in over the whole beat (no dead hold).
+      tl.fromTo($("s01-world"), { scale: 1 }, { scale: 1.035, duration: 3.5, ease: "none", transformOrigin: "960px 540px" }, 0);
+      window.__timelines["s01"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

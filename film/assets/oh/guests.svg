@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<!-- Two illustrated guests, already cut out (transparent around them), on the backgrounds' 1920x1080 artboard.
+     Face anchors (artboard px), used by the scenes to pin avatars:
+       Maya (left):  eyes centre (742, 548), eye span 96, forehead (742, 470), head top 392
+       Jun  (right): eyes centre (1176, 520), eye span 96, forehead (1176, 444), head top 368 -->
+
+<!-- Maya: bun, curls, mustard top -->
+<g>
+  <path d="M470 1080 C470 900 540 800 742 790 C944 800 1014 900 1014 1080Z" fill="#f2b33d"/>
+  <path d="M600 822 C650 860 834 860 884 822 C850 808 800 798 742 798 C684 798 634 808 600 822Z" fill="#d8962a"/>
+  <path d="M700 700 L784 700 L790 812 C770 834 714 834 694 812Z" fill="#9a5b3c"/>
+  <path d="M694 790 C714 812 770 812 790 790 L790 812 C770 834 714 834 694 812Z" fill="#7e4730" opacity="0.6"/>
+  <circle cx="742" cy="360" r="62" fill="#1d1416"/>
+  <ellipse cx="742" cy="560" rx="122" ry="150" fill="#a8664a"/>
+  <path d="M612 560 C600 430 660 380 742 380 C824 380 884 430 872 560 C864 500 830 470 742 466 C660 468 626 500 612 560Z" fill="#1d1416"/>
+  <path d="M612 560 C606 610 616 650 630 676 C624 620 626 590 636 560Z" fill="#1d1416"/>
+  <path d="M872 560 C878 610 868 650 854 676 C860 620 858 590 848 560Z" fill="#1d1416"/>
+  <ellipse cx="620" cy="570" rx="18" ry="28" fill="#9a5b3c"/>
+  <ellipse cx="864" cy="570" rx="18" ry="28" fill="#9a5b3c"/>
+  <path d="M676 512 Q696 500 716 510" fill="none" stroke="#1d1416" stroke-width="8" stroke-linecap="round"/>
+  <path d="M768 510 Q788 500 808 512" fill="none" stroke="#1d1416" stroke-width="8" stroke-linecap="round"/>
+  <ellipse cx="694" cy="548" rx="11" ry="13" fill="#1d1416"/>
+  <ellipse cx="790" cy="548" rx="11" ry="13" fill="#1d1416"/>
+  <path d="M736 566 Q728 598 742 604" fill="none" stroke="#7e4730" stroke-width="6" stroke-linecap="round"/>
+  <path d="M694 636 Q742 680 790 636 Q742 652 694 636Z" fill="#fff" stroke="#5a2a22" stroke-width="6" stroke-linejoin="round"/>
+  <ellipse cx="672" cy="612" rx="22" ry="12" fill="#d0705a" opacity="0.45"/>
+  <ellipse cx="812" cy="612" rx="22" ry="12" fill="#d0705a" opacity="0.45"/>
+</g>
+
+<!-- Jun: short hair, glasses-free, navy shirt with a collar -->
+<g>
+  <path d="M900 1080 C900 880 980 770 1176 760 C1372 770 1452 880 1452 1080Z" fill="#2f4a7a"/>
+  <path d="M1118 772 L1176 852 L1234 772 L1210 766 L1176 812 L1142 766Z" fill="#f4f1ea"/>
+  <path d="M1134 670 L1218 670 L1222 784 C1204 806 1148 806 1130 784Z" fill="#e9b892"/>
+  <path d="M1130 764 C1148 786 1204 786 1222 764 L1222 784 C1204 806 1148 806 1130 784Z" fill="#c9926c" opacity="0.6"/>
+  <ellipse cx="1176" cy="530" rx="120" ry="150" fill="#f1c7a5"/>
+  <path d="M1052 540 C1040 420 1100 360 1180 362 C1270 364 1316 420 1302 540 C1294 470 1262 444 1220 440 C1180 470 1110 470 1070 456 C1060 480 1056 510 1052 540Z" fill="#3a2a24"/>
+  <ellipse cx="1058" cy="546" rx="18" ry="28" fill="#e9b892"/>
+  <ellipse cx="1294" cy="546" rx="18" ry="28" fill="#e9b892"/>
+  <path d="M1110 486 Q1130 476 1150 484" fill="none" stroke="#3a2a24" stroke-width="9" stroke-linecap="round"/>
+  <path d="M1202 484 Q1222 476 1242 486" fill="none" stroke="#3a2a24" stroke-width="9" stroke-linecap="round"/>
+  <ellipse cx="1128" cy="520" rx="11" ry="13" fill="#2a1d18"/>
+  <ellipse cx="1224" cy="520" rx="11" ry="13" fill="#2a1d18"/>
+  <path d="M1170 540 Q1162 572 1178 576" fill="none" stroke="#c9926c" stroke-width="6" stroke-linecap="round"/>
+  <path d="M1132 612 Q1176 650 1220 612" fill="none" stroke="#7a3b2e" stroke-width="7" stroke-linecap="round"/>
+  <ellipse cx="1104" cy="584" rx="22" ry="12" fill="#e58f7a" opacity="0.4"/>
+  <ellipse cx="1248" cy="584" rx="22" ry="12" fill="#e58f7a" opacity="0.4"/>
+</g>
+</svg>

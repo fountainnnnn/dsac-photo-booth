@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<!-- Three guests, cut out, on the 1920x1080 camera artboard. Sticker style: flat fills, an 8px ink outline.
+     Face anchors (artboard px) for avatars:
+       Nadia (left)   eyes (520,486)/(600,486) centre (560,486)  forehead (560,404)  crown of head y 330
+       Ravi  (middle) eyes (920,452)/(1000,452) centre (960,452) forehead (960,368)  crown of head y 290
+       Mei   (right)  eyes (1320,492)/(1400,492) centre (1360,492) forehead (1360,412) crown of head y 338 -->
+<g stroke="#1b1a1f" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+
+<!-- Ravi (behind, middle) -->
+<path d="M700 1090 C700 800 790 700 960 692 C1130 700 1220 800 1220 1090Z" fill="#ff4b3e"/>
+<path d="M905 760 C900 700 902 620 908 580 L1012 580 C1018 620 1020 700 1015 760 C995 790 925 790 905 760Z" fill="#c98b5e"/>
+<ellipse cx="960" cy="470" rx="118" ry="142" fill="#d9a070"/>
+<path d="M842 470 C826 360 870 296 930 290 C950 262 1000 262 1018 288 C1080 298 1104 370 1080 468 C1074 410 1050 380 1010 372 C980 392 920 394 880 378 C860 400 848 430 842 470Z" fill="#2a1f1c"/>
+<circle cx="900" cy="300" r="26" fill="#2a1f1c"/><circle cx="960" cy="276" r="28" fill="#2a1f1c"/><circle cx="1022" cy="296" r="26" fill="#2a1f1c"/>
+<path d="M896 420 Q918 410 940 418" fill="none"/><path d="M980 418 Q1002 410 1024 420" fill="none"/>
+<circle cx="920" cy="452" r="12" fill="#1b1a1f" stroke="none"/><circle cx="1000" cy="452" r="12" fill="#1b1a1f" stroke="none"/>
+<path d="M955 470 Q946 504 962 510" fill="none" stroke-width="6"/>
+<path d="M910 548 Q960 600 1010 548 Z" fill="#fff"/>
+<path d="M905 700 Q960 750 1015 700" fill="none"/>
+
+<!-- Nadia (front left), hijab -->
+<path d="M300 1090 C300 900 390 800 560 790 C730 800 820 900 820 1090Z" fill="#7a5cff"/>
+<path d="M410 470 C400 330 470 300 560 300 C650 300 720 330 710 470 C716 600 690 690 640 760 C600 800 520 800 480 760 C430 690 404 600 410 470Z" fill="#ff8fc1"/>
+<ellipse cx="560" cy="498" rx="104" ry="126" fill="#f0c19a"/>
+<path d="M458 440 C470 390 510 372 560 372 C610 372 650 390 662 440" fill="none" stroke-width="7"/>
+<path d="M500 456 Q520 446 540 452" fill="none"/><path d="M580 452 Q600 446 620 456" fill="none"/>
+<circle cx="520" cy="486" r="12" fill="#1b1a1f" stroke="none"/><circle cx="600" cy="486" r="12" fill="#1b1a1f" stroke="none"/>
+<path d="M556 500 Q548 530 562 536" fill="none" stroke-width="6"/>
+<path d="M516 568 Q560 600 604 568" fill="none" stroke-width="7"/>
+<circle cx="494" cy="540" r="18" fill="#ff8fa0" stroke="none" opacity="0.55"/><circle cx="626" cy="540" r="18" fill="#ff8fa0" stroke="none" opacity="0.55"/>
+
+<!-- Mei (front right), bob -->
+<path d="M1100 1090 C1100 830 1190 714 1360 706 C1530 714 1620 830 1620 1090Z" fill="#2fc59a"/>
+<path d="M1308 712 C1330 740 1390 740 1412 712 L1416 590 L1304 590Z" fill="#f6d2b0"/>
+<path d="M1230 520 C1220 380 1280 336 1360 336 C1440 336 1500 380 1490 520 L1500 640 C1470 650 1440 640 1420 620 L1300 620 C1280 640 1250 650 1220 640Z" fill="#3b2a6b"/>
+<ellipse cx="1360" cy="504" rx="106" ry="128" fill="#f6d2b0"/>
+<path d="M1254 470 C1262 400 1300 380 1360 380 C1420 380 1460 400 1466 470 C1440 430 1400 420 1360 432 C1320 420 1280 430 1254 470Z" fill="#3b2a6b"/>
+<path d="M1300 462 Q1320 452 1340 458" fill="none"/><path d="M1380 458 Q1400 452 1420 462" fill="none"/>
+<circle cx="1320" cy="492" r="12" fill="#1b1a1f" stroke="none"/><circle cx="1400" cy="492" r="12" fill="#1b1a1f" stroke="none"/>
+<path d="M1356 506 Q1348 536 1362 540" fill="none" stroke-width="6"/>
+<path d="M1316 570 Q1360 610 1404 570 Z" fill="#fff"/>
+<circle cx="1292" cy="546" r="18" fill="#ff8fa0" stroke="none" opacity="0.55"/><circle cx="1428" cy="546" r="18" fill="#ff8fa0" stroke="none" opacity="0.55"/>
+</g>
+</svg>

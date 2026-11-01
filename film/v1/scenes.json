@@ -1,0 +1,198 @@
+{
+  "music": {
+    "src": "assets/bgm/saturday-instrumental.wav",
+    "offset": 0.72,
+    "volume": 0.8,
+    "fadeIn": 0.6,
+    "fadeOut": 1.4,
+    "bpm": 120,
+    "sections": {
+      "drop": "s04",
+      "outro": {
+        "scene": "s12",
+        "at": 0.3
+      }
+    },
+    "_note": "Openverse/Jamendo: \"Saturday (Instrumental)\" by Josh Woodward, CC BY 3.0. Its first lift (24.72s in the full track; this file starts at 16.0s) lands on s04 at 8.0s."
+  },
+  "scenes": [
+    {
+      "id": "s01",
+      "file": "scenes/s01-hook.html",
+      "duration": 3.5,
+      "sfx": []
+    },
+    {
+      "id": "s02",
+      "file": "scenes/s02-reveal.html",
+      "duration": 2.5,
+      "sfx": [],
+      "in": {
+        "type": "zoom-in",
+        "dur": 0.5
+      }
+    },
+    {
+      "id": "s03",
+      "file": "scenes/s03-promise.html",
+      "duration": 3.5,
+      "sfx": [],
+      "in": {
+        "type": "zoom-out",
+        "dur": 0.5
+      },
+      "drift": 0
+    },
+    {
+      "id": "s04",
+      "file": "scenes/s04-backgrounds.html",
+      "duration": 4.5,
+      "sfx": [
+        {
+          "file": "tap",
+          "at": 1.7,
+          "vol": 0.14
+        },
+        {
+          "file": "tap",
+          "at": 2.6,
+          "vol": 0.14
+        }
+      ],
+      "in": {
+        "type": "iris",
+        "dur": 0.5,
+        "at": [
+          1304,
+          574
+        ]
+      }
+    },
+    {
+      "id": "s05",
+      "file": "scenes/s05-typed.html",
+      "duration": 5.5,
+      "sfx": [
+        {
+          "file": "tap",
+          "at": 0.7,
+          "vol": 0.14
+        },
+        {
+          "file": "typing",
+          "at": 0.82,
+          "vol": 0.12,
+          "max": 0.75
+        },
+        {
+          "file": "click",
+          "at": 2.15,
+          "vol": 0.14
+        }
+      ],
+      "in": {
+        "type": "zoom-in",
+        "dur": 0.5
+      }
+    },
+    {
+      "id": "s06",
+      "file": "scenes/s06-avatars.html",
+      "duration": 4.0,
+      "sfx": [
+        {
+          "file": "tap",
+          "at": 0.85,
+          "vol": 0.14
+        }
+      ],
+      "in": {
+        "type": "zoom-out",
+        "dur": 0.5
+      }
+    },
+    {
+      "id": "s07",
+      "file": "scenes/s07-shutter.html",
+      "duration": 4.5,
+      "sfx": [
+        {
+          "file": "click",
+          "at": 0.7,
+          "vol": 0.14
+        },
+        {
+          "file": "shutter",
+          "at": 2.5,
+          "vol": 0.28
+        }
+      ],
+      "in": {
+        "type": "zoom-in",
+        "dur": 0.5
+      }
+    },
+    {
+      "id": "s08",
+      "file": "scenes/s08-qr.html",
+      "duration": 4.0,
+      "sfx": [],
+      "in": {
+        "type": "zoom-out",
+        "dur": 0.5
+      }
+    },
+    {
+      "id": "s09",
+      "file": "scenes/s09-phone.html",
+      "duration": 4.0,
+      "sfx": [
+        {
+          "file": "tap",
+          "at": 1.35,
+          "vol": 0.14
+        }
+      ],
+      "in": {
+        "type": "zoom-in",
+        "dur": 0.5
+      }
+    },
+    {
+      "id": "s10",
+      "file": "scenes/s10-privacy.html",
+      "duration": 3.0,
+      "sfx": [],
+      "in": {
+        "type": "zoom-out",
+        "dur": 0.5
+      }
+    },
+    {
+      "id": "s11",
+      "file": "scenes/s11-cta.html",
+      "duration": 3.0,
+      "sfx": [
+        {
+          "file": "click",
+          "at": 1.4,
+          "vol": 0.14
+        }
+      ],
+      "in": {
+        "type": "zoom-in",
+        "dur": 0.5
+      }
+    },
+    {
+      "id": "s12",
+      "file": "scenes/s12-logo.html",
+      "duration": 3.0,
+      "sfx": [],
+      "in": {
+        "type": "zoom-in",
+        "dur": 0.5
+      }
+    }
+  ]
+}

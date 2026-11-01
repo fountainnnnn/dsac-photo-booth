@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* The trust beat: the booth deletes each photo ten minutes after its QR code (Settings > Event, default 10). One line, centred on (960,540): 96px on a 104px line box, top 488. */
+    [data-composition-id="s10"] .s10-line { position: absolute; left: 0; top: 488px; width: 1920px; font-size: 96px; line-height: 104px; white-space: nowrap; }
+  </style>
+  <div id="s10-root" class="rk-scene" data-composition-id="s10" data-width="1920" data-height="1080" data-duration="3.0" data-qa-center="x">
+    <div id="s10-ground" class="rk-ground clip" data-start="0" data-duration="3.0" data-track-index="0"></div>
+    <div id="s10-world" class="rk-world" data-qa-camera>
+      <div id="s10-line" class="s10-line t-hero">Gone from the booth in ten minutes.</div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+      // 0.00 — the line builds.
+      RK.words(tl, $("s10-line"), 0.0, { stagger: 0.06 });
+      // The frame drifts in over the whole beat (no dead hold).
+      tl.fromTo($("s10-world"), { scale: 1 }, { scale: 1.035, duration: 3.0, ease: "none", transformOrigin: "960px 540px" }, 0);
+      window.__timelines["s10"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

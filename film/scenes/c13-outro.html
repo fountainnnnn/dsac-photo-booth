@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c13"] .big { position: absolute; left: 0; top: 150px; width: 1920px; text-align: center; font-size: 190px; line-height: 200px; font-weight: 900; letter-spacing: -0.05em; color: #fff; -webkit-text-stroke: 12px #1b1a1f; paint-order: stroke fill; text-shadow: 10px 10px 0 #1b1a1f; white-space: nowrap; }
+    [data-composition-id="c13"] .pill { position: absolute; left: 0; top: 400px; width: 1920px; display: flex; justify-content: center; }
+    [data-composition-id="c13"] .pill span { height: 104px; padding: 0 54px; display: flex; align-items: center; border-radius: 52px; background: #ffd23f; box-shadow: 0 0 0 6px #1b1a1f, 10px 10px 0 6px #1b1a1f; font-size: 48px; font-weight: 900; color: #1b1a1f; white-space: nowrap; }
+    [data-composition-id="c13"] .crew { position: absolute; left: 360px; top: 560px; width: 1200px; height: 675px; transform-origin: 600px 675px; }
+    [data-composition-id="c13"] .crew img { position: absolute; left: 0; top: 0; width: 1200px; height: 675px; }
+    [data-composition-id="c13"] .crew .av { position: absolute; }
+    [data-composition-id="c13"] .logo { position: absolute; left: 610px; top: 380px; width: 700px; height: 320px; border-radius: 40px; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 14px 14px 0 6px #1b1a1f; display: flex; align-items: center; justify-content: center; }
+    [data-composition-id="c13"] .logo img { width: 560px; }
+    [data-composition-id="c13"] .dd { transform-origin: 50% 50%; }
+  </style>
+  <div id="c13-root" class="oh" data-composition-id="c13" data-width="1920" data-height="1080" data-duration="8.0">
+    <div id="c13-ground" class="oh-ground clip" data-start="0" data-duration="8.0" data-track-index="0" style="background:#ff4b3e"></div>
+    <div id="c13-world" class="oh-world">
+
+      <div id="c13-d0" class="dd" style="position:absolute;left:80px;top:360px;width:110px;height:110px;transform:rotate(-10deg)"><svg viewBox="0 0 100 100"><path d="M50 6 61 38 95 38 67 58 78 92 50 71 22 92 33 58 5 38 39 38Z" fill="#ffd23f" stroke="#1b1a1f" stroke-width="6" stroke-linejoin="round"/></svg></div><div id="c13-d1" class="dd" style="position:absolute;left:1740px;top:380px;width:100px;height:100px;transform:rotate(12deg)"><svg viewBox="0 0 100 100"><path d="M50 6 89 28 89 72 50 94 11 72 11 28Z" fill="#fff4e3" stroke="#1b1a1f" stroke-width="6" stroke-linejoin="round"/></svg></div><div id="c13-d2" class="dd" style="position:absolute;left:1700px;top:620px;width:90px;height:90px;transform:rotate(0deg)"><svg viewBox="0 0 100 100"><path d="M50 4 C54 40 60 46 96 50 C60 54 54 60 50 96 C46 60 40 54 4 50 C40 46 46 40 50 4Z" fill="#2fc59a" stroke="#1b1a1f" stroke-width="5" stroke-linejoin="round"/></svg></div><div id="c13-d3" class="dd" style="position:absolute;left:140px;top:620px;width:70px;height:70px;transform:rotate(0deg)"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="#59b6ff" stroke="#1b1a1f" stroke-width="6"/></svg></div><div id="c13-d4" class="dd" style="position:absolute;left:300px;top:420px;width:144px;height:54px;transform:rotate(8deg)"><svg viewBox="0 0 160 60"><path d="M8 40 C28 6 48 6 58 30 C68 54 88 54 98 30 C108 6 128 6 152 30" fill="none" stroke="#1b1a1f" stroke-width="12" stroke-linecap="round"/></svg></div><div id="c13-d5" class="dd" style="position:absolute;left:1480px;top:440px;width:70px;height:70px;transform:rotate(18deg)"><svg viewBox="0 0 100 100"><path d="M50 6 61 38 95 38 67 58 78 92 50 71 22 92 33 58 5 38 39 38Z" fill="#7a5cff" stroke="#1b1a1f" stroke-width="6" stroke-linejoin="round"/></svg></div>
+      <div id="c13-big" class="big">Come strike a pose!</div>
+      <div id="c13-pill" class="pill"><span>Find the photo booth at Open House</span></div>
+      <div id="c13-crew" class="crew"><div style="position:absolute;left:0;top:0;width:1920px;height:1080px;transform:scale(0.625);transform-origin:0 0"><img src="assets/v2/crew.svg" alt="" style="width:1920px;height:1080px"><img id="c13-party-N" class="av" src="assets/oh/avatars/party-hat.svg" alt="" style="left:503px;top:240px;width:114px;height:148px;transform-origin:50% 100%"><img id="c13-party-R" class="av" src="assets/oh/avatars/party-hat.svg" alt="" style="left:903px;top:204px;width:114px;height:148px;transform-origin:50% 100%"><img id="c13-party-M" class="av" src="assets/oh/avatars/party-hat.svg" alt="" style="left:1303px;top:248px;width:114px;height:148px;transform-origin:50% 100%"></div></div>
+      <div id="c13-logo" class="logo"><img src="assets/oh/sp-dsac-logo.png" alt=""></div>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      tl.set($("c13-logo"), { opacity: 0 }, 0);
+      // 0.00 — the line slams in; the pill springs up; the crew pops up from below in party hats; doodles burst.
+      OH.slam(tl, $("c13-big"), 0.05, { from: 2.8, rot: -5, dur: 0.6 });
+      tl.fromTo($("c13-pill"), { y: 200, opacity: 0, scaleY: 1.4 }, { y: 0, opacity: 1, scaleY: 1, duration: 0.55, ease: E.back }, 0.6);
+      tl.fromTo($("c13-crew"), { y: 700 }, { y: 0, duration: 0.7, ease: E.back }, 0.9);
+      const dd = Array.from(document.querySelectorAll('[data-composition-id="c13"] .dd'));
+      OH.pop(tl, dd, 1.1, { stagger: 0.06 });
+      dd.forEach((d, i) => tl.fromTo(d, { rotation: 0 }, { rotation: i % 2 ? 60 : -60, duration: 6, ease: "none", immediateRender: false }, 1.6));
+      // 2.20 and 3.20 — the crew bounces to the beat; a wave runs through the line.
+      [2.2, 3.2].forEach((t) => {
+        tl.fromTo($("c13-crew"), { y: 0, scaleY: 1 }, { y: -50, scaleY: 1.04, duration: 0.18, ease: E.out, immediateRender: false }, t);
+        tl.fromTo($("c13-crew"), { y: -50, scaleY: 1.04 }, { y: 0, scaleY: 1, duration: 0.3, ease: E.drop, immediateRender: false }, t + 0.18);
+      });
+      OH.split($("c13-big")).forEach((c, i) => {
+        tl.fromTo(c, { y: 0 }, { y: -40, duration: 0.16, ease: E.out, immediateRender: false }, 2.6 + i * 0.03);
+        tl.fromTo(c, { y: -40 }, { y: 0, duration: 0.4, ease: E.back, immediateRender: false }, 2.76 + i * 0.03);
+      });
+      // 4.60 — everything pops away except the logo, which pops in on its own sticker; 7.30 a plain fade.
+      OH.unpop(tl, [$("c13-big"), $("c13-pill"), ...dd], 4.6, { stagger: 0.03 });
+      tl.fromTo($("c13-crew"), { y: 0 }, { y: 800, duration: 0.5, ease: E.in, immediateRender: false }, 4.6);
+      OH.pop(tl, $("c13-logo"), 5.0, { rot: -8, dur: 0.6 });
+      tl.fromTo($("c13-logo"), { opacity: 1 }, { opacity: 0, duration: 0.6, ease: "none", immediateRender: false }, 7.3);
+      tl.fromTo($("c13-ground"), { opacity: 1 }, { opacity: 0, duration: 0.6, ease: "none", immediateRender: false }, 7.3);
+
+      tl.set({}, {}, 8.0);
+      window.__timelines["c13"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

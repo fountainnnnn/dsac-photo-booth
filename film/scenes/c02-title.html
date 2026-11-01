@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c02"] .t1 { position: absolute; left: 0; top: 250px; width: 1920px; text-align: center; font-size: 250px; line-height: 250px; font-weight: 900; letter-spacing: -0.05em; color: #ff4b3e; text-shadow: 10px 10px 0 #1b1a1f; transform-origin: 960px 125px; }
+    [data-composition-id="c02"] .t2 { position: absolute; left: 0; top: 520px; width: 1920px; text-align: center; font-size: 250px; line-height: 250px; font-weight: 900; letter-spacing: -0.05em; color: #fff; -webkit-text-stroke: 14px #1b1a1f; paint-order: stroke fill; text-shadow: 10px 10px 0 #1b1a1f; transform-origin: 960px 125px; }
+    [data-composition-id="c02"] .by { position: absolute; left: 0; top: 858px; width: 1920px; display: flex; justify-content: center; }
+    [data-composition-id="c02"] .by span { height: 84px; padding: 0 44px; display: flex; align-items: center; border-radius: 42px; background: #1b1a1f; color: #fff4e3; font-size: 38px; font-weight: 800; white-space: nowrap; }
+    [data-composition-id="c02"] .dd { transform-origin: 50% 50%; }
+  </style>
+  <div id="c02-root" class="oh" data-composition-id="c02" data-width="1920" data-height="1080" data-duration="7.0">
+    <div id="c02-ground" class="oh-ground clip" data-start="0" data-duration="7.0" data-track-index="0" style="background:#ffd23f"></div>
+    <div id="c02-world" class="oh-world">
+
+      <div id="c02-t1" class="t1">OPEN HOUSE</div>
+      <div id="c02-t2" class="t2">PHOTO BOOTH</div>
+      <div id="c02-by" class="by"><span>by SP Data Science &amp; Analytics Centre</span></div>
+      <div id="c02-d0" class="dd" style="position:absolute;left:190px;top:150px;width:130px;height:130px;transform:rotate(-12deg)"><svg viewBox="0 0 100 100"><path d="M50 6 61 38 95 38 67 58 78 92 50 71 22 92 33 58 5 38 39 38Z" fill="#ff4b3e" stroke="#1b1a1f" stroke-width="6" stroke-linejoin="round"/></svg></div><div id="c02-d1" class="dd" style="position:absolute;left:1600px;top:120px;width:120px;height:120px;transform:rotate(8deg)"><svg viewBox="0 0 100 100"><path d="M50 6 89 28 89 72 50 94 11 72 11 28Z" fill="#12817b" stroke="#1b1a1f" stroke-width="6" stroke-linejoin="round"/></svg></div><div id="c02-d2" class="dd" style="position:absolute;left:1500px;top:820px;width:176px;height:66px;transform:rotate(-10deg)"><svg viewBox="0 0 160 60"><path d="M8 40 C28 6 48 6 58 30 C68 54 88 54 98 30 C108 6 128 6 152 30" fill="none" stroke="#1b1a1f" stroke-width="12" stroke-linecap="round"/></svg></div><div id="c02-d3" class="dd" style="position:absolute;left:260px;top:760px;width:90px;height:90px;transform:rotate(0deg)"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="#59b6ff" stroke="#1b1a1f" stroke-width="6"/></svg></div><div id="c02-d4" class="dd" style="position:absolute;left:1730px;top:720px;width:110px;height:110px;transform:rotate(0deg)"><svg viewBox="0 0 100 100"><path d="M50 4 C54 40 60 46 96 50 C60 54 54 60 50 96 C46 60 40 54 4 50 C40 46 46 40 50 4Z" fill="#fff4e3" stroke="#1b1a1f" stroke-width="5" stroke-linejoin="round"/></svg></div><div id="c02-d5" class="dd" style="position:absolute;left:110px;top:470px;width:80px;height:80px;transform:rotate(20deg)"><svg viewBox="0 0 100 100"><path d="M50 6 89 28 89 72 50 94 11 72 11 28Z" fill="#ff8fc1" stroke="#1b1a1f" stroke-width="6" stroke-linejoin="round"/></svg></div><div id="c02-d6" class="dd" style="position:absolute;left:1420px;top:110px;width:80px;height:80px;transform:rotate(14deg)"><svg viewBox="0 0 100 100"><path d="M50 6 61 38 95 38 67 58 78 92 50 71 22 92 33 58 5 38 39 38Z" fill="#2fc59a" stroke="#1b1a1f" stroke-width="6" stroke-linejoin="round"/></svg></div><div id="c02-d7" class="dd" style="position:absolute;left:470px;top:120px;width:80px;height:80px;transform:rotate(0deg)"><svg viewBox="0 0 100 100"><path d="M50 4 C54 40 60 46 96 50 C60 54 54 60 50 96 C46 60 40 54 4 50 C40 46 46 40 50 4Z" fill="#7a5cff" stroke="#1b1a1f" stroke-width="5" stroke-linejoin="round"/></svg></div>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      // 0.05 / 0.40 — both lines slam down from the camera (hold, then snap) while the lens opens.
+      OH.slam(tl, $("c02-t1"), 0.05, { from: 3.2, rot: -7, dur: 0.6 });
+      OH.slam(tl, $("c02-t2"), 0.4, { from: 3.2, rot: 6, dur: 0.6 });
+      // 0.95 — doodles pop around them, then keep turning slowly.
+      const dd = Array.from(document.querySelectorAll('[data-composition-id="c02"] .dd'));
+      OH.pop(tl, dd, 0.95, { stagger: 0.06, dur: 0.5 });
+      dd.forEach((d, i) => tl.fromTo(d, { rotation: 0 }, { rotation: i % 2 ? 50 : -50, duration: 5, ease: "none", immediateRender: false }, 1.5));
+      // 1.70 — the credit line springs up from below.
+      tl.fromTo($("c02-by"), { y: 220, scaleY: 1.4, opacity: 0 }, { y: 0, scaleY: 1, opacity: 1, duration: 0.55, ease: E.back }, 1.7);
+      // 2.60 / 3.30 — a wave runs through each line.
+      [["c02-t1", 2.6], ["c02-t2", 3.3]].forEach(([id, t]) => OH.split($(id)).forEach((c, i) => {
+        tl.fromTo(c, { y: 0, scaleY: 1 }, { y: -60, scaleY: 1.12, duration: 0.18, ease: E.out, immediateRender: false }, t + i * 0.035);
+        tl.fromTo(c, { y: -60, scaleY: 1.12 }, { y: 0, scaleY: 1, duration: 0.45, ease: E.back, immediateRender: false }, t + 0.18 + i * 0.035);
+      }));
+      // 4.80 — the title squashes and springs (a beat on the music), then drifts toward the stripes.
+      [["c02-t1"], ["c02-t2"]].forEach(([id], k) => {
+        tl.fromTo($(id), { scaleX: 1, scaleY: 1 }, { scaleX: 1.06, scaleY: 0.86, duration: 0.1, ease: E.in, immediateRender: false }, 4.8 + k * 0.08);
+        tl.fromTo($(id), { scaleX: 1.06, scaleY: 0.86 }, { scaleX: 1, scaleY: 1, duration: 0.5, ease: E.pop, immediateRender: false }, 4.9 + k * 0.08);
+      });
+      tl.fromTo($("c02-world"), { scale: 1 }, { scale: 1.06, duration: 7, ease: "none", immediateRender: false }, 0);
+
+      tl.set({}, {}, 7.0);
+      window.__timelines["c02"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

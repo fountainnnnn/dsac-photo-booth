@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* Say cheese (the capture screen's own heading): the rail's red shutter is tapped, the 3-second countdown runs on
+       the stage (the app's dark translucent disc), the flash, and the photo is taken. Beach and crowns carried over.
+       Fixed geometry (frame px). Line as s04. Frame at (190, 280) (internals as s04): centre (720, 611). Panel 440
+       wide at (1290, 345), 60 padding → content 1350–1670: "Capture" 40/52 at 405–457 · shutter 216 + a 12 white
+       ring (240) at 497–737, centre (1510, 617) · "Frame: Doodle" 30/40 at 777–817. Panel 532 tall, centred on
+       611. Union 190–1730 → centre 960. Countdown disc 260 at the frame centre (530, 331 in the frame). */
+    [data-composition-id="s07"] .s07-line { position: absolute; left: 0; top: 90px; width: 1920px; line-height: 104px; white-space: nowrap; }
+    [data-composition-id="s07"] .s07-frame { position: absolute; left: 190px; top: 280px; width: 1060px; height: 663px; border-radius: 24px; overflow: hidden; background: #fff;
+      box-shadow: var(--ui-shadow-stage); transform-origin: 50% 50%; }
+    [data-composition-id="s07"] .s07-cam { position: absolute; left: 76px; top: 88px; width: 907px; height: 511px; overflow: hidden; background: #dcd8d0; }
+    [data-composition-id="s07"] .s07-art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform: scale(0.4727); transform-origin: 0 0; }
+    [data-composition-id="s07"] .s07-art > img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="s07"] .s07-art > .s07-crown { width: 177px; height: 118px; }
+    [data-composition-id="s07"] .s07-artwork { position: absolute; left: 0; top: 0; width: 1060px; height: 663px; }
+    [data-composition-id="s07"] .s07-flash { position: absolute; left: 0; top: 0; width: 1060px; height: 663px; background: #fff; opacity: 0; }
+
+    [data-composition-id="s07"] .s07-count { position: absolute; left: 400px; top: 201px; width: 260px; height: 260px; border-radius: 50%; background: rgba(0, 0, 0, 0.45);
+      border: 2px solid rgba(255, 255, 255, 0.2); opacity: 0; transform-origin: 50% 50%; }
+    [data-composition-id="s07"] .s07-n { position: absolute; left: 0; top: 0; width: 256px; height: 256px; display: flex; align-items: center; justify-content: center;
+      font-size: 160px; font-weight: 500; color: #fff; font-variant-numeric: tabular-nums; opacity: 0; }
+
+    [data-composition-id="s07"] .s07-panel { position: absolute; left: 1290px; top: 345px; width: 440px; height: 532px; padding: 60px; background: #fff; border-radius: 48px; color: var(--ink);
+      box-shadow: var(--ui-shadow-stage); }
+    [data-composition-id="s07"] .s07-title { height: 52px; font-size: 40px; line-height: 52px; font-weight: 600; text-align: center; white-space: nowrap; }
+    [data-composition-id="s07"] .s07-shutter { margin: 52px auto 0; width: 216px; height: 216px; border-radius: 50%; background: var(--ui-accent); display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 0 12px #fff, 0 20px 60px -16px rgba(225, 38, 47, 0.55); transform-origin: 50% 50%; }
+    [data-composition-id="s07"] .s07-shutter svg { width: 80px; height: 80px; }
+    [data-composition-id="s07"] .s07-meta { margin-top: 52px; height: 40px; font-size: 30px; line-height: 40px; text-align: center; color: #8b8993; white-space: nowrap; }
+    [data-composition-id="s07"] .s07-meta b { font-weight: 600; color: var(--ink); }
+
+    [data-composition-id="s07"] .s07-finger { position: absolute; left: 0; top: 0; z-index: 5; width: 76px; height: 76px; border-radius: 50%; background: rgba(23, 22, 26, 0.16);
+      border: 2px solid rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 1.5px rgba(23, 22, 26, 0.16), 0 8px 22px rgba(0, 0, 0, 0.2); opacity: 0; transform-origin: 50% 50%; }
+    [data-composition-id="s07"] .s07-ripple { position: absolute; z-index: 4; width: 76px; height: 76px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.6); opacity: 0; transform-origin: 50% 50%; }
+  </style>
+
+  <div id="s07-root" class="rk-scene on-stage" data-composition-id="s07" data-width="1920" data-height="1080" data-duration="4.5" data-qa-center="x">
+    <div id="s07-ground" class="rk-ground is-stage clip" data-start="0" data-duration="4.5" data-track-index="0"></div>
+    <div id="s07-world" class="rk-world" data-qa-camera>
+      <div id="s07-line" class="s07-line t-title">Say cheese.</div>
+
+      <div id="s07-frame" class="s07-frame" data-qa="box">
+        <div class="s07-cam">
+          <div class="s07-art">
+            <img src="assets/oh/beach.svg" alt="">
+            <img src="assets/oh/guests.svg" alt="">
+            <img class="s07-crown" src="assets/oh/avatars/crown.svg" alt="" style="left: 654px; top: 350px">
+            <img class="s07-crown" src="assets/oh/avatars/crown.svg" alt="" style="left: 1088px; top: 326px">
+          </div>
+        </div>
+        <img class="s07-artwork" src="assets/oh/frame-doodle.png" alt="">
+        <div id="s07-count" class="s07-count" data-qa-ignore>
+          <span id="s07-n3" class="s07-n">3</span><span id="s07-n2" class="s07-n">2</span><span id="s07-n1" class="s07-n">1</span>
+        </div>
+        <div id="s07-flash" class="s07-flash" data-qa-ignore></div>
+      </div>
+
+      <div id="s07-panel" class="s07-panel" data-qa="box">
+        <p class="s07-title">Capture</p>
+        <div id="s07-shutter" class="s07-shutter" data-qa="box">
+          <svg viewBox="0 0 256 256" aria-hidden="true"><path fill="#fff" d="M208 56h-27.7l-13.6-20.4A8 8 0 0 0 160 32H96a8 8 0 0 0-6.7 3.6L75.7 56H48a24 24 0 0 0-24 24v112a24 24 0 0 0 24 24h160a24 24 0 0 0 24-24V80a24 24 0 0 0-24-24Zm-80 132a44 44 0 1 1 44-44 44 44 0 0 1-44 44Z"/></svg>
+        </div>
+        <p class="s07-meta">Frame: <b>Doodle</b></p>
+      </div>
+
+      <i id="s07-rp0" class="s07-ripple" data-qa-ignore style="left: 1472px; top: 579px"></i>
+      <i id="s07-finger" class="s07-finger" data-qa-ignore></i>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+      const F = $("s07-finger"), FR = 38;
+      const at = (x, y) => ({ x: x - FR, y: y - FR });
+      tl.set([$("s07-n3"), $("s07-n2"), $("s07-n1")], { opacity: 0 }, 0);
+
+      // 0.00 — "Say cheese." builds as the zoom settles.
+      RK.words(tl, $("s07-line"), 0.0, { stagger: 0.08 });
+
+      // 0.40 — a fingertip comes down on the shutter; 0.70 tap (click sfx): it presses in.
+      tl.fromTo(F, at(1580, 700), { ...at(1510, 617), duration: 0.28, ease: RK.E.io, immediateRender: false }, 0.4);
+      tl.fromTo(F, { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.24, ease: RK.E.out, immediateRender: false }, 0.4);
+      tl.fromTo(F, { scale: 1 }, { scale: 0.82, duration: 0.08, ease: RK.E.in, immediateRender: false }, 0.67);
+      tl.fromTo(F, { scale: 0.82 }, { scale: 1, duration: 0.14, ease: RK.E.out, immediateRender: false }, 0.77);
+      tl.fromTo($("s07-rp0"), { scale: 0.9, opacity: 0.8 }, { scale: 1.9, opacity: 0, duration: 0.5, ease: RK.E.out, immediateRender: false }, 0.7);
+      RK.press(tl, $("s07-shutter"), 0.68);
+      tl.fromTo(F, { opacity: 1, scale: 1 }, { opacity: 0, scale: 1.12, duration: 0.2, ease: RK.E.out, immediateRender: false }, 0.95);
+
+      // 0.85 — the countdown disc appears over the stage: 3 · 2 · 1, one every 0.55s.
+      tl.fromTo($("s07-count"), { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.25, ease: RK.E.out, immediateRender: false }, 0.85);
+      const nums = [$("s07-n3"), $("s07-n2"), $("s07-n1")];
+      nums.forEach((n, i) => {
+        const t = 0.85 + i * 0.55;
+        tl.fromTo(n, { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.2, ease: RK.E.out, immediateRender: false }, t);
+        if (i < 2) tl.fromTo(n, { opacity: 1 }, { opacity: 0, duration: 0.12, ease: RK.E.in, immediateRender: false }, t + 0.45);
+      });
+
+      // 2.50 — the flash: the disc goes, the stage blinks white and the photo is taken (shutter sfx).
+      tl.fromTo($("s07-count"), { opacity: 1 }, { opacity: 0, duration: 0.08, immediateRender: false }, 2.5);
+      tl.fromTo($("s07-flash"), { opacity: 0 }, { opacity: 0.9, duration: 0.06, ease: RK.E.out, immediateRender: false }, 2.5);
+      tl.fromTo($("s07-flash"), { opacity: 0.9 }, { opacity: 0, duration: 0.45, ease: RK.E.out, immediateRender: false }, 2.58);
+      tl.fromTo($("s07-frame"), { scale: 1 }, { scale: 0.985, duration: 0.1, ease: RK.E.in, immediateRender: false }, 2.5);
+      tl.fromTo($("s07-frame"), { scale: 0.985 }, { scale: 1, duration: 0.5, ease: RK.E.out, immediateRender: false }, 2.6);
+
+      // Slow push-in over the whole scene.
+      tl.fromTo($("s07-world"), { scale: 1 }, { scale: 1.03, duration: 4.5, ease: "none", transformOrigin: "720px 600px" }, 0);
+      window.__timelines["s07"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

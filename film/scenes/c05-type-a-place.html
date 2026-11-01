@@ -1,0 +1,161 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c05"] .stage { position: absolute; left: 110px; top: 262px; width: 1180px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 60%; }
+    [data-composition-id="c05"] .cam { position: absolute; left: 84px; top: 98px; width: 1010px; height: 568px; overflow: hidden; background: #d8d4cc; }
+    [data-composition-id="c05"] .art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform: scale(0.526); transform-origin: 0 0; }
+    [data-composition-id="c05"] .art .lay { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c05"] .art .lay > img.full { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c05"] .av { position: absolute; }
+    [data-composition-id="c05"] .frm { position: absolute; left: 0; top: 0; width: 1180px; height: 738px; }
+    [data-composition-id="c05"] .rail { position: absolute; left: 1330px; top: 262px; width: 480px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 50%; }
+    [data-composition-id="c05"] .rail > * { position: absolute; }
+    [data-composition-id="c05"] .r-label { left: 40px; font-size: 32px; line-height: 40px; font-weight: 700; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c05"] .r-note { left: 40px; font-size: 28px; line-height: 36px; color: #5f5d68; white-space: nowrap; }
+    [data-composition-id="c05"] .r-input { left: 40px; width: 400px; height: 84px; padding: 0 20px; display: flex; align-items: center; border-radius: 22px; box-shadow: inset 0 0 0 3px #e6e4e9; font-size: 28px; white-space: nowrap; background: #fff; color: #17161a; }
+    [data-composition-id="c05"] .r-input .ph { color: #7d7b86; }
+    [data-composition-id="c05"] .r-btn { left: 40px; width: 400px; height: 84px; border-radius: 22px; background: #17161a; color: #fff; font-size: 30px; font-weight: 700; transform-origin: 50% 50%; }
+    [data-composition-id="c05"] .r-btn > span { position: absolute; left: 0; top: 0; width: 400px; height: 84px; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+    [data-composition-id="c05"] .caret { display: inline-block; width: 3px; height: 34px; margin-left: 2px; background: #17161a; border-radius: 2px; vertical-align: middle; }
+    [data-composition-id="c05"] .bt { position: absolute; width: 190px; height: 146px; border-radius: 22px; overflow: hidden; background: #fff; }
+    [data-composition-id="c05"] .bt img { position: absolute; left: 5px; top: 5px; width: 180px; height: 101px; border-radius: 16px; object-fit: cover; }
+    [data-composition-id="c05"] .bt span { position: absolute; left: 0; top: 106px; width: 190px; height: 40px; font-size: 28px; line-height: 40px; font-weight: 700; text-align: center; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c05"] .at { position: absolute; width: 120px; height: 120px; border-radius: 22px; background: #fff; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    [data-composition-id="c05"] .at img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    [data-composition-id="c05"] .ring { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 6px solid #e1262f; border-radius: 22px; }
+    [data-composition-id="c05"] .cur { position: absolute; left: -5px; top: -3px; width: 52px; height: 72px; z-index: 60; transform-origin: 5px 3px; filter: drop-shadow(4px 5px 0 rgba(27,26,31,0.35)); }
+    [data-composition-id="c05"] .bub { position: absolute; padding: 0 40px; height: 100px; display: flex; align-items: center; background: #fff; border-radius: 50px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 52px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; transform-origin: 20% 100%; }
+    [data-composition-id="c05"] .hd { position: absolute; left: 110px; top: 92px; font-size: 112px; line-height: 120px; font-weight: 900; letter-spacing: -0.045em; white-space: nowrap; }
+    [data-composition-id="c05"] .hd.lt { color: #fff; -webkit-text-stroke: 10px #1b1a1f; paint-order: stroke fill; }
+    [data-composition-id="c05"] .hd .hi { color: #ffd23f; }
+    [data-composition-id="c05"] .sticker { position: absolute; padding: 0 36px; height: 84px; display: flex; align-items: center; gap: 18px; background: #fff; border-radius: 48px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 38px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; color: #1b1a1f; z-index: 30; }
+    [data-composition-id="c05"] .tag { position: absolute; height: 72px; padding: 0 30px; display: flex; align-items: center; border-radius: 36px; background: #1b1a1f; color: #fff; font-size: 36px; font-weight: 900; letter-spacing: 0.04em; white-space: nowrap; z-index: 30; }
+    [data-composition-id="c05"] .watch { position: absolute; left: 1000px; top: 380px; width: 200px; height: 250px; transform-origin: 50% 40%; z-index: 30; }
+    [data-composition-id="c05"] .watch svg { width: 200px; height: 200px; }
+    [data-composition-id="c05"] .watch span { position: absolute; left: 10px; top: 196px; width: 180px; height: 52px; line-height: 52px; border-radius: 26px; background: #fff; box-shadow: 0 0 0 5px #1b1a1f; text-align: center; font-size: 30px; font-weight: 900; color: #1b1a1f; white-space: nowrap; }
+    [data-composition-id="c05"] #c05-wh { transform-origin: 100px 108px; }
+  </style>
+  <div id="c05-root" class="oh" data-composition-id="c05" data-width="1920" data-height="1080" data-duration="14.0">
+    <div id="c05-ground" class="oh-ground clip" data-start="0" data-duration="14.0" data-track-index="0" style="background:#7a5cff"></div>
+    <div id="c05-world" class="oh-world">
+
+      <div id="c05-hd" class="hd lt">Or type <span class="hi">any</span> place.</div>
+      <div id="c05-hd2" class="hd lt">Type as many as you like.</div>
+      <div id="c05-stage" class="stage"><div class="cam"><div class="art"><div id="c05-b0" class="lay"><img class="full" src="assets/oh/backgrounds/neon.svg" alt=""></div><div id="c05-b1" class="lay" style="opacity:0"><img class="full" src="assets/v2/undersea.svg" alt=""></div><div id="c05-b2" class="lay" style="opacity:0"><img class="full" src="assets/v2/snow.svg" alt=""></div><div id="c05-b3" class="lay" style="opacity:0"><img class="full" src="assets/v2/candy.svg" alt=""></div><div id="c05-crew" class="lay"><img class="full" src="assets/v2/crew.svg" alt=""></div></div></div><img class="frm" src="assets/oh/frame-doodle.png" alt=""></div>
+      <div id="c05-rail" class="rail">
+        <p class="r-label" style="top:36px">Background</p>
+        <div id="c05-in" class="r-input" style="top:92px"><span id="c05-ph" class="ph">Where do you want to be?</span><div id="c05-w1" style="position:absolute;left:20px;top:0;height:84px;display:flex;align-items:center;opacity:0"><span id="c05-t1"></span><i id="c05-k1" class="caret" style="opacity:0"></i></div><div id="c05-w2" style="position:absolute;left:20px;top:0;height:84px;display:flex;align-items:center;opacity:0"><span id="c05-t2"></span><i id="c05-k2" class="caret" style="opacity:0"></i></div><div id="c05-w3" style="position:absolute;left:20px;top:0;height:84px;display:flex;align-items:center;opacity:0"><span id="c05-t3"></span><i id="c05-k3" class="caret" style="opacity:0"></i></div></div>
+        <div id="c05-btn" class="r-btn" style="top:196px;opacity:0.4"><span id="c05-go">Make it</span><span id="c05-busy" style="opacity:0">Making your background…</span><span id="c05-go2" style="opacity:0">Make it</span></div>
+        <p class="r-note" style="top:300px">What you type is sent to<br>an online image service.</p>
+        <div id="c05-g1" style="position:absolute;left:0;top:0;width:480px;height:738px"><div id="c05-t-studio" class="bt" style="left:40px;top:400px"><img src="assets/oh/backgrounds/studio.svg" alt=""><span>Studio</span><i id="c05-r-studio" class="ring" style="opacity:0"></i></div><div id="c05-t-sunset" class="bt" style="left:250px;top:400px"><img src="assets/oh/backgrounds/sunset.svg" alt=""><span>Sunset</span><i id="c05-r-sunset" class="ring" style="opacity:0"></i></div><div id="c05-t-space" class="bt" style="left:40px;top:560px"><img src="assets/oh/backgrounds/space.svg" alt=""><span>Space</span><i id="c05-r-space" class="ring" style="opacity:0"></i></div><div id="c05-t-neon" class="bt" style="left:250px;top:560px"><img src="assets/oh/backgrounds/neon.svg" alt=""><span>Neon</span><i id="c05-r-neon" class="ring"></i></div></div>
+        <div id="c05-g2" style="position:absolute;left:0;top:0;width:480px;height:738px;opacity:0"><div id="c05-t-yours" class="bt" style="left:40px;top:400px"><img src="assets/v2/undersea.svg" alt=""><img id="c05-y2" src="assets/v2/snow.svg" alt="" style="opacity:0"><img id="c05-y3" src="assets/v2/candy.svg" alt="" style="opacity:0"><span>Yours</span><i class="ring"></i></div><div id="c05x-t-studio" class="bt" style="left:250px;top:400px"><img src="assets/oh/backgrounds/studio.svg" alt=""><span>Studio</span><i id="c05x-r-studio" class="ring" style="opacity:0"></i></div><div id="c05x-t-sunset" class="bt" style="left:40px;top:560px"><img src="assets/oh/backgrounds/sunset.svg" alt=""><span>Sunset</span><i id="c05x-r-sunset" class="ring" style="opacity:0"></i></div><div id="c05x-t-space" class="bt" style="left:250px;top:560px"><img src="assets/oh/backgrounds/space.svg" alt=""><span>Space</span><i id="c05x-r-space" class="ring" style="opacity:0"></i></div></div>
+      </div>
+      <div id="c05-watch" class="watch"><svg viewBox="0 0 200 200"><circle cx="100" cy="108" r="78" fill="#fff" stroke="#1b1a1f" stroke-width="10"/><rect x="84" y="8" width="32" height="22" rx="6" fill="#1b1a1f"/><circle id="c05-wr" cx="100" cy="108" r="60" fill="none" stroke="#ff4b3e" stroke-width="22" stroke-dasharray="377" stroke-dashoffset="377" transform="rotate(-90 100 108)"/><line id="c05-wh" x1="100" y1="108" x2="100" y2="56" stroke="#1b1a1f" stroke-width="10" stroke-linecap="round"/><circle cx="100" cy="108" r="9" fill="#1b1a1f"/></svg><span>about 5 s</span></div>
+      <div id="c05-call" class="sticker" style="left:230px;top:962px">Your faces stay real. Only the place is drawn.</div>
+      <svg id="c05-cur" class="cur" viewBox="0 0 32 44"><path d="M3 2 28 24 17 25 23 40 17 43 11 27 3 34Z" fill="#fff" stroke="#1b1a1f" stroke-width="2.6" stroke-linejoin="round"/></svg>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      const cur = $("c05-cur");
+      tl.set(cur, { opacity: 0 }, 0);
+      const mv = (a, b, t, d = 0.45, click = true) => {
+        tl.fromTo(cur, { x: a[0], y: a[1] }, { x: b[0], y: b[1], duration: d, ease: E.io, immediateRender: false }, t);
+        if (click) { tl.fromTo(cur, { scale: 1 }, { scale: 0.78, duration: 0.07, ease: E.in, immediateRender: false }, t + d);
+          tl.fromTo(cur, { scale: 0.78 }, { scale: 1, duration: 0.3, ease: E.back, immediateRender: false }, t + d + 0.08); }
+        return t + d;
+      };
+      const curIn = (t) => tl.fromTo(cur, { opacity: 0 }, { opacity: 1, duration: 0.15, immediateRender: false }, t);
+      const curOut = (t) => tl.fromTo(cur, { opacity: 1 }, { opacity: 0, duration: 0.2, immediateRender: false }, t);
+
+      // Typing helper: wrapper n shows, its text types out with a caret that blinks after.
+      const typeIn = (n, text, t, cps) => {
+        tl.set($("c05-w" + n), { opacity: 1 }, t);
+        const end = OH.type(tl, $("c05-t" + n), text, t, { cps });
+        tl.set($("c05-k" + n), { opacity: 1 }, t);
+        for (let k = 0; k < 4; k++) tl.set($("c05-k" + n), { opacity: k % 2 ? 1 : 0 }, end + 0.25 + k * 0.4);
+        return end;
+      };
+      const typeOut = (n, t) => tl.set($("c05-w" + n), { opacity: 0 }, t);
+
+      // The stopwatch: pops on, its ring fills and its hand sweeps (time compressed), pops off.
+      const watch = (t, d) => {
+        OH.pop(tl, $("c05-watch"), t, { dur: 0.45, rot: -20 });
+        tl.fromTo($("c05-wr"), { strokeDashoffset: 377 }, { strokeDashoffset: 0, duration: d, ease: E.io, immediateRender: false }, t + 0.1);
+        tl.fromTo($("c05-wh"), { rotation: 0 }, { rotation: 720, duration: d, ease: E.io, immediateRender: false }, t + 0.1);
+        OH.unpop(tl, $("c05-watch"), t + d + 0.15);
+      };
+      tl.set($("c05-watch"), { opacity: 0 }, 0);
+
+      // 0.00 — the strip clears; the screen settles from a little lift, the heading bounces up.
+      tl.fromTo([$("c05-stage"), $("c05-rail")], { y: 50 }, { y: 0, duration: 0.6, ease: E.back }, 0.0);
+      tl.set($("c05-hd2"), { opacity: 0 }, 0);
+      OH.bounce(tl, $("c05-hd"), 0.25, { stagger: 0.035 });
+      // 1.00 — click into the box (it takes an ink outline), type "under the sea".
+      curIn(0.95); mv([1900, 1100], [1570, 396], 0.95, 0.5);
+      tl.fromTo($("c05-in"), { boxShadow: "inset 0 0 0 3px #e6e4e9" }, { boxShadow: "inset 0 0 0 5px #17161a", duration: 0.12, immediateRender: false }, 1.47);
+      tl.set($("c05-ph"), { opacity: 0 }, 1.6);
+      const e1 = typeIn(1, "under the sea", 1.6, 14);
+      tl.fromTo($("c05-btn"), { opacity: 0.4 }, { opacity: 1, duration: 0.15, immediateRender: false }, 1.65);
+      // 2.75 — Make it: the button greys and reads "Making your background…" while the image is drawn (~5 s,
+      // compressed here under a stopwatch).
+      mv([1570, 396], [1570, 500], 2.45, 0.3);
+      OH.press(tl, $("c05-btn"), 2.75);
+      tl.fromTo($("c05-btn"), { opacity: 1 }, { opacity: 0.4, duration: 0.15, immediateRender: false }, 2.8);
+      tl.set($("c05-go"), { opacity: 0 }, 2.8); tl.set($("c05-busy"), { opacity: 1 }, 2.8);
+      watch(2.9, 2.0);
+      tl.fromTo($("c05-crew"), { rotation: 0 }, { rotation: 0, duration: 0.01, immediateRender: false }, 2.9);
+      // 5.10 — the sea opens out of the middle of the picture (sparkle); the guests hop; "Yours" is chosen.
+      tl.set($("c05-b1"), { opacity: 1 }, 5.1);
+      tl.fromTo($("c05-b1"), { clipPath: "circle(0px at 960px 540px)" }, { clipPath: "circle(1200px at 960px 540px)", duration: 0.7, ease: E.whip, immediateRender: false }, 5.1);
+      tl.fromTo($("c05-crew"), { y: 0 }, { y: -80, duration: 0.2, ease: E.out, immediateRender: false }, 5.35);
+      tl.fromTo($("c05-crew"), { y: -80 }, { y: 0, duration: 0.32, ease: E.drop, immediateRender: false }, 5.55);
+      tl.set($("c05-busy"), { opacity: 0 }, 5.1); tl.set($("c05-go2"), { opacity: 1 }, 5.1);
+      tl.fromTo($("c05-btn"), { opacity: 0.4 }, { opacity: 1, duration: 0.15, immediateRender: false }, 5.1);
+      OH.unpop(tl, $("c05-g1"), 5.15, { dur: 0.2 });
+      OH.pop(tl, $("c05-g2"), 5.3, { dur: 0.45, rot: 0 });
+      // 5.90 — the callout: the guests are cut out on the laptop; only the place is drawn.
+      OH.pop(tl, $("c05-call"), 5.9, { rot: -6 });
+      OH.unpop(tl, $("c05-call"), 7.6);
+      // 7.80 — new heading; then two more places in quick succession (typing and drawing sped up).
+      OH.flyOut(tl, $("c05-hd"), 7.8);
+      tl.set($("c05-hd2"), { opacity: 1 }, 8.1);
+      OH.bounce(tl, $("c05-hd2"), 8.1, { stagger: 0.03 });
+      const quick = (n, text, t, layer, tile, from, to) => {
+        mv([1570, 500], [1570, 396], t, 0.25);
+        typeOut(n - 1, t + 0.3);
+        typeIn(n, text, t + 0.3, 34);
+        const tb = t + 0.3 + text.length / 34 + 0.12;
+        mv([1570, 396], [1570, 500], tb, 0.22);
+        OH.press(tl, $("c05-btn"), tb + 0.22);
+        tl.fromTo($("c05-btn"), { opacity: 1 }, { opacity: 0.4, duration: 0.1, immediateRender: false }, tb + 0.25);
+        tl.fromTo($("c05-btn"), { opacity: 0.4 }, { opacity: 1, duration: 0.1, immediateRender: false }, tb + 0.85);
+        const tr = tb + 0.85;
+        tl.set($("c05-" + layer), { opacity: 1 }, tr);
+        tl.fromTo($("c05-" + layer), { clipPath: from }, { clipPath: to, duration: 0.55, ease: E.whip, immediateRender: false }, tr);
+        tl.fromTo($("c05-" + tile), { opacity: 0 }, { opacity: 1, duration: 0.2, immediateRender: false }, tr + 0.3);
+        tl.fromTo($("c05-crew"), { scaleY: 1 }, { scaleY: 0.92, duration: 0.08, ease: E.in, transformOrigin: "960px 1080px", immediateRender: false }, tr + 0.2);
+        tl.fromTo($("c05-crew"), { scaleY: 0.92 }, { scaleY: 1, duration: 0.4, ease: E.pop, transformOrigin: "960px 1080px", immediateRender: false }, tr + 0.28);
+        return tr;
+      };
+      quick(2, "a snowy mountain", 8.7, "b2", "y2", "inset(0% 0% 100% 0%)", "inset(0% 0% 0% 0%)");
+      quick(3, "a candy land", 10.55, "b3", "y3", "circle(0px at 150px 950px)", "circle(2300px at 150px 950px)");
+      curOut(12.6);
+      tl.fromTo($("c05-world"), { scale: 1 }, { scale: 1.04, duration: 14, ease: "none", immediateRender: false }, 0);
+
+      tl.set({}, {}, 14.0);
+      window.__timelines["c05"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

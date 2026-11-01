@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* Scan to take it home: the QR screen (QrDownloadScreen), cropped to its two parts — the finished photo on the
+       stage band and the panel's "Your photo is ready / Scan to download." with the QR on its white bed. The logo,
+       the link-lifetime note and Retake/Done are left out at film scale. The QR is real (a fictional tunnel link).
+       Fixed geometry (frame px). Line as s04. Photo 1060×663 at (140, 280) (assets/oh/photo.png, the composed
+       Doodle-frame photo from s07). Panel 520 wide at (1260, 313), 60 padding → content 1320–1720:
+         eyebrow 30/40 at 373–413 · 12 · title 52/64 at 425–489 · 40 · QR 320 square at (1360, 529) → 529–849.
+       Panel 596 tall, centred on the photo's 611. Union 140–1780 → centre 960. */
+    [data-composition-id="s08"] .s08-line { position: absolute; left: 0; top: 90px; width: 1920px; line-height: 104px; white-space: nowrap; }
+    [data-composition-id="s08"] .s08-photo { position: absolute; left: 140px; top: 280px; width: 1060px; height: 663px; border-radius: 24px; overflow: hidden; box-shadow: var(--ui-shadow-stage); }
+    [data-composition-id="s08"] .s08-photo img { display: block; width: 1060px; height: 663px; }
+    [data-composition-id="s08"] .s08-panel { position: absolute; left: 1260px; top: 313px; width: 520px; height: 596px; padding: 60px; background: #fff; border-radius: 48px; color: var(--ink);
+      box-shadow: var(--ui-shadow-stage); }
+    [data-composition-id="s08"] .s08-eyebrow { height: 40px; font-size: 30px; line-height: 40px; font-weight: 600; color: #8b8993; text-align: center; white-space: nowrap; }
+    [data-composition-id="s08"] .s08-title { margin-top: 12px; height: 64px; font-size: 52px; line-height: 64px; font-weight: 600; letter-spacing: -0.02em; text-align: center; white-space: nowrap; }
+    [data-composition-id="s08"] .s08-title i { font-style: normal; color: var(--ui-accent); }
+    [data-composition-id="s08"] .s08-qr { position: relative; margin: 40px auto 0; width: 320px; height: 320px; }
+    [data-composition-id="s08"] .s08-qr img { display: block; width: 320px; height: 320px; }
+  </style>
+
+  <div id="s08-root" class="rk-scene on-stage" data-composition-id="s08" data-width="1920" data-height="1080" data-duration="4" data-qa-center="x">
+    <div id="s08-ground" class="rk-ground is-stage clip" data-start="0" data-duration="4" data-track-index="0"></div>
+    <div id="s08-world" class="rk-world" data-qa-camera>
+      <div id="s08-line" class="s08-line t-title">Scan to take it home.</div>
+      <div id="s08-photo" class="s08-photo" data-qa="box"><img src="assets/oh/photo.png" alt=""></div>
+      <div id="s08-panel" class="s08-panel" data-qa="box">
+        <p id="s08-eyebrow" class="s08-eyebrow">Your photo is ready</p>
+        <p id="s08-title" class="s08-title">Scan to download<i>.</i></p>
+        <div id="s08-qr" class="s08-qr" data-qa="box"><img src="assets/oh/qr.svg" alt=""></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+
+      // 0.00 — the line builds; the photo is already up (handed on from the flash), the panel rises beside it.
+      RK.words(tl, $("s08-line"), 0.0, { stagger: 0.07 });
+      RK.rise(tl, $("s08-panel"), 0.1, { y: 40, dur: 0.6, fade: 0.1 });
+      RK.rise(tl, [$("s08-eyebrow"), $("s08-title")], 0.3, { y: 12, dur: 0.5, stagger: 0.1 });
+      // 0.60 — the QR code draws in from the top, row by row.
+      tl.fromTo($("s08-qr"), { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.6, ease: RK.E.out, immediateRender: false }, 0.6);
+      tl.set($("s08-qr"), { clipPath: "inset(0% 0% 100% 0%)" }, 0);
+
+      // Slow push toward the QR, where the next scene's phone picks up.
+      tl.fromTo($("s08-world"), { scale: 1 }, { scale: 1.04, duration: 4, ease: "none", transformOrigin: "1520px 689px" }, 0);
+      window.__timelines["s08"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

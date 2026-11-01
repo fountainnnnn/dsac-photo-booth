@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c01"] .br { position: absolute; width: 150px; height: 150px; border: 0 solid #fff4e3; }
+    [data-composition-id="c01"] .num { position: absolute; left: 0; top: 300px; width: 1920px; text-align: center; font-size: 460px; line-height: 460px; font-weight: 900; color: #fff4e3; letter-spacing: -0.04em; transform-origin: 960px 230px; }
+    [data-composition-id="c01"] .rng { position: absolute; left: 760px; top: 340px; width: 400px; height: 400px; border-radius: 50%; border: 14px solid #ffd23f; opacity: 0; }
+    [data-composition-id="c01"] .rec { position: absolute; left: 560px; top: 300px; display: flex; align-items: center; gap: 16px; font-size: 40px; font-weight: 800; color: #fff4e3; letter-spacing: 0.08em; }
+    [data-composition-id="c01"] .rec i { width: 30px; height: 30px; border-radius: 50%; background: #ff4b3e; }
+    [data-composition-id="c01"] .say { position: absolute; left: 0; top: 420px; width: 1920px; text-align: center; font-size: 240px; line-height: 240px; font-weight: 900; letter-spacing: -0.045em; color: #ffd23f; }
+  </style>
+  <div id="c01-root" class="oh" data-composition-id="c01" data-width="1920" data-height="1080" data-duration="7.0">
+    <div id="c01-ground" class="oh-ground clip" data-start="0" data-duration="7.0" data-track-index="0" style="background:#1b1a1f"></div>
+    <div id="c01-world" class="oh-world">
+
+      <div id="c01-tl" class="br" style="left:510px;top:250px;border-top-width:16px;border-left-width:16px;border-top-left-radius:26px"></div>
+      <div id="c01-tr" class="br" style="left:1260px;top:250px;border-top-width:16px;border-right-width:16px;border-top-right-radius:26px"></div>
+      <div id="c01-bl" class="br" style="left:510px;top:680px;border-bottom-width:16px;border-left-width:16px;border-bottom-left-radius:26px"></div>
+      <div id="c01-brr" class="br" style="left:1260px;top:680px;border-bottom-width:16px;border-right-width:16px;border-bottom-right-radius:26px"></div>
+      <div id="c01-rec" class="rec"><i id="c01-dot"></i>REC</div>
+      <div id="c01-r3" class="rng"></div><div id="c01-r2" class="rng"></div><div id="c01-r1" class="rng"></div>
+      <div id="c01-n3" class="num">3</div><div id="c01-n2" class="num">2</div><div id="c01-n1" class="num">1</div>
+      <div id="c01-say" class="say">SAY CHEESE!</div>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      const B = [["c01-tl", -420, -260], ["c01-tr", 420, -260], ["c01-bl", -420, 260], ["c01-brr", 420, 260]];
+      // 0.00 — the viewfinder snaps in from the frame's corners (already moving on frame 0).
+      B.forEach(([id, dx, dy], i) => tl.fromTo($(id), { x: dx, y: dy, rotation: i % 2 ? 12 : -12 }, { x: 0, y: 0, rotation: 0, duration: 0.7, ease: E.snap }, 0));
+      // REC blinks.
+      for (let k = 0; k < 6; k++) tl.set($("c01-dot"), { opacity: k % 2 ? 1 : 0.15 }, 0.5 + k * 0.5);
+      // 0.55 · 1.45 · 2.35 — the countdown slams in, one number per beat, a ring bursts off each; the viewfinder flinches.
+      ["3", "2", "1"].forEach((n, i) => {
+        const t = 0.55 + i * 0.9, el = $("c01-n" + n);
+        OH.slam(tl, el, t, { from: 2.6, rot: i % 2 ? 8 : -8, dur: 0.42 });
+        tl.fromTo(el, { scale: 1, opacity: 1 }, { scale: 0, opacity: 0, duration: 0.2, ease: E.in, immediateRender: false }, t + 0.66);
+        tl.fromTo($("c01-r" + n), { scale: 0.3, opacity: 1 }, { scale: 2.4, opacity: 0, duration: 0.7, ease: E.out, immediateRender: false }, t + 0.18);
+        B.forEach(([id, dx, dy]) => {
+          tl.fromTo($(id), { x: 0, y: 0 }, { x: -dx * 0.06, y: -dy * 0.06, duration: 0.1, ease: E.in, immediateRender: false }, t + 0.18);
+          tl.fromTo($(id), { x: -dx * 0.06, y: -dy * 0.06 }, { x: 0, y: 0, duration: 0.4, ease: E.back, immediateRender: false }, t + 0.28);
+        });
+      });
+      // 3.30 — the viewfinder throws open wide and "SAY CHEESE!" bounces up letter by letter.
+      B.forEach(([id, dx, dy]) => tl.fromTo($(id), { x: 0, y: 0 }, { x: dx * 0.62, y: dy * 0.55, duration: 0.5, ease: E.snap, immediateRender: false }, 3.2));
+      tl.fromTo($("c01-rec"), { x: 0, y: 0 }, { x: -260, y: -140, duration: 0.5, ease: E.snap, immediateRender: false }, 3.2);
+      OH.bounce(tl, $("c01-say"), 3.35, { stagger: 0.045, dur: 0.5 });
+      // 4.90 — a wave runs through the letters.
+      OH.split($("c01-say")).forEach((c, i) => {
+        tl.fromTo(c, { y: 0 }, { y: -46, duration: 0.18, ease: E.out, immediateRender: false }, 4.9 + i * 0.04);
+        tl.fromTo(c, { y: -46 }, { y: 0, duration: 0.4, ease: E.back, immediateRender: false }, 5.08 + i * 0.04);
+      });
+      // 6.00 — the whole frame rushes at the camera as the lens closes (iris at 7.0).
+      tl.fromTo($("c01-world"), { scale: 1 }, { scale: 1.35, duration: 1.0, ease: E.in, immediateRender: false }, 6.0);
+
+      tl.set({}, {}, 7.0);
+      window.__timelines["c01"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

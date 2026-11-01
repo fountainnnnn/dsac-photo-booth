@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c06"] .stage { position: absolute; left: 110px; top: 262px; width: 1180px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 60%; }
+    [data-composition-id="c06"] .cam { position: absolute; left: 84px; top: 98px; width: 1010px; height: 568px; overflow: hidden; background: #d8d4cc; }
+    [data-composition-id="c06"] .art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform: scale(0.526); transform-origin: 0 0; }
+    [data-composition-id="c06"] .art .lay { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c06"] .art .lay > img.full { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c06"] .av { position: absolute; }
+    [data-composition-id="c06"] .frm { position: absolute; left: 0; top: 0; width: 1180px; height: 738px; }
+    [data-composition-id="c06"] .rail { position: absolute; left: 1330px; top: 262px; width: 480px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 50%; }
+    [data-composition-id="c06"] .rail > * { position: absolute; }
+    [data-composition-id="c06"] .r-label { left: 40px; font-size: 32px; line-height: 40px; font-weight: 700; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c06"] .r-note { left: 40px; font-size: 28px; line-height: 36px; color: #5f5d68; white-space: nowrap; }
+    [data-composition-id="c06"] .r-input { left: 40px; width: 400px; height: 84px; padding: 0 20px; display: flex; align-items: center; border-radius: 22px; box-shadow: inset 0 0 0 3px #e6e4e9; font-size: 28px; white-space: nowrap; background: #fff; color: #17161a; }
+    [data-composition-id="c06"] .r-input .ph { color: #7d7b86; }
+    [data-composition-id="c06"] .r-btn { left: 40px; width: 400px; height: 84px; border-radius: 22px; background: #17161a; color: #fff; font-size: 30px; font-weight: 700; transform-origin: 50% 50%; }
+    [data-composition-id="c06"] .r-btn > span { position: absolute; left: 0; top: 0; width: 400px; height: 84px; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+    [data-composition-id="c06"] .caret { display: inline-block; width: 3px; height: 34px; margin-left: 2px; background: #17161a; border-radius: 2px; vertical-align: middle; }
+    [data-composition-id="c06"] .bt { position: absolute; width: 190px; height: 146px; border-radius: 22px; overflow: hidden; background: #fff; }
+    [data-composition-id="c06"] .bt img { position: absolute; left: 5px; top: 5px; width: 180px; height: 101px; border-radius: 16px; object-fit: cover; }
+    [data-composition-id="c06"] .bt span { position: absolute; left: 0; top: 106px; width: 190px; height: 40px; font-size: 28px; line-height: 40px; font-weight: 700; text-align: center; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c06"] .at { position: absolute; width: 120px; height: 120px; border-radius: 22px; background: #fff; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    [data-composition-id="c06"] .at img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    [data-composition-id="c06"] .ring { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 6px solid #e1262f; border-radius: 22px; }
+    [data-composition-id="c06"] .cur { position: absolute; left: -5px; top: -3px; width: 52px; height: 72px; z-index: 60; transform-origin: 5px 3px; filter: drop-shadow(4px 5px 0 rgba(27,26,31,0.35)); }
+    [data-composition-id="c06"] .bub { position: absolute; padding: 0 40px; height: 100px; display: flex; align-items: center; background: #fff; border-radius: 50px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 52px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; transform-origin: 20% 100%; }
+    [data-composition-id="c06"] .hd { position: absolute; left: 110px; top: 92px; font-size: 112px; line-height: 120px; font-weight: 900; letter-spacing: -0.045em; white-space: nowrap; }
+    [data-composition-id="c06"] .hd.lt { color: #fff; -webkit-text-stroke: 10px #1b1a1f; paint-order: stroke fill; }
+    [data-composition-id="c06"] .hd .hi { color: #ffd23f; }
+    [data-composition-id="c06"] .sticker { position: absolute; padding: 0 36px; height: 84px; display: flex; align-items: center; gap: 18px; background: #fff; border-radius: 48px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 38px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; color: #1b1a1f; z-index: 30; }
+    [data-composition-id="c06"] .tag { position: absolute; height: 72px; padding: 0 30px; display: flex; align-items: center; border-radius: 36px; background: #1b1a1f; color: #fff; font-size: 36px; font-weight: 900; letter-spacing: 0.04em; white-space: nowrap; z-index: 30; }
+  </style>
+  <div id="c06-root" class="oh" data-composition-id="c06" data-width="1920" data-height="1080" data-duration="11.0">
+    <div id="c06-ground" class="oh-ground clip" data-start="0" data-duration="11.0" data-track-index="0" style="background:#ffd23f"></div>
+    <div id="c06-world" class="oh-world">
+
+      <div id="c06-hd" class="hd">Pile on the props.</div>
+      <div id="c06-hd2" class="hd">Same part? It swaps.</div>
+      <div id="c06-stage" class="stage"><div class="cam"><div class="art"><div id="c06-b0" class="lay"><img class="full" src="assets/v2/candy.svg" alt=""></div><div id="c06-crew" class="lay"><img class="full" src="assets/v2/crew.svg" alt=""><img id="c06-crown-N" class="av" src="assets/oh/avatars/crown.svg" alt="" style="left:482px;top:295px;width:156px;height:104px;transform-origin:50% 95%"><img id="c06-crown-R" class="av" src="assets/oh/avatars/crown.svg" alt="" style="left:882px;top:259px;width:156px;height:104px;transform-origin:50% 95%"><img id="c06-crown-M" class="av" src="assets/oh/avatars/crown.svg" alt="" style="left:1282px;top:303px;width:156px;height:104px;transform-origin:50% 95%"><img id="c06-party-N" class="av" src="assets/oh/avatars/party-hat.svg" alt="" style="left:503px;top:240px;width:114px;height:148px;transform-origin:50% 100%"><img id="c06-party-R" class="av" src="assets/oh/avatars/party-hat.svg" alt="" style="left:903px;top:204px;width:114px;height:148px;transform-origin:50% 100%"><img id="c06-party-M" class="av" src="assets/oh/avatars/party-hat.svg" alt="" style="left:1303px;top:248px;width:114px;height:148px;transform-origin:50% 100%"><img id="c06-shades-N" class="av" src="assets/oh/avatars/shades.svg" alt="" style="left:469px;top:457px;width:182px;height:68px;transform-origin:50% 42%"><img id="c06-shades-R" class="av" src="assets/oh/avatars/shades.svg" alt="" style="left:869px;top:423px;width:182px;height:68px;transform-origin:50% 42%"><img id="c06-shades-M" class="av" src="assets/oh/avatars/shades.svg" alt="" style="left:1269px;top:463px;width:182px;height:68px;transform-origin:50% 42%"><img id="c06-mous-N" class="av" src="assets/oh/avatars/moustache.svg" alt="" style="left:516px;top:537px;width:88px;height:32px;transform-origin:50% 40%"><img id="c06-mous-R" class="av" src="assets/oh/avatars/moustache.svg" alt="" style="left:916px;top:513px;width:88px;height:32px;transform-origin:50% 40%"><img id="c06-mous-M" class="av" src="assets/oh/avatars/moustache.svg" alt="" style="left:1316px;top:541px;width:88px;height:32px;transform-origin:50% 40%"></div></div></div><img class="frm" src="assets/oh/frame-doodle.png" alt=""></div>
+      <div id="c06-rail" class="rail">
+        <p class="r-label" style="top:36px">Avatars</p>
+        <p class="r-note" style="top:84px">Pick as many as you like,<br>one for each part of<br>the face.</p>
+        <div id="c06-in" class="r-input" style="top:212px"><span id="c06-ph" class="ph">What do you want to wear?</span><div id="c06-w1" style="position:absolute;left:20px;top:0;height:84px;display:flex;align-items:center;opacity:0"><span id="c06-t1"></span><i id="c06-k1" class="caret" style="opacity:0"></i></div><div id="c06-w2" style="position:absolute;left:20px;top:0;height:84px;display:flex;align-items:center;opacity:0"><span id="c06-t2"></span><i id="c06-k2" class="caret" style="opacity:0"></i></div></div>
+        <div id="c06-btn" class="r-btn" style="top:316px;opacity:0.4"><span id="c06-go">Make it</span><span id="c06-busy" style="opacity:0">Making your avatar…</span><span id="c06-go2" style="opacity:0">Make it</span></div>
+        <div id="c06-g" style="position:absolute;left:0;top:0;width:480px;height:738px"><div id="c06g-t-none" class="at" style="left:40px;top:432px"><svg viewBox="0 0 256 256" width="56" height="56"><circle cx="128" cy="128" r="96" fill="none" stroke="#a3a1ab" stroke-width="18"/><path d="M60 60 196 196" stroke="#a3a1ab" stroke-width="18" stroke-linecap="round"/></svg><i id="c06g-r-none" class="ring"></i></div><div id="c06g-t-shades" class="at" style="left:180px;top:432px"><img src="assets/oh/avatars/shades.svg" alt=""><i id="c06g-r-shades" class="ring" style="opacity:0"></i></div><div id="c06g-t-party" class="at" style="left:320px;top:432px"><img src="assets/oh/avatars/party-hat.svg" alt=""><i id="c06g-r-party" class="ring" style="opacity:0"></i></div><div id="c06g-t-cat" class="at" style="left:40px;top:572px"><img src="assets/oh/avatars/cat-ears.svg" alt=""><i id="c06g-r-cat" class="ring" style="opacity:0"></i></div><div id="c06g-t-crown" class="at" style="left:180px;top:572px"><img src="assets/oh/avatars/crown.svg" alt=""><i id="c06g-r-crown" class="ring" style="opacity:0"></i></div><div id="c06g-t-mous" class="at" style="left:320px;top:572px"><img src="assets/oh/avatars/moustache.svg" alt=""><i id="c06g-r-mous" class="ring" style="opacity:0"></i></div></div>
+      </div>
+      <div id="c06-tg1" class="tag" style="left:1010px;top:116px">HEAD</div>
+      <div id="c06-tg2" class="tag" style="left:1190px;top:116px">EYES</div>
+      <div id="c06-tg3" class="tag" style="left:1362px;top:116px">UPPER LIP</div>
+      <svg id="c06-cur" class="cur" viewBox="0 0 32 44"><path d="M3 2 28 24 17 25 23 40 17 43 11 27 3 34Z" fill="#fff" stroke="#1b1a1f" stroke-width="2.6" stroke-linejoin="round"/></svg>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      const cur = $("c06-cur");
+      tl.set(cur, { opacity: 0 }, 0);
+      const mv = (a, b, t, d = 0.45, click = true) => {
+        tl.fromTo(cur, { x: a[0], y: a[1] }, { x: b[0], y: b[1], duration: d, ease: E.io, immediateRender: false }, t);
+        if (click) { tl.fromTo(cur, { scale: 1 }, { scale: 0.78, duration: 0.07, ease: E.in, immediateRender: false }, t + d);
+          tl.fromTo(cur, { scale: 0.78 }, { scale: 1, duration: 0.3, ease: E.back, immediateRender: false }, t + d + 0.08); }
+        return t + d;
+      };
+      const curIn = (t) => tl.fromTo(cur, { opacity: 0 }, { opacity: 1, duration: 0.15, immediateRender: false }, t);
+      const curOut = (t) => tl.fromTo(cur, { opacity: 1 }, { opacity: 0, duration: 0.2, immediateRender: false }, t);
+
+      const C = {"none": [1430, 754], "shades": [1570, 754], "party": [1710, 754], "cat": [1430, 894], "crown": [1570, 894], "mous": [1710, 894]};
+      const A = (k) => ["N", "R", "M"].map((f) => $("c06-" + k + "-" + f));
+      ["crown", "party", "shades", "mous"].forEach((k) => tl.set(A(k), { opacity: 0 }, 0));
+      tl.set([$("c06-hd2"), $("c06-tg1"), $("c06-tg2"), $("c06-tg3")], { opacity: 0 }, 0);
+      tl.fromTo([$("c06-stage"), $("c06-rail")], { scale: 0.92 }, { scale: 1, duration: 0.6, ease: E.back }, 0.0);
+      OH.bounce(tl, $("c06-hd"), 0.2, { stagger: 0.035 });
+      const pick = (from, k, t) => {
+        mv(from, C[k], t - 0.45, 0.45);
+        tl.fromTo($("c06g-r-" + k), { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.3, ease: E.pop, immediateRender: false }, t);
+      };
+      curIn(0.9);
+      // 1.40 — Crown: a crown drops onto every head, squashes, settles (head).
+      tl.fromTo($("c06g-r-none"), { opacity: 1 }, { opacity: 0, duration: 0.08, immediateRender: false }, 1.4);
+      mv([1900, 1100], C.crown, 0.9, 0.5);
+      tl.fromTo($("c06g-r-crown"), { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.3, ease: E.pop, immediateRender: false }, 1.4);
+      A("crown").forEach((el, i) => {
+        const t = 1.45 + i * 0.08;
+        tl.fromTo(el, { opacity: 0, y: -600, rotation: (i - 1) * 25 }, { opacity: 1, y: 0, rotation: 0, duration: 0.42, ease: E.drop, immediateRender: false }, t);
+        tl.fromTo(el, { scaleX: 1, scaleY: 1 }, { scaleX: 1.25, scaleY: 0.75, duration: 0.07, ease: E.out, immediateRender: false }, t + 0.42);
+        tl.fromTo(el, { scaleX: 1.25, scaleY: 0.75 }, { scaleX: 1, scaleY: 1, duration: 0.45, ease: E.pop, immediateRender: false }, t + 0.49);
+      });
+      OH.pop(tl, $("c06-tg1"), 1.9, { rot: -10 });
+      // 3.00 — Shades: they fly in from the side and snap onto every pair of eyes (eyes).
+      pick(C.crown, "shades", 3.0);
+      A("shades").forEach((el, i) => {
+        const t = 3.05 + i * 0.07;
+        tl.fromTo(el, { opacity: 0, x: -1500, rotation: -40 }, { opacity: 1, x: 0, rotation: 0, duration: 0.5, ease: E.whip, immediateRender: false }, t);
+        tl.fromTo(el, { scaleX: 1 }, { scaleX: 0.82, duration: 0.06, ease: E.out, immediateRender: false }, t + 0.5);
+        tl.fromTo(el, { scaleX: 0.82 }, { scaleX: 1, duration: 0.4, ease: E.pop, immediateRender: false }, t + 0.56);
+      });
+      OH.pop(tl, $("c06-tg2"), 3.5, { rot: 8 });
+      // 4.50 — Moustache: boing (upper lip).
+      pick(C.shades, "mous", 4.5);
+      OH.pop(tl, A("mous"), 4.55, { stagger: 0.07, rot: -30, dur: 0.55 });
+      OH.pop(tl, $("c06-tg3"), 5.0, { rot: -6 });
+      // 6.00 — new heading; Party hat replaces the crown (one avatar per part): crowns spin off, hats drop in.
+      OH.unpop(tl, [$("c06-tg1"), $("c06-tg2"), $("c06-tg3")], 5.8);
+      OH.flyOut(tl, $("c06-hd"), 6.0);
+      tl.set($("c06-hd2"), { opacity: 1 }, 6.3);
+      OH.bounce(tl, $("c06-hd2"), 6.3, { stagger: 0.035 });
+      pick(C.mous, "party", 6.9);
+      tl.fromTo($("c06g-r-crown"), { opacity: 1 }, { opacity: 0, duration: 0.08, immediateRender: false }, 6.9);
+      A("crown").forEach((el, i) => tl.fromTo(el, { y: 0, rotation: 0, opacity: 1 }, { y: -700, rotation: (i - 1) * 120 + 90, opacity: 0, duration: 0.5, ease: E.in, immediateRender: false }, 6.95 + i * 0.05));
+      A("party").forEach((el, i) => {
+        const t = 7.15 + i * 0.08;
+        tl.fromTo(el, { opacity: 0, y: -600 }, { opacity: 1, y: 0, duration: 0.4, ease: E.drop, immediateRender: false }, t);
+        tl.fromTo(el, { scaleX: 1, scaleY: 1 }, { scaleX: 1.2, scaleY: 0.8, duration: 0.07, ease: E.out, immediateRender: false }, t + 0.4);
+        tl.fromTo(el, { scaleX: 1.2, scaleY: 0.8 }, { scaleX: 1, scaleY: 1, duration: 0.45, ease: E.pop, immediateRender: false }, t + 0.47);
+      });
+      tl.fromTo(cur, { x: C.party[0], y: C.party[1] }, { x: 1900, y: 1150, duration: 0.6, ease: E.in, immediateRender: false }, 8.2);
+      // 8.60 — the three of them cheer: two hops.
+      [8.6, 9.4].forEach((t) => {
+        tl.fromTo($("c06-crew"), { y: 0 }, { y: -60, duration: 0.18, ease: E.out, immediateRender: false }, t);
+        tl.fromTo($("c06-crew"), { y: -60 }, { y: 0, duration: 0.28, ease: E.drop, immediateRender: false }, t + 0.18);
+      });
+      tl.fromTo($("c06-world"), { scale: 1 }, { scale: 1.04, duration: 11, ease: "none", immediateRender: false }, 0);
+
+      tl.set({}, {}, 11.0);
+      window.__timelines["c06"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>
