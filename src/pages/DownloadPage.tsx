@@ -1,18 +1,10 @@
 import { useState } from 'react';
-import { Check, Copy, DownloadSimple } from '@phosphor-icons/react';
+import { DownloadSimple } from '@phosphor-icons/react';
 import BrandMark from '@/components/ui/BrandMark';
 
 interface DownloadPageProps {
   token: string;
 }
-
-const DEFAULT_LINKEDIN_TEXT = `Just had an incredible AI Learning Journey at Singapore Polytechnic!
-
-The Data Science & Analytics Centre showed me how artificial intelligence is transforming education and industry, from machine learning fundamentals to real-world applications.
-
-A huge thank you to the SP DSAC team for an unforgettable experience!
-
-#AILearningJourney #SingaporePolytechnic #DSAC #ArtificialIntelligence #MachineLearning #FutureOfLearning`;
 
 export default function DownloadPage({ token }: DownloadPageProps) {
   // /api/download sends Content-Disposition: attachment (for the Save button);
@@ -20,24 +12,10 @@ export default function DownloadPage({ token }: DownloadPageProps) {
   const downloadHref = `/api/download/${encodeURIComponent(token)}`;
   const previewHref = `/api/preview/${encodeURIComponent(token)}`;
 
-  const [copied, setCopied] = useState(false);
   // The booth deletes each photo a few minutes after its QR code goes up, so
   // a guest who scans late finds nothing. Say so, rather than show a broken
   // picture and a Save button that downloads an error.
   const [gone, setGone] = useState(false);
-  /**
-   * The caption is a starting point, not a script. Guests were copying it
-   * verbatim or not at all; letting them edit it in place is the difference
-   * between a post that sounds like them and one that sounds like a form.
-   * Deliberately not persisted — it belongs to this photo and this guest.
-   */
-  const [caption, setCaption] = useState(DEFAULT_LINKEDIN_TEXT);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(caption).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <main
@@ -87,43 +65,6 @@ export default function DownloadPage({ token }: DownloadPageProps) {
               <DownloadSimple className="h-4 w-4" />
               Save photo
             </a>}
-          </section>
-
-          <div className="h-px bg-[#ececee]" />
-
-          <section>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a1a1aa]">Caption for your post</p>
-            <p className="mt-1 text-sm leading-6 text-[#52525b]">
-              Edit this however you like, then copy it and paste it into a new
-              LinkedIn post along with your photo.
-            </p>
-
-            <textarea
-              value={caption}
-              onChange={(e) => { setCaption(e.target.value); setCopied(false); }}
-              rows={7}
-              aria-label="Your LinkedIn caption"
-              className="mt-3 w-full resize-y rounded-lg border border-[#e5e5e8] bg-[#fafafa] px-3 py-2.5 text-xs leading-5 text-[#3f3f46] outline-none transition focus:border-[#0a66c2] focus:bg-white"
-            />
-
-            {caption.trim() !== DEFAULT_LINKEDIN_TEXT.trim() && (
-              <button
-                type="button"
-                onClick={() => { setCaption(DEFAULT_LINKEDIN_TEXT); setCopied(false); }}
-                className="mt-1.5 text-[11px] font-semibold text-[#a1a1aa] transition hover:text-[#52525b]"
-              >
-                Reset to the suggested caption
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="mt-2.5 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#18181b] px-4 text-sm font-semibold text-white transition hover:bg-[#3f3f46] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#18181b] focus-visible:ring-offset-2"
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied ? 'Copied — now paste it into LinkedIn' : 'Copy caption'}
-            </button>
           </section>
         </div>
 
