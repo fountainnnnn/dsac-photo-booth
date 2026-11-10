@@ -12,7 +12,9 @@ export default tseslint.config(
     // than by directory, because `tiledFaces.mjs` sits beside them and is ours.
     ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'public/models/**',
       'release/**', '.wrangler/**',
-      'public/vision/vision_bundle.mjs', 'public/vision/wasm/**'],
+      'public/vision/vision_bundle.mjs', 'public/vision/wasm/**',
+      // The promo film: its own project, with its own tools and globals.
+      'film/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
