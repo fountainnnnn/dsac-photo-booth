@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c08"] .stage { position: absolute; left: 110px; top: 262px; width: 1180px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 60%; }
+    [data-composition-id="c08"] .cam { position: absolute; left: 84px; top: 98px; width: 1010px; height: 568px; overflow: hidden; background: #d8d4cc; }
+    [data-composition-id="c08"] .art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform: scale(0.526); transform-origin: 0 0; }
+    [data-composition-id="c08"] .art .lay { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c08"] .art .lay > img.full { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c08"] .av { position: absolute; }
+    [data-composition-id="c08"] .frm { position: absolute; left: 0; top: 0; width: 1180px; height: 738px; }
+    [data-composition-id="c08"] .rail { position: absolute; left: 1330px; top: 262px; width: 480px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 50%; }
+    [data-composition-id="c08"] .rail > * { position: absolute; }
+    [data-composition-id="c08"] .r-label { left: 40px; font-size: 32px; line-height: 40px; font-weight: 700; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c08"] .r-note { left: 40px; font-size: 28px; line-height: 36px; color: #5f5d68; white-space: nowrap; }
+    [data-composition-id="c08"] .r-input { left: 40px; width: 400px; height: 84px; padding: 0 20px; display: flex; align-items: center; border-radius: 22px; box-shadow: inset 0 0 0 3px #e6e4e9; font-size: 28px; white-space: nowrap; background: #fff; color: #17161a; }
+    [data-composition-id="c08"] .r-input .ph { color: #7d7b86; }
+    [data-composition-id="c08"] .r-btn { left: 40px; width: 400px; height: 84px; border-radius: 22px; background: #17161a; color: #fff; font-size: 30px; font-weight: 700; transform-origin: 50% 50%; }
+    [data-composition-id="c08"] .r-btn > span { position: absolute; left: 0; top: 0; width: 400px; height: 84px; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+    [data-composition-id="c08"] .caret { display: inline-block; width: 3px; height: 34px; margin-left: 2px; background: #17161a; border-radius: 2px; vertical-align: middle; }
+    [data-composition-id="c08"] .bt { position: absolute; width: 190px; height: 146px; border-radius: 22px; overflow: hidden; background: #fff; }
+    [data-composition-id="c08"] .bt img { position: absolute; left: 5px; top: 5px; width: 180px; height: 101px; border-radius: 16px; object-fit: cover; }
+    [data-composition-id="c08"] .bt span { position: absolute; left: 0; top: 106px; width: 190px; height: 40px; font-size: 28px; line-height: 40px; font-weight: 700; text-align: center; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c08"] .at { position: absolute; width: 120px; height: 120px; border-radius: 22px; background: #fff; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    [data-composition-id="c08"] .at img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    [data-composition-id="c08"] .ring { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 6px solid #e1262f; border-radius: 22px; }
+    [data-composition-id="c08"] .cur { position: absolute; left: -5px; top: -3px; width: 52px; height: 72px; z-index: 60; transform-origin: 5px 3px; filter: drop-shadow(4px 5px 0 rgba(27,26,31,0.35)); }
+    [data-composition-id="c08"] .bub { position: absolute; padding: 0 40px; height: 100px; display: flex; align-items: center; background: #fff; border-radius: 50px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 52px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; transform-origin: 20% 100%; }
+    [data-composition-id="c08"] .hd { position: absolute; left: 110px; top: 92px; font-size: 112px; line-height: 120px; font-weight: 900; letter-spacing: -0.045em; white-space: nowrap; }
+    [data-composition-id="c08"] .hd.lt { color: #fff; -webkit-text-stroke: 10px #1b1a1f; paint-order: stroke fill; }
+    [data-composition-id="c08"] .hd .hi { color: #ffd23f; }
+    [data-composition-id="c08"] .sticker { position: absolute; padding: 0 36px; height: 84px; display: flex; align-items: center; gap: 18px; background: #fff; border-radius: 48px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 38px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; color: #1b1a1f; z-index: 30; }
+    [data-composition-id="c08"] .tag { position: absolute; height: 72px; padding: 0 30px; display: flex; align-items: center; border-radius: 36px; background: #1b1a1f; color: #fff; font-size: 36px; font-weight: 900; letter-spacing: 0.04em; white-space: nowrap; z-index: 30; }
+    [data-composition-id="c08"] .rail.ppl { top: 481px; height: 300px; }
+    [data-composition-id="c08"] .pb { width: 85px; height: 72px; border-radius: 16px; box-shadow: inset 0 0 0 4px #e6e4e9; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 700; color: #53515b; }
+    [data-composition-id="c08"] .pb.on { box-shadow: inset 0 0 0 5px #e1262f; color: #e1262f; }
+    [data-composition-id="c08"] .hd.sm { font-size: 84px; line-height: 120px; }
+  </style>
+  <div id="c08-root" class="oh" data-composition-id="c08" data-width="1920" data-height="1080" data-duration="10.0">
+    <div id="c08-ground" class="oh-ground clip" data-start="0" data-duration="10.0" data-track-index="0" style="background:#2fc59a"></div>
+    <div id="c08-world" class="oh-world">
+
+      <div id="c08-hd" class="hd">Bring your crew.</div>
+      <div id="c08-hd2" class="hd sm">Anyone further back is left out.</div>
+      <div id="c08-stage" class="stage"><div class="cam"><div class="art"><div id="c08-b0" class="lay"><img class="full" src="assets/oh/backgrounds/space.svg" alt=""></div><div id="c08-pass" class="lay"><svg viewBox="0 0 1920 1080" style="position:absolute;left:0;top:0;width:1920px;height:1080px"><g stroke="#1b1a1f" stroke-width="7" stroke-dasharray="none"><g id="c08-xa"><circle cx="0" cy="330" r="62" fill="#c9c4d6"/><path d="M-110 760 C-110 520 -60 440 0 430 C60 440 110 520 110 760Z" fill="#a9a2bd"/></g><g id="c08-xb"><circle cx="0" cy="350" r="58" fill="#d6cfbf"/><path d="M-100 760 C-100 530 -55 455 0 446 C55 455 100 530 100 760Z" fill="#b8ad97"/></g></g></svg></div><div id="c08-ghost" class="lay" style="opacity:0"><svg viewBox="0 0 1920 1080" style="position:absolute;left:0;top:0;width:1920px;height:1080px"><g stroke="#1b1a1f" stroke-width="7" stroke-dasharray="14 14"><g id="c08-ga"><circle cx="0" cy="330" r="62" fill-opacity="0.2" fill="#c9c4d6"/><path d="M-110 760 C-110 520 -60 440 0 430 C60 440 110 520 110 760Z" fill-opacity="0.2" fill="#a9a2bd"/></g><g id="c08-gb"><circle cx="0" cy="350" r="58" fill-opacity="0.2" fill="#d6cfbf"/><path d="M-100 760 C-100 530 -55 455 0 446 C55 455 100 530 100 760Z" fill-opacity="0.2" fill="#b8ad97"/></g></g></svg></div><div id="c08-crew" class="lay"><img class="full" src="assets/v2/crew.svg" alt=""></div></div></div><img class="frm" src="assets/oh/frame-doodle.png" alt=""></div>
+      <div id="c08-rail" class="rail ppl">
+        <p class="r-label" style="top:36px">People</p>
+        <div id="c08-p0" class="pb" style="left:40px;top:96px">Any</div><div id="c08-p1" class="pb" style="left:145px;top:96px">1</div><div id="c08-p2" class="pb" style="left:250px;top:96px">2</div><div id="c08-p3" class="pb" style="left:355px;top:96px">3</div><div id="c08-p4" class="pb" style="left:40px;top:188px">4</div><div id="c08-p5" class="pb" style="left:145px;top:188px">5</div><div id="c08-p6" class="pb" style="left:250px;top:188px">6</div>
+        <div id="c08-on3" class="pb on" style="left:355px;top:96px;opacity:0">3</div>
+      </div>
+      <div id="c08-badge" class="sticker" style="left:530px;top:962px">3 people in the photo</div>
+      <svg id="c08-cur" class="cur" viewBox="0 0 32 44"><path d="M3 2 28 24 17 25 23 40 17 43 11 27 3 34Z" fill="#fff" stroke="#1b1a1f" stroke-width="2.6" stroke-linejoin="round"/></svg>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      const cur = $("c08-cur");
+      tl.set(cur, { opacity: 0 }, 0);
+      const mv = (a, b, t, d = 0.45, click = true) => {
+        tl.fromTo(cur, { x: a[0], y: a[1] }, { x: b[0], y: b[1], duration: d, ease: E.io, immediateRender: false }, t);
+        if (click) { tl.fromTo(cur, { scale: 1 }, { scale: 0.78, duration: 0.07, ease: E.in, immediateRender: false }, t + d);
+          tl.fromTo(cur, { scale: 0.78 }, { scale: 1, duration: 0.3, ease: E.back, immediateRender: false }, t + d + 0.08); }
+        return t + d;
+      };
+      const curIn = (t) => tl.fromTo(cur, { opacity: 0 }, { opacity: 1, duration: 0.15, immediateRender: false }, t);
+      const curOut = (t) => tl.fromTo(cur, { opacity: 1 }, { opacity: 0, duration: 0.2, immediateRender: false }, t);
+
+      tl.set([$("c08-hd2"), $("c08-badge")], { opacity: 0 }, 0);
+      tl.fromTo([$("c08-stage"), $("c08-rail")], { x: -120 }, { x: 0, duration: 0.7, ease: E.back }, 0.0);
+      OH.bounce(tl, $("c08-hd"), 0.2, { stagger: 0.035 });
+      // Passers-by stroll across behind the group (far back, smaller).
+      const walk = (id, x0, x1, t, d) => tl.fromTo($(id), { x: x0, y: 0 }, { x: x1, y: 0, duration: d, ease: "none", immediateRender: false }, t);
+      walk("c08-xa", -300, 2300, 0, 5.5); walk("c08-xb", 2200, -300, 0, 6.5);
+      // 2.10 — People: 3. The two at the back are cut away (they shrink into the background); a badge pops.
+      curIn(1.2); mv([1900, 1100], [1727, 613], 1.2, 0.55);
+      tl.fromTo($("c08-on3"), { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.3, ease: E.pop, immediateRender: false }, 1.75);
+      tl.fromTo($("c08-pass"), { opacity: 1, scale: 1 }, { opacity: 0, scale: 0.85, duration: 0.35, ease: E.in, transformOrigin: "960px 400px", immediateRender: false }, 2.0);
+      OH.pop(tl, $("c08-badge"), 2.2, { rot: -5 });
+      curOut(2.6);
+      // 3.60 — the rule, then a passer-by walks through again, only a dashed ghost: not in the photo.
+      OH.flyOut(tl, $("c08-hd"), 3.5);
+      tl.set($("c08-hd2"), { opacity: 1 }, 3.8);
+      OH.bounce(tl, $("c08-hd2"), 3.8, { stagger: 0.025 });
+      tl.set($("c08-ghost"), { opacity: 1 }, 4.3);
+      walk("c08-ga", 2300, -300, 4.3, 4.2); walk("c08-gb", -400, 2300, 4.6, 4.6);
+      // 6.40 — the crew squeezes together for the shot.
+      tl.fromTo($("c08-crew"), { scaleX: 1 }, { scaleX: 0.94, duration: 0.25, ease: E.out, transformOrigin: "960px 1080px", immediateRender: false }, 6.4);
+      tl.fromTo($("c08-crew"), { scaleX: 0.94 }, { scaleX: 1, duration: 0.5, ease: E.pop, transformOrigin: "960px 1080px", immediateRender: false }, 6.65);
+      tl.fromTo($("c08-world"), { scale: 1 }, { scale: 1.04, duration: 10, ease: "none", immediateRender: false }, 0);
+
+      tl.set({}, {}, 10.0);
+      window.__timelines["c08"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

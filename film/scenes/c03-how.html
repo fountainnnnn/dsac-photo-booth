@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c03"] .hd { position: absolute; left: 0; top: 96px; width: 1920px; text-align: center; font-size: 104px; line-height: 110px; font-weight: 900; letter-spacing: -0.04em; color: #1b1a1f; }
+    [data-composition-id="c03"] .cd { position: absolute; top: 330px; width: 380px; height: 500px; background: #fff; border-radius: 40px; box-shadow: 0 0 0 6px #1b1a1f, 14px 14px 0 6px #1b1a1f; transform-origin: 50% 100%; }
+    [data-composition-id="c03"] .cd .n { position: absolute; left: 140px; top: 36px; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 60px; font-weight: 900; color: #1b1a1f; box-shadow: 0 0 0 6px #1b1a1f; }
+    [data-composition-id="c03"] .cd .ic { position: absolute; left: 90px; top: 170px; width: 200px; height: 150px; transform-origin: 50% 50%; }
+    [data-composition-id="c03"] .cd .lb { position: absolute; left: 0; top: 352px; width: 380px; text-align: center; font-size: 46px; line-height: 52px; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; }
+    [data-composition-id="c03"] .path { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  </style>
+  <div id="c03-root" class="oh" data-composition-id="c03" data-width="1920" data-height="1080" data-duration="10.0">
+    <div id="c03-ground" class="oh-ground clip" data-start="0" data-duration="10.0" data-track-index="0" style="background:#fff4e3"></div>
+    <div id="c03-world" class="oh-world">
+
+      <div id="c03-hd" class="hd">Here’s the deal.</div>
+      <svg id="c03-path" class="path" viewBox="0 0 1920 1080"><path d="M300 900 C500 1000 700 860 960 940 C1220 1020 1420 880 1620 940" fill="none" stroke="#1b1a1f" stroke-width="8" stroke-dasharray="4 26" stroke-linecap="round"/></svg>
+      <div id="c03-c0" class="cd" style="left:130px"><div class="n" style="background:#ff4b3e">1</div><div id="c03-i0" class="ic"><svg viewBox="0 0 160 120"><rect x="6" y="6" width="148" height="108" rx="16" fill="#59b6ff" stroke="#1b1a1f" stroke-width="7"/><circle cx="118" cy="38" r="14" fill="#ffd23f" stroke="#1b1a1f" stroke-width="6"/><path d="M10 100 L58 48 L90 82 L108 64 L150 104 L150 108 L10 108Z" fill="#2fc59a" stroke="#1b1a1f" stroke-width="7" stroke-linejoin="round"/></svg></div><div class="lb">Pick a<br>place</div></div><div id="c03-c1" class="cd" style="left:560px"><div class="n" style="background:#ffd23f">2</div><div id="c03-i1" class="ic"><svg viewBox="0 0 160 120"><path d="M14 104 L22 22 L58 62 L80 10 L102 62 L138 22 L146 104Z" fill="#ffd23f" stroke="#1b1a1f" stroke-width="7" stroke-linejoin="round"/><circle cx="80" cy="74" r="10" fill="#ff4b3e" stroke="#1b1a1f" stroke-width="5"/></svg></div><div class="lb">Wear<br>something silly</div></div><div id="c03-c2" class="cd" style="left:990px"><div class="n" style="background:#2fc59a">3</div><div id="c03-i2" class="ic"><svg viewBox="0 0 160 120"><rect x="8" y="24" width="144" height="90" rx="18" fill="#1b1a1f"/><rect x="50" y="8" width="60" height="26" rx="8" fill="#1b1a1f"/><circle cx="80" cy="68" r="30" fill="#fff4e3" stroke="#ff4b3e" stroke-width="10"/><circle cx="130" cy="44" r="7" fill="#ffd23f"/></svg></div><div class="lb">Strike<br>a pose</div></div><div id="c03-c3" class="cd" style="left:1420px"><div class="n" style="background:#59b6ff">4</div><div id="c03-i3" class="ic"><svg viewBox="0 0 160 120"><rect x="44" y="4" width="72" height="112" rx="14" fill="#fff" stroke="#1b1a1f" stroke-width="7"/><g fill="#1b1a1f"><rect x="56" y="22" width="18" height="18"/><rect x="86" y="22" width="18" height="18"/><rect x="56" y="52" width="18" height="18"/><rect x="80" y="48" width="8" height="8"/><rect x="94" y="58" width="10" height="10"/><rect x="70" y="76" width="22" height="8"/></g><rect x="64" y="96" width="32" height="8" rx="4" fill="#ff4b3e"/></svg></div><div class="lb">Scan it,<br>take it home</div></div>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      // 0.00 — the heading bounces in as the stripes clear.
+      OH.bounce(tl, $("c03-hd"), 0.05, { stagger: 0.03 });
+      // 0.50 + 0.30 i — each card falls in under gravity, squashes on landing, springs back.
+      const rot = [-9, 7, -6, 8];
+      [0, 1, 2, 3].forEach((i) => {
+        const c = $("c03-c" + i), t = 0.5 + i * 0.3;
+        tl.fromTo(c, { y: -1000, rotation: rot[i] * 2 }, { y: 0, rotation: rot[i] * 0.3, duration: 0.5, ease: E.drop }, t);
+        tl.fromTo(c, { scaleX: 1, scaleY: 1 }, { scaleX: 1.12, scaleY: 0.84, duration: 0.08, ease: E.out, immediateRender: false }, t + 0.5);
+        tl.fromTo(c, { scaleX: 1.12, scaleY: 0.84, rotation: rot[i] * 0.3 }, { scaleX: 1, scaleY: 1, rotation: rot[i] * 0.15, duration: 0.5, ease: E.back, immediateRender: false }, t + 0.58);
+      });
+      // 1.90 — the dotted trail draws under them, left to right.
+      tl.fromTo($("c03-path"), { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 1.1, ease: E.io }, 1.9);
+      // 3.10 and 6.00 — a hop runs along the row, each icon spinning once on the way up.
+      [3.1, 6.0].forEach((t0) => [0, 1, 2, 3].forEach((i) => {
+        const c = $("c03-c" + i), ic = $("c03-i" + i), t = t0 + i * 0.22;
+        tl.fromTo(c, { y: 0 }, { y: -60, duration: 0.2, ease: E.out, immediateRender: false }, t);
+        tl.fromTo(c, { y: -60 }, { y: 0, duration: 0.3, ease: E.drop, immediateRender: false }, t + 0.2);
+        tl.fromTo(c, { scaleX: 1, scaleY: 1 }, { scaleX: 1.08, scaleY: 0.9, duration: 0.07, ease: E.out, immediateRender: false }, t + 0.5);
+        tl.fromTo(c, { scaleX: 1.08, scaleY: 0.9 }, { scaleX: 1, scaleY: 1, duration: 0.35, ease: E.back, immediateRender: false }, t + 0.57);
+        tl.fromTo(ic, { rotation: 0 }, { rotation: 360, duration: 0.55, ease: E.io, immediateRender: false }, t);
+      }));
+      // 7.90 — card 1 swells; the sky pours out of it (blob into c04 from its centre).
+      tl.fromTo($("c03-c0"), { scale: 1 }, { scale: 1.14, duration: 0.6, ease: E.back, immediateRender: false }, 8.8);
+      tl.fromTo($("c03-world"), { scale: 1 }, { scale: 1.04, duration: 10, ease: "none", immediateRender: false }, 0);
+
+      tl.set({}, {}, 10.0);
+      window.__timelines["c03"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

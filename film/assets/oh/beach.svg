@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<!-- The background a guest types ("a beach with palm trees"), in the placeholder backgrounds' flat style. -->
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fb6e8"/><stop offset="1" stop-color="#bfe6f5"/></linearGradient>
+  <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f9bb0"/><stop offset="1" stop-color="#48c6c0"/></linearGradient>
+</defs>
+<rect width="1920" height="620" fill="url(#sky)"/>
+<circle cx="1540" cy="190" r="80" fill="#fff4c2"/>
+<ellipse cx="420" cy="170" rx="150" ry="34" fill="#fff" opacity="0.85"/><ellipse cx="500" cy="150" rx="90" ry="34" fill="#fff" opacity="0.85"/>
+<ellipse cx="1120" cy="250" rx="120" ry="26" fill="#fff" opacity="0.7"/>
+<rect y="600" width="1920" height="230" fill="url(#sea)"/>
+<path d="M0 640 H1920" stroke="#fff" stroke-width="6" opacity="0.4"/>
+<path d="M0 760 C320 730 640 790 960 760 C1280 730 1600 790 1920 760 L1920 830 L0 830Z" fill="#9fe0d4"/>
+<path d="M0 800 C320 770 640 830 960 800 C1280 770 1600 830 1920 800 L1920 1080 L0 1080Z" fill="#f2dca6"/>
+<path d="M0 900 C400 880 800 930 1200 905 C1500 890 1700 920 1920 910 L1920 1080 L0 1080Z" fill="#e9cc8e"/>
+<path d="M210 1080 C230 860 270 650 330 470" fill="none" stroke="#8a5a3a" stroke-width="34" stroke-linecap="round"/>
+<path d="M330 470 C260 420 170 430 110 480 C200 460 260 470 330 470Z" fill="#2f8a4a"/>
+<path d="M330 470 C300 390 230 350 160 360 C240 390 290 420 330 470Z" fill="#3a9c55"/>
+<path d="M330 470 C380 400 460 380 530 400 C450 410 390 440 330 470Z" fill="#3a9c55"/>
+<path d="M330 470 C410 460 490 500 520 560 C450 520 390 500 330 470Z" fill="#2f8a4a"/>
+<path d="M330 470 C340 400 380 350 420 330 C390 380 360 420 330 470Z" fill="#45ad62"/>
+<path d="M1730 1080 C1700 880 1660 700 1600 560" fill="none" stroke="#8a5a3a" stroke-width="30" stroke-linecap="round"/>
+<path d="M1600 560 C1670 510 1760 520 1820 570 C1730 550 1670 560 1600 560Z" fill="#2f8a4a"/>
+<path d="M1600 560 C1630 480 1700 440 1770 450 C1690 480 1640 510 1600 560Z" fill="#3a9c55"/>
+<path d="M1600 560 C1550 490 1470 470 1400 490 C1480 500 1540 530 1600 560Z" fill="#3a9c55"/>
+<path d="M1600 560 C1520 550 1440 590 1410 650 C1480 610 1540 590 1600 560Z" fill="#2f8a4a"/>
+</svg>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c12"] .clk { position: absolute; left: 660px; top: 120px; width: 600px; height: 600px; }
+    [data-composition-id="c12"] .thumb { position: absolute; left: 790px; top: 250px; width: 340px; height: 340px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 8px #fff4e3; transform-origin: 50% 50%; }
+    [data-composition-id="c12"] .thumb img { position: absolute; left: -130px; top: 0; width: 544px; height: 340px; }
+    [data-composition-id="c12"] .mm { position: absolute; left: 0; top: 740px; width: 1920px; text-align: center; font-size: 120px; line-height: 120px; font-weight: 900; color: #ffd23f; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    [data-composition-id="c12"] .ln { position: absolute; left: 0; top: 890px; width: 1920px; text-align: center; font-size: 76px; line-height: 90px; font-weight: 900; color: #fff4e3; letter-spacing: -0.03em; white-space: nowrap; }
+    [data-composition-id="c12"] .cf { position: absolute; left: 945px; top: 405px; width: 30px; height: 30px; border-radius: 6px; opacity: 0; }
+  </style>
+  <div id="c12-root" class="oh" data-composition-id="c12" data-width="1920" data-height="1080" data-duration="8.0">
+    <div id="c12-ground" class="oh-ground clip" data-start="0" data-duration="8.0" data-track-index="0" style="background:#1b1a1f"></div>
+    <div id="c12-world" class="oh-world">
+
+      <svg id="c12-clk" class="clk" viewBox="0 0 600 600"><circle cx="300" cy="300" r="270" fill="none" stroke="#3a3940" stroke-width="40"/><circle id="c12-arc" cx="300" cy="300" r="270" fill="none" stroke="#ff4b3e" stroke-width="40" stroke-linecap="round" stroke-dasharray="1696" stroke-dashoffset="0" transform="rotate(-90 300 300)"/></svg>
+      <div id="c12-th" class="thumb"><img src="assets/v2/photo-sm.jpg" alt=""></div>
+      <i id="c12-c0" class="cf" style="background:#ff4b3e"></i><i id="c12-c1" class="cf" style="background:#ffd23f"></i><i id="c12-c2" class="cf" style="background:#2fc59a"></i><i id="c12-c3" class="cf" style="background:#59b6ff"></i><i id="c12-c4" class="cf" style="background:#7a5cff"></i><i id="c12-c5" class="cf" style="background:#ff8fc1"></i><i id="c12-c6" class="cf" style="background:#ff4b3e"></i><i id="c12-c7" class="cf" style="background:#ffd23f"></i><i id="c12-c8" class="cf" style="background:#2fc59a"></i><i id="c12-c9" class="cf" style="background:#59b6ff"></i><i id="c12-c10" class="cf" style="background:#7a5cff"></i><i id="c12-c11" class="cf" style="background:#ff8fc1"></i>
+      <div id="c12-mm" class="mm">10:00</div>
+      <div id="c12-l1" class="ln">Save it within 10 minutes…</div>
+      <div id="c12-l2" class="ln" style="top:480px;font-size:104px;line-height:120px">…then it’s deleted from the booth.</div>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      tl.set($("c12-l2"), { opacity: 0 }, 0);
+      // 0.00 — the clock pops up with the photo in it; the first line bounces in.
+      OH.pop(tl, [$("c12-clk"), $("c12-th")], 0.05, { stagger: 0.08, rot: -30 });
+      OH.bounce(tl, $("c12-l1"), 0.35, { stagger: 0.025 });
+      tl.fromTo($("c12-mm"), { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.4, ease: E.back }, 0.3);
+      // 1.00–3.60 — ten minutes run out on a ramp: it hangs at 10:00, then races to 0:00.
+      const p = { s: 600 }, mm = $("c12-mm"), arc = $("c12-arc");
+      const draw = () => { const v = Math.max(0, Math.round(p.s)); mm.textContent = Math.floor(v / 60) + ":" + String(v % 60).padStart(2, "0"); arc.setAttribute("stroke-dashoffset", String(1696 * (1 - p.s / 600))); };
+      tl.fromTo(p, { s: 600 }, { s: 0, duration: 2.6, ease: OH.ramp([[0, 0], [0.25, 0.04], [1, 1]], [E.io, E.in]), onUpdate: draw, onStart: draw, immediateRender: false }, 1.0);
+      // 3.65 — poof: the photo swells and vanishes; confetti flies out from where it was.
+      tl.fromTo($("c12-th"), { scale: 1 }, { scale: 1.15, duration: 0.12, ease: E.out, immediateRender: false }, 3.6);
+      tl.fromTo($("c12-th"), { scale: 1.15, opacity: 1 }, { scale: 0, opacity: 0, duration: 0.2, ease: E.in, immediateRender: false }, 3.72);
+      tl.fromTo($("c12-c0"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: -360, y: -120, rotation: -300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c1"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: 360, y: -120, rotation: 300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c2"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: -360, y: 480, rotation: -300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c3"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: 360, y: 480, rotation: 300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c4"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: 0, y: -210, rotation: -300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c5"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: 0, y: 570, rotation: 300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c6"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: -468, y: 180, rotation: -300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c7"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: 468, y: 180, rotation: 300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c8"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: -252, y: -180, rotation: -300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c9"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: 252, y: 540, rotation: 300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c10"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: 432, y: 0, rotation: -300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      tl.fromTo($("c12-c11"), { x: 0, y: 0, rotation: 0, opacity: 1, scale: 1 }, { x: -432, y: 360, rotation: 300, opacity: 0, scale: 0.6, duration: 0.9, ease: E.out, immediateRender: false }, 3.78);
+      // 4.10 — the clock clears away and the second line takes the middle of the frame.
+      OH.flyOut(tl, $("c12-l1"), 4.0);
+      OH.unpop(tl, [$("c12-mm"), $("c12-clk")], 4.0, { stagger: 0.06 });
+      tl.set($("c12-l2"), { opacity: 1 }, 4.35); OH.bounce(tl, $("c12-l2"), 4.35, { stagger: 0.025 });
+      tl.fromTo($("c12-world"), { scale: 1 }, { scale: 1.05, duration: 8, ease: "none", immediateRender: false }, 0);
+
+      tl.set({}, {}, 8.0);
+      window.__timelines["c12"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

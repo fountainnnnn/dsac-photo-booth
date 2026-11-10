@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* The reveal: exactly "Introducing <product>". One line, centred on (960,540): 92px on a 100px line box, top 490. */
+    [data-composition-id="s02"] .s02-line { position: absolute; left: 0; top: 490px; width: 1920px; font-size: 92px; line-height: 100px; white-space: nowrap; }
+  </style>
+  <div id="s02-root" class="rk-scene" data-composition-id="s02" data-width="1920" data-height="1080" data-duration="2.5" data-qa-center="x">
+    <div id="s02-ground" class="rk-ground clip" data-start="0" data-duration="2.5" data-track-index="0"></div>
+    <div id="s02-world" class="rk-world" data-qa-camera>
+      <div id="s02-line" class="s02-line t-hero">Introducing the Open House photo booth</div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+      // 0.00 — "Introducing", then the name a beat later.
+      RK.words(tl, $("s02-line"), 0.0, { stagger: 0.06 });
+      // The frame drifts in over the whole beat (no dead hold).
+      tl.fromTo($("s02-world"), { scale: 1 }, { scale: 1.035, duration: 2.5, ease: "none", transformOrigin: "960px 540px" }, 0);
+      window.__timelines["s02"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

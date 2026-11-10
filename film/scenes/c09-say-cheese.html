@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c09"] .stage { position: absolute; left: 110px; top: 262px; width: 1180px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 60%; }
+    [data-composition-id="c09"] .cam { position: absolute; left: 84px; top: 98px; width: 1010px; height: 568px; overflow: hidden; background: #d8d4cc; }
+    [data-composition-id="c09"] .art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform: scale(0.526); transform-origin: 0 0; }
+    [data-composition-id="c09"] .art .lay { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c09"] .art .lay > img.full { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c09"] .av { position: absolute; }
+    [data-composition-id="c09"] .frm { position: absolute; left: 0; top: 0; width: 1180px; height: 738px; }
+    [data-composition-id="c09"] .rail { position: absolute; left: 1330px; top: 262px; width: 480px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 50%; }
+    [data-composition-id="c09"] .rail > * { position: absolute; }
+    [data-composition-id="c09"] .r-label { left: 40px; font-size: 32px; line-height: 40px; font-weight: 700; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c09"] .r-note { left: 40px; font-size: 28px; line-height: 36px; color: #5f5d68; white-space: nowrap; }
+    [data-composition-id="c09"] .r-input { left: 40px; width: 400px; height: 84px; padding: 0 20px; display: flex; align-items: center; border-radius: 22px; box-shadow: inset 0 0 0 3px #e6e4e9; font-size: 28px; white-space: nowrap; background: #fff; color: #17161a; }
+    [data-composition-id="c09"] .r-input .ph { color: #7d7b86; }
+    [data-composition-id="c09"] .r-btn { left: 40px; width: 400px; height: 84px; border-radius: 22px; background: #17161a; color: #fff; font-size: 30px; font-weight: 700; transform-origin: 50% 50%; }
+    [data-composition-id="c09"] .r-btn > span { position: absolute; left: 0; top: 0; width: 400px; height: 84px; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+    [data-composition-id="c09"] .caret { display: inline-block; width: 3px; height: 34px; margin-left: 2px; background: #17161a; border-radius: 2px; vertical-align: middle; }
+    [data-composition-id="c09"] .bt { position: absolute; width: 190px; height: 146px; border-radius: 22px; overflow: hidden; background: #fff; }
+    [data-composition-id="c09"] .bt img { position: absolute; left: 5px; top: 5px; width: 180px; height: 101px; border-radius: 16px; object-fit: cover; }
+    [data-composition-id="c09"] .bt span { position: absolute; left: 0; top: 106px; width: 190px; height: 40px; font-size: 28px; line-height: 40px; font-weight: 700; text-align: center; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c09"] .at { position: absolute; width: 120px; height: 120px; border-radius: 22px; background: #fff; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    [data-composition-id="c09"] .at img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    [data-composition-id="c09"] .ring { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 6px solid #e1262f; border-radius: 22px; }
+    [data-composition-id="c09"] .cur { position: absolute; left: -5px; top: -3px; width: 52px; height: 72px; z-index: 60; transform-origin: 5px 3px; filter: drop-shadow(4px 5px 0 rgba(27,26,31,0.35)); }
+    [data-composition-id="c09"] .bub { position: absolute; padding: 0 40px; height: 100px; display: flex; align-items: center; background: #fff; border-radius: 50px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 52px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; transform-origin: 20% 100%; }
+    [data-composition-id="c09"] .hd { position: absolute; left: 110px; top: 92px; font-size: 112px; line-height: 120px; font-weight: 900; letter-spacing: -0.045em; white-space: nowrap; }
+    [data-composition-id="c09"] .hd.lt { color: #fff; -webkit-text-stroke: 10px #1b1a1f; paint-order: stroke fill; }
+    [data-composition-id="c09"] .hd .hi { color: #ffd23f; }
+    [data-composition-id="c09"] .sticker { position: absolute; padding: 0 36px; height: 84px; display: flex; align-items: center; gap: 18px; background: #fff; border-radius: 48px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 38px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; color: #1b1a1f; z-index: 30; }
+    [data-composition-id="c09"] .tag { position: absolute; height: 72px; padding: 0 30px; display: flex; align-items: center; border-radius: 36px; background: #1b1a1f; color: #fff; font-size: 36px; font-weight: 900; letter-spacing: 0.04em; white-space: nowrap; z-index: 30; }
+    [data-composition-id="c09"] .rail.cap { top: 401px; height: 460px; }
+    [data-composition-id="c09"] .cap-t { left: 0; top: 40px; width: 480px; text-align: center; font-size: 40px; font-weight: 800; color: #17161a; }
+    [data-composition-id="c09"] .shut { left: 130px; top: 120px; width: 220px; height: 220px; border-radius: 50%; background: #e1262f; box-shadow: 0 0 0 12px #fff, 0 0 0 18px #e6e4e9, 0 18px 40px -10px rgba(225,38,47,0.6); display: flex; align-items: center; justify-content: center; transform-origin: 50% 50%; }
+    [data-composition-id="c09"] .cap-f { left: 0; top: 386px; width: 480px; text-align: center; font-size: 30px; color: #8b8993; white-space: nowrap; }
+    [data-composition-id="c09"] .cap-f b { color: #17161a; }
+    [data-composition-id="c09"] .timer { position: absolute; left: 1330px; top: 300px; height: 72px; padding: 0 30px; display: flex; align-items: center; gap: 14px; border-radius: 36px; background: #fff; box-shadow: 0 0 0 5px #1b1a1f; font-size: 34px; font-weight: 800; color: #17161a; }
+    [data-composition-id="c09"] .cd { position: absolute; left: 579px; top: 524px; width: 240px; height: 240px; border-radius: 50%; background: rgba(0,0,0,0.45); border: 3px solid rgba(255,255,255,0.25); z-index: 20; }
+    [data-composition-id="c09"] .cd span { position: absolute; left: 0; top: 0; width: 234px; height: 234px; display: flex; align-items: center; justify-content: center; font-size: 150px; font-weight: 500; color: #fff; }
+    [data-composition-id="c09"] .prep { position: absolute; left: 330px; top: 900px; height: 110px; padding: 0 48px; display: flex; align-items: center; gap: 22px; border-radius: 55px; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 10px 10px 0 6px #1b1a1f; font-size: 46px; font-weight: 800; white-space: nowrap; z-index: 25; }
+    [data-composition-id="c09"] .prep i { display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: #1b1a1f; }
+  </style>
+  <div id="c09-root" class="oh" data-composition-id="c09" data-width="1920" data-height="1080" data-duration="9.0">
+    <div id="c09-ground" class="oh-ground clip" data-start="0" data-duration="9.0" data-track-index="0" style="background:#1b1a1f"></div>
+    <div id="c09-world" class="oh-world">
+
+      <div id="c09-hd" class="hd lt">Say cheese.</div>
+      <div id="c09-stage" class="stage"><div class="cam"><div class="art"><div id="c09-b0" class="lay"><img class="full" src="assets/v2/undersea.svg" alt=""></div><div id="c09-crew" class="lay"><img class="full" src="assets/v2/crew.svg" alt=""><img id="c09-crown-N" class="av" src="assets/oh/avatars/crown.svg" alt="" style="left:482px;top:295px;width:156px;height:104px;transform-origin:50% 95%"><img id="c09-crown-R" class="av" src="assets/oh/avatars/crown.svg" alt="" style="left:882px;top:259px;width:156px;height:104px;transform-origin:50% 95%"><img id="c09-crown-M" class="av" src="assets/oh/avatars/crown.svg" alt="" style="left:1282px;top:303px;width:156px;height:104px;transform-origin:50% 95%"><img id="c09-shades-N" class="av" src="assets/oh/avatars/shades.svg" alt="" style="left:469px;top:457px;width:182px;height:68px;transform-origin:50% 42%"><img id="c09-shades-R" class="av" src="assets/oh/avatars/shades.svg" alt="" style="left:869px;top:423px;width:182px;height:68px;transform-origin:50% 42%"><img id="c09-shades-M" class="av" src="assets/oh/avatars/shades.svg" alt="" style="left:1269px;top:463px;width:182px;height:68px;transform-origin:50% 42%"></div></div></div><img class="frm" src="assets/oh/frame-doodle.png" alt=""></div>
+      <div id="c09-timer" class="timer"><svg width="36" height="36" viewBox="0 0 256 256"><circle cx="128" cy="140" r="88" fill="none" stroke="#17161a" stroke-width="20"/><path d="M128 140 L128 92 M100 28 L156 28" stroke="#17161a" stroke-width="20" stroke-linecap="round"/></svg>3s</div>
+      <div id="c09-rail" class="rail cap">
+        <p class="cap-t">Capture</p>
+        <div id="c09-shut" class="shut"><svg width="84" height="84" viewBox="0 0 256 256"><path fill="#fff" d="M208 56h-27.7l-13.6-20.4A8 8 0 0 0 160 32H96a8 8 0 0 0-6.7 3.6L75.7 56H48a24 24 0 0 0-24 24v112a24 24 0 0 0 24 24h160a24 24 0 0 0 24-24V80a24 24 0 0 0-24-24Zm-80 132a44 44 0 1 1 44-44 44 44 0 0 1-44 44Z"/></svg></div>
+        <p class="cap-f">Frame: <b>Doodle</b></p>
+      </div>
+      <div id="c09-cd" class="cd"><span id="c09-n3">3</span><span id="c09-n2">2</span><span id="c09-n1">1</span></div>
+      <div id="c09-prep" class="prep">Preparing your download<i id="c09-d1"></i><i id="c09-d2"></i><i id="c09-d3"></i></div>
+      <svg id="c09-cur" class="cur" viewBox="0 0 32 44"><path d="M3 2 28 24 17 25 23 40 17 43 11 27 3 34Z" fill="#fff" stroke="#1b1a1f" stroke-width="2.6" stroke-linejoin="round"/></svg>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      const cur = $("c09-cur");
+      tl.set(cur, { opacity: 0 }, 0);
+      const mv = (a, b, t, d = 0.45, click = true) => {
+        tl.fromTo(cur, { x: a[0], y: a[1] }, { x: b[0], y: b[1], duration: d, ease: E.io, immediateRender: false }, t);
+        if (click) { tl.fromTo(cur, { scale: 1 }, { scale: 0.78, duration: 0.07, ease: E.in, immediateRender: false }, t + d);
+          tl.fromTo(cur, { scale: 0.78 }, { scale: 1, duration: 0.3, ease: E.back, immediateRender: false }, t + d + 0.08); }
+        return t + d;
+      };
+      const curIn = (t) => tl.fromTo(cur, { opacity: 0 }, { opacity: 1, duration: 0.15, immediateRender: false }, t);
+      const curOut = (t) => tl.fromTo(cur, { opacity: 1 }, { opacity: 0, duration: 0.2, immediateRender: false }, t);
+
+      tl.set([$("c09-cd"), $("c09-n3"), $("c09-n2"), $("c09-n1"), $("c09-prep")], { opacity: 0 }, 0);
+      tl.fromTo([$("c09-stage"), $("c09-rail"), $("c09-timer")], { y: -80 }, { y: 0, duration: 0.7, ease: E.back }, 0.0);
+      OH.bounce(tl, $("c09-hd"), 0.15, { stagger: 0.05 });
+      // 1.40 — the big red shutter is clicked (countdown 3s, the default).
+      curIn(0.8); mv([1900, 1100], [1570, 631], 0.8, 0.55);
+      OH.press(tl, $("c09-shut"), 1.38);
+      curOut(1.7);
+      // 1.55 — 3 · 2 · 1 in the booth's dark disc (0.75 s a beat here); the crew winds up a little more each beat.
+      tl.fromTo($("c09-cd"), { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.3, ease: E.pop, immediateRender: false }, 1.55);
+      ["3", "2", "1"].forEach((n, i) => {
+        const t = 1.6 + i * 0.75, el = $("c09-n" + n);
+        tl.fromTo(el, { opacity: 0, scale: 1.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: E.snap, immediateRender: false }, t);
+        tl.fromTo(el, { opacity: 1 }, { opacity: 0, duration: 0.1, immediateRender: false }, t + 0.66);
+        tl.fromTo($("c09-crew"), { scaleY: 1 - i * 0.02 }, { scaleY: 0.96 - i * 0.02, duration: 0.25, ease: E.out, transformOrigin: "960px 1080px", immediateRender: false }, t);
+      });
+      tl.fromTo($("c09-cd"), { opacity: 1 }, { opacity: 0, duration: 0.1, immediateRender: false }, 3.86);
+      // 3.85 — snap: the crew springs up, the whole screen jolts like a shutter.
+      tl.fromTo($("c09-crew"), { scaleY: 0.92, y: 0 }, { scaleY: 1, y: 0, duration: 0.5, ease: E.pop, transformOrigin: "960px 1080px", immediateRender: false }, 3.85);
+      tl.fromTo($("c09-stage"), { scale: 1 }, { scale: 0.95, duration: 0.07, ease: E.in, immediateRender: false }, 3.85);
+      tl.fromTo($("c09-stage"), { scale: 0.95 }, { scale: 1, duration: 0.45, ease: E.pop, immediateRender: false }, 3.92);
+      // 4.40 — "Preparing your download…" with bouncing dots.
+      OH.pop(tl, $("c09-prep"), 4.4, { rot: -4 });
+      [1, 2, 3].forEach((k) => [0, 1].forEach((r) => {
+        const t = 4.7 + r * 0.6 + k * 0.12;
+        tl.fromTo($("c09-d" + k), { y: 0 }, { y: -18, duration: 0.15, ease: E.out, immediateRender: false }, t);
+        tl.fromTo($("c09-d" + k), { y: -18 }, { y: 0, duration: 0.2, ease: E.drop, immediateRender: false }, t + 0.15);
+      }));
+      OH.unpop(tl, $("c09-prep"), 7.3);
+      // 7.10 — the photo is thrown off to the right (whip, motion blur at speed); the QR screen catches it.
+      tl.fromTo([$("c09-rail"), $("c09-timer"), $("c09-hd")], { opacity: 1 }, { opacity: 0, duration: 0.2, immediateRender: false }, 7.8);
+      tl.fromTo($("c09-stage"), { x: 0, rotation: 0 }, { x: 2300, rotation: 18, duration: 0.9, ease: E.in, immediateRender: false }, 8.1);
+      tl.fromTo($("c09-stage"), { filter: "blur(0px)" }, { filter: "blur(14px)", duration: 0.9, ease: E.in, immediateRender: false }, 8.1);
+
+      tl.set({}, {}, 9.0);
+      window.__timelines["c09"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="260" viewBox="0 0 200 260">
+<defs><clipPath id="cone"><path d="M100 30 L180 250 H20Z"/></clipPath></defs>
+<path d="M100 30 L180 250 H20Z" fill="#ff4f7b"/>
+<g clip-path="url(#cone)" fill="#ffd23f">
+<rect x="0" y="80" width="200" height="22" transform="rotate(-18 100 90)"/>
+<rect x="0" y="150" width="200" height="22" transform="rotate(-18 100 160)"/>
+<rect x="0" y="220" width="200" height="22" transform="rotate(-18 100 230)"/>
+</g>
+<g fill="#2ec4b6"><circle cx="80" cy="200" r="7"/><circle cx="125" cy="130" r="6"/><circle cx="96" cy="95" r="5"/><circle cx="140" cy="215" r="6"/></g>
+<rect x="14" y="240" width="172" height="18" rx="9" fill="#ffd23f"/>
+<circle cx="100" cy="26" r="22" fill="#fff4b8"/><circle cx="100" cy="26" r="22" fill="none" stroke="#ffd23f" stroke-width="5"/>
+</svg>

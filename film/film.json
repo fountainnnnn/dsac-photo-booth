@@ -1,0 +1,590 @@
+{
+ "music": {
+  "src": "assets/bgm/saturday-instrumental.mp3",
+  "offset": 0,
+  "volume": 0.8,
+  "fadeIn": 0.3,
+  "fadeOut": 2.0,
+  "_note": "Openverse/Jamendo: \"Saturday (Instrumental)\" by Josh Woodward, CC BY 3.0. File starts at 17.72s of the track, so its first lift (24.72s) lands on the title at 7.0s."
+ },
+ "scenes": [
+  {
+   "id": "c01",
+   "file": "scenes/c01-cold-open.html",
+   "duration": 7,
+   "sfx": [
+    {
+     "file": "pop",
+     "at": 0.8,
+     "vol": 0.35
+    },
+    {
+     "file": "pop",
+     "at": 1.7,
+     "vol": 0.35
+    },
+    {
+     "file": "pop",
+     "at": 2.6,
+     "vol": 0.35
+    },
+    {
+     "file": "bubble",
+     "at": 3.4,
+     "vol": 0.3
+    },
+    {
+     "file": "whoosh",
+     "at": 6.1,
+     "vol": 0.35
+    }
+   ]
+  },
+  {
+   "id": "c02",
+   "file": "scenes/c02-title.html",
+   "duration": 7,
+   "tx": {
+    "type": "iris",
+    "dur": 0.8,
+    "at": [
+     960,
+     540
+    ]
+   },
+   "sfx": [
+    {
+     "file": "pop",
+     "at": 0.4,
+     "vol": 0.4
+    },
+    {
+     "file": "pop",
+     "at": 0.75,
+     "vol": 0.4
+    },
+    {
+     "file": "bubble",
+     "at": 1.0,
+     "vol": 0.25
+    },
+    {
+     "file": "bubble",
+     "at": 1.3,
+     "vol": 0.2
+    },
+    {
+     "file": "swoosh",
+     "at": 1.7,
+     "vol": 0.2,
+     "max": 0.6
+    }
+   ]
+  },
+  {
+   "id": "c03",
+   "file": "scenes/c03-how.html",
+   "duration": 10,
+   "tx": {
+    "type": "stripes",
+    "dur": 0.9
+   },
+   "sfx": [
+    {
+     "file": "tap",
+     "at": 1.0,
+     "vol": 0.35
+    },
+    {
+     "file": "tap",
+     "at": 1.3,
+     "vol": 0.35
+    },
+    {
+     "file": "tap",
+     "at": 1.6,
+     "vol": 0.35
+    },
+    {
+     "file": "tap",
+     "at": 1.9,
+     "vol": 0.35
+    },
+    {
+     "file": "bubble",
+     "at": 3.1,
+     "vol": 0.15
+    }
+   ]
+  },
+  {
+   "id": "c04",
+   "file": "scenes/c04-places.html",
+   "duration": 8,
+   "tx": {
+    "type": "blob",
+    "dur": 0.8,
+    "color": "#59b6ff",
+    "at": [
+     320,
+     580
+    ]
+   },
+   "sfx": [
+    {
+     "file": "whoosh",
+     "at": 0.05,
+     "vol": 0.3
+    },
+    {
+     "file": "click",
+     "at": 2.0,
+     "vol": 0.35
+    },
+    {
+     "file": "swoosh",
+     "at": 2.05,
+     "vol": 0.15,
+     "max": 0.6
+    },
+    {
+     "file": "click",
+     "at": 3.2,
+     "vol": 0.35
+    },
+    {
+     "file": "swoosh",
+     "at": 3.25,
+     "vol": 0.15,
+     "max": 0.6
+    },
+    {
+     "file": "click",
+     "at": 4.4,
+     "vol": 0.35
+    },
+    {
+     "file": "swoosh",
+     "at": 4.45,
+     "vol": 0.15,
+     "max": 0.6
+    }
+   ]
+  },
+  {
+   "id": "c05",
+   "file": "scenes/c05-type-a-place.html",
+   "duration": 14,
+   "tx": {
+    "type": "strip",
+    "dur": 0.8,
+    "color": "#1b1a1f",
+    "hole": "#fff4e3"
+   },
+   "sfx": [
+    {
+     "file": "click",
+     "at": 1.45,
+     "vol": 0.3
+    },
+    {
+     "file": "typing",
+     "at": 1.47,
+     "vol": 0.18,
+     "max": 0.95
+    },
+    {
+     "file": "click",
+     "at": 2.75,
+     "vol": 0.35
+    },
+    {
+     "file": "sparkle",
+     "at": 5.1,
+     "vol": 0.3
+    },
+    {
+     "file": "pop",
+     "at": 5.9,
+     "vol": 0.3
+    },
+    {
+     "file": "typing",
+     "at": 8.87,
+     "vol": 0.18,
+     "max": 0.5
+    },
+    {
+     "file": "click",
+     "at": 9.81,
+     "vol": 0.3
+    },
+    {
+     "file": "sparkle",
+     "at": 10.44,
+     "vol": 0.22,
+     "max": 1.0
+    },
+    {
+     "file": "typing",
+     "at": 10.72,
+     "vol": 0.18,
+     "max": 0.38
+    },
+    {
+     "file": "click",
+     "at": 11.54,
+     "vol": 0.3
+    },
+    {
+     "file": "sparkle",
+     "at": 12.17,
+     "vol": 0.22,
+     "max": 1.0
+    }
+   ]
+  },
+  {
+   "id": "c06",
+   "file": "scenes/c06-avatars.html",
+   "duration": 11,
+   "tx": {
+    "type": "tiles",
+    "dur": 0.9,
+    "color": "#ffd23f"
+   },
+   "sfx": [
+    {
+     "file": "click",
+     "at": 1.4,
+     "vol": 0.35
+    },
+    {
+     "file": "pop",
+     "at": 1.9,
+     "vol": 0.35
+    },
+    {
+     "file": "click",
+     "at": 3.0,
+     "vol": 0.35
+    },
+    {
+     "file": "whoosh",
+     "at": 3.05,
+     "vol": 0.25,
+     "max": 0.8
+    },
+    {
+     "file": "click",
+     "at": 4.5,
+     "vol": 0.35
+    },
+    {
+     "file": "bubble",
+     "at": 4.6,
+     "vol": 0.35
+    },
+    {
+     "file": "click",
+     "at": 6.9,
+     "vol": 0.35
+    },
+    {
+     "file": "whoosh",
+     "at": 6.95,
+     "vol": 0.2,
+     "max": 0.6
+    },
+    {
+     "file": "pop",
+     "at": 7.6,
+     "vol": 0.35
+    }
+   ]
+  },
+  {
+   "id": "c07",
+   "file": "scenes/c07-type-an-avatar.html",
+   "duration": 14,
+   "tx": {
+    "type": "blob",
+    "dur": 0.8,
+    "color": "#ff4b3e",
+    "at": [
+     1710,
+     754
+    ]
+   },
+   "sfx": [
+    {
+     "file": "click",
+     "at": 1.37,
+     "vol": 0.3
+    },
+    {
+     "file": "typing",
+     "at": 1.37,
+     "vol": 0.18,
+     "max": 0.8
+    },
+    {
+     "file": "click",
+     "at": 2.75,
+     "vol": 0.35
+    },
+    {
+     "file": "sparkle",
+     "at": 5.0,
+     "vol": 0.3
+    },
+    {
+     "file": "click",
+     "at": 7.0,
+     "vol": 0.35
+    },
+    {
+     "file": "bubble",
+     "at": 7.05,
+     "vol": 0.3
+    },
+    {
+     "file": "typing",
+     "at": 7.82,
+     "vol": 0.18,
+     "max": 0.4
+    },
+    {
+     "file": "click",
+     "at": 8.7,
+     "vol": 0.3
+    },
+    {
+     "file": "sparkle",
+     "at": 10.0,
+     "vol": 0.3
+    },
+    {
+     "file": "pop",
+     "at": 10.9,
+     "vol": 0.3
+    }
+   ]
+  },
+  {
+   "id": "c08",
+   "file": "scenes/c08-crew.html",
+   "duration": 10,
+   "tx": {
+    "type": "iris",
+    "dur": 0.8,
+    "at": [
+     699,
+     644
+    ]
+   },
+   "sfx": [
+    {
+     "file": "whoosh",
+     "at": 0.0,
+     "vol": 0.25,
+     "max": 0.8
+    },
+    {
+     "file": "click",
+     "at": 1.75,
+     "vol": 0.35
+    },
+    {
+     "file": "swoosh",
+     "at": 2.0,
+     "vol": 0.2,
+     "max": 0.7
+    },
+    {
+     "file": "pop",
+     "at": 2.2,
+     "vol": 0.3
+    }
+   ]
+  },
+  {
+   "id": "c09",
+   "file": "scenes/c09-say-cheese.html",
+   "duration": 9,
+   "tx": {
+    "type": "stripes",
+    "dur": 0.9
+   },
+   "sfx": [
+    {
+     "file": "click",
+     "at": 1.38,
+     "vol": 0.4
+    },
+    {
+     "file": "tap",
+     "at": 1.6,
+     "vol": 0.3
+    },
+    {
+     "file": "tap",
+     "at": 2.35,
+     "vol": 0.3
+    },
+    {
+     "file": "tap",
+     "at": 3.1,
+     "vol": 0.3
+    },
+    {
+     "file": "pop",
+     "at": 3.85,
+     "vol": 0.4
+    },
+    {
+     "file": "pop",
+     "at": 4.4,
+     "vol": 0.3
+    },
+    {
+     "file": "whoosh",
+     "at": 8.1,
+     "vol": 0.4
+    }
+   ]
+  },
+  {
+   "id": "c10",
+   "file": "scenes/c10-scan.html",
+   "duration": 7,
+   "sfx": [
+    {
+     "file": "chime",
+     "at": 1.0,
+     "vol": 0.25
+    },
+    {
+     "file": "swoosh",
+     "at": 2.1,
+     "vol": 0.2,
+     "max": 0.8
+    },
+    {
+     "file": "chime",
+     "at": 3.9,
+     "vol": 0.3
+    },
+    {
+     "file": "tap",
+     "at": 4.8,
+     "vol": 0.3
+    },
+    {
+     "file": "whoosh",
+     "at": 5.7,
+     "vol": 0.35
+    }
+   ]
+  },
+  {
+   "id": "c11",
+   "file": "scenes/c11-phone.html",
+   "duration": 7,
+   "sfx": [
+    {
+     "file": "tap",
+     "at": 2.65,
+     "vol": 0.35
+    },
+    {
+     "file": "chime",
+     "at": 2.75,
+     "vol": 0.25
+    },
+    {
+     "file": "swoosh",
+     "at": 3.8,
+     "vol": 0.15,
+     "max": 0.6
+    }
+   ]
+  },
+  {
+   "id": "c12",
+   "file": "scenes/c12-gone.html",
+   "duration": 8,
+   "tx": {
+    "type": "blob",
+    "dur": 0.8,
+    "color": "#1b1a1f",
+    "at": [
+     540,
+     540
+    ]
+   },
+   "sfx": [
+    {
+     "file": "pop",
+     "at": 0.1,
+     "vol": 0.3
+    },
+    {
+     "file": "whoosh",
+     "at": 1.6,
+     "vol": 0.15,
+     "max": 0.8
+    },
+    {
+     "file": "bubble",
+     "at": 3.72,
+     "vol": 0.4
+    },
+    {
+     "file": "sparkle",
+     "at": 3.78,
+     "vol": 0.25,
+     "max": 1.0
+    }
+   ]
+  },
+  {
+   "id": "c13",
+   "file": "scenes/c13-outro.html",
+   "duration": 8,
+   "tx": {
+    "type": "tiles",
+    "dur": 0.9,
+    "color": "#ff4b3e"
+   },
+   "sfx": [
+    {
+     "file": "pop",
+     "at": 0.35,
+     "vol": 0.4
+    },
+    {
+     "file": "bubble",
+     "at": 1.1,
+     "vol": 0.25
+    },
+    {
+     "file": "bubble",
+     "at": 1.4,
+     "vol": 0.2
+    },
+    {
+     "file": "pop",
+     "at": 5.1,
+     "vol": 0.35
+    },
+    {
+     "file": "sparkle",
+     "at": 5.1,
+     "vol": 0.2,
+     "max": 1.2
+    }
+   ]
+  }
+ ]
+}

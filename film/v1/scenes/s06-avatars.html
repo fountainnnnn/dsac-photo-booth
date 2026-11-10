@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* Try on a crown: the rail's Avatar picker (no avatar, Shades, Party hat, Cat ears, Crown, Moustache — the real
+       set, types/scene.ts). A fingertip taps Crown and a crown lands on each face in the picture (the booth pins
+       avatars to every face in the group). The beach from s05 stays behind them.
+       Fixed geometry (frame px). Line as s04. Frame at (150, 280) (internals as s04). Panel 520 wide at
+       (1250, 391), 60 padding → content 1310–1710: label 451–491 · grid 511–771 (tiles 120 square, gap 20:
+       cols 1310 | 1450 | 1590, rows 511 | 651). Panel 440 tall, centred on the frame's 611. Union 150–1770.
+       Crown tile centre (1510, 711). Crowns in artboard px (assets/oh/guests.svg): Maya 177 wide at (654, 350),
+       Jun at (1088, 326); their bottom edge sits on the forehead, so they pop from there. */
+    [data-composition-id="s06"] .s06-line { position: absolute; left: 0; top: 90px; width: 1920px; line-height: 104px; white-space: nowrap; }
+    [data-composition-id="s06"] .s06-frame { position: absolute; left: 150px; top: 280px; width: 1060px; height: 663px; border-radius: 24px; overflow: hidden; background: #fff;
+      box-shadow: var(--ui-shadow-stage); }
+    [data-composition-id="s06"] .s06-cam { position: absolute; left: 76px; top: 88px; width: 907px; height: 511px; overflow: hidden; background: #dcd8d0; }
+    [data-composition-id="s06"] .s06-art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform: scale(0.4727); transform-origin: 0 0; }
+    [data-composition-id="s06"] .s06-art > img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="s06"] .s06-art > .s06-crown { position: absolute; width: 177px; height: 118px; transform-origin: 50% 95%; opacity: 0; }
+    [data-composition-id="s06"] .s06-artwork { position: absolute; left: 0; top: 0; width: 1060px; height: 663px; }
+
+    [data-composition-id="s06"] .s06-panel { position: absolute; left: 1250px; top: 391px; width: 520px; height: 440px; padding: 60px; background: #fff; border-radius: 48px; color: var(--ink);
+      box-shadow: var(--ui-shadow-stage); }
+    [data-composition-id="s06"] .s06-label { height: 40px; font-size: 30px; line-height: 40px; font-weight: 600; color: var(--ui-muted); white-space: nowrap; }
+    [data-composition-id="s06"] .s06-grid { margin-top: 20px; display: grid; grid-template-columns: 120px 120px 120px; gap: 20px; }
+    [data-composition-id="s06"] .s06-tile { position: relative; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; padding: 14px;
+      border: 4px solid transparent; border-radius: 24px; transform-origin: 50% 50%; }
+    [data-composition-id="s06"] .s06-tile img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    [data-composition-id="s06"] .s06-tile svg { width: 48px; height: 48px; }
+    [data-composition-id="s06"] .s06-ring { position: absolute; left: -4px; top: -4px; width: 120px; height: 120px; border: 4px solid var(--ui-accent); border-radius: 24px; }
+
+    [data-composition-id="s06"] .s06-finger { position: absolute; left: 0; top: 0; z-index: 5; width: 76px; height: 76px; border-radius: 50%; background: rgba(23, 22, 26, 0.16);
+      border: 2px solid rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 1.5px rgba(23, 22, 26, 0.16), 0 8px 22px rgba(0, 0, 0, 0.2); opacity: 0; transform-origin: 50% 50%; }
+    [data-composition-id="s06"] .s06-ripple { position: absolute; z-index: 4; width: 76px; height: 76px; border-radius: 50%; border: 3px solid rgba(23, 22, 26, 0.3); opacity: 0; transform-origin: 50% 50%; }
+  </style>
+
+  <div id="s06-root" class="rk-scene on-stage" data-composition-id="s06" data-width="1920" data-height="1080" data-duration="4" data-qa-center="x">
+    <div id="s06-ground" class="rk-ground is-stage clip" data-start="0" data-duration="4" data-track-index="0"></div>
+    <div id="s06-world" class="rk-world" data-qa-camera>
+      <div id="s06-line" class="s06-line t-title">Try on a crown.</div>
+
+      <div id="s06-frame" class="s06-frame" data-qa="box">
+        <div class="s06-cam">
+          <div class="s06-art">
+            <img src="assets/oh/beach.svg" alt="">
+            <img src="assets/oh/guests.svg" alt="">
+            <img id="s06-c0" class="s06-crown" src="assets/oh/avatars/crown.svg" alt="" style="left: 654px; top: 350px">
+            <img id="s06-c1" class="s06-crown" src="assets/oh/avatars/crown.svg" alt="" style="left: 1088px; top: 326px">
+          </div>
+        </div>
+        <img class="s06-artwork" src="assets/oh/frame-doodle.png" alt="">
+      </div>
+
+      <div id="s06-panel" class="s06-panel" data-qa="box">
+        <p class="s06-label">Avatar</p>
+        <div class="s06-grid">
+          <div class="s06-tile"><i id="s06-r-none" class="s06-ring" data-qa-ignore></i>
+            <svg viewBox="0 0 256 256" aria-hidden="true"><circle cx="128" cy="128" r="96" fill="none" stroke="#a3a1ab" stroke-width="16"/><path d="M60 60 196 196" stroke="#a3a1ab" stroke-width="16" stroke-linecap="round"/></svg></div>
+          <div class="s06-tile"><img src="assets/oh/avatars/shades.svg" alt=""></div>
+          <div class="s06-tile"><img src="assets/oh/avatars/party-hat.svg" alt=""></div>
+          <div class="s06-tile"><img src="assets/oh/avatars/cat-ears.svg" alt=""></div>
+          <div id="s06-t-crown" class="s06-tile"><i id="s06-r-crown" class="s06-ring" data-qa-ignore style="opacity: 0"></i><img src="assets/oh/avatars/crown.svg" alt=""></div>
+          <div class="s06-tile"><img src="assets/oh/avatars/moustache.svg" alt=""></div>
+        </div>
+      </div>
+
+      <i id="s06-rp0" class="s06-ripple" data-qa-ignore style="left: 1472px; top: 673px"></i>
+      <i id="s06-finger" class="s06-finger" data-qa-ignore></i>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+      const F = $("s06-finger"), FR = 38;
+      const at = (x, y) => ({ x: x - FR, y: y - FR });
+
+      // 0.00 — the line builds as the zoom settles.
+      RK.words(tl, $("s06-line"), 0.0, { stagger: 0.07 });
+
+      // 0.50 — a fingertip comes down on Crown; 0.85 tap (click sfx): Crown takes the red outline.
+      tl.fromTo(F, at(1560, 780), { ...at(1510, 711), duration: 0.28, ease: RK.E.io, immediateRender: false }, 0.5);
+      tl.fromTo(F, { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.24, ease: RK.E.out, immediateRender: false }, 0.5);
+      tl.fromTo(F, { scale: 1 }, { scale: 0.82, duration: 0.08, ease: RK.E.in, immediateRender: false }, 0.82);
+      tl.fromTo(F, { scale: 0.82 }, { scale: 1, duration: 0.14, ease: RK.E.out, immediateRender: false }, 0.92);
+      tl.fromTo($("s06-rp0"), { scale: 0.9, opacity: 0.8 }, { scale: 1.9, opacity: 0, duration: 0.5, ease: RK.E.out, immediateRender: false }, 0.85);
+      tl.fromTo($("s06-r-none"), { opacity: 1 }, { opacity: 0, duration: 0.1, immediateRender: false }, 0.87);
+      tl.fromTo($("s06-r-crown"), { opacity: 0 }, { opacity: 1, duration: 0.12, ease: RK.E.out, immediateRender: false }, 0.87);
+      tl.fromTo(F, { opacity: 1, scale: 1 }, { opacity: 0, scale: 1.12, duration: 0.2, ease: RK.E.out, immediateRender: false }, 1.1);
+
+      // 0.95 — a crown settles onto each face: opacity leads, the scale settles from 0.88 (never tiny).
+      [$("s06-c0"), $("s06-c1")].forEach((c, i) => {
+        tl.fromTo(c, { opacity: 0 }, { opacity: 1, duration: 0.15, ease: RK.E.out, immediateRender: false }, 0.95 + i * 0.08);
+        tl.fromTo(c, { scale: 0.88, y: -24 }, { scale: 1, y: 0, duration: 0.5, ease: RK.E.soft, immediateRender: false }, 0.95 + i * 0.08);
+      });
+
+      // Slow push-in over the whole scene.
+      tl.fromTo($("s06-world"), { scale: 1 }, { scale: 1.03, duration: 4, ease: "none", transformOrigin: "680px 600px" }, 0);
+      window.__timelines["s06"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

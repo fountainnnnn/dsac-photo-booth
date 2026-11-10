@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* The close: the invitation and, in place of a URL, a "Find the photo booth" button, which a cursor clicks.
+       Arrives on a zoom from s10 and zooms on into the logo (s12).
+       Fixed geometry. Line 120px (132 box), top 404 → 404–536. Button row: top 580, 104 tall → 580–684.
+       Group 404–684, centre 544. */
+    [data-composition-id="s11"] .s11-line { position: absolute; left: 0; top: 404px; width: 1920px; white-space: nowrap; font-size: 120px; letter-spacing: -0.035em; line-height: 132px; }
+    [data-composition-id="s11"] .s11-pillrow { position: absolute; left: 0; top: 580px; width: 1920px; height: 104px; display: flex; justify-content: center; }
+    [data-composition-id="s11"] .s11-pill { display: inline-flex; align-items: center; gap: 18px; height: 104px; padding: 0 44px 0 52px; border-radius: 999px; background: var(--ink); color: #fff;
+      font-size: 46px; font-weight: 500; letter-spacing: -0.01em; white-space: nowrap; transform-origin: 50% 50%; }
+    [data-composition-id="s11"] .s11-pill svg { width: 40px; height: 40px; flex: none; }
+  </style>
+
+  <div id="s11-root" class="rk-scene" data-composition-id="s11" data-width="1920" data-height="1080" data-duration="3" data-qa-center="x">
+    <div id="s11-ground" class="rk-ground clip" data-start="0" data-duration="3" data-track-index="0"></div>
+    <div id="s11-line" class="s11-line t-hero">Come strike a pose.</div>
+    <div class="s11-pillrow"><span id="s11-pill" class="s11-pill">Find the photo booth<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+    <svg id="s11-cursor" class="rk-cursor" data-qa-ignore viewBox="0 0 32 44" aria-hidden="true"><path d="M3 2 28 24 17 25 23 40 17 43 11 27 3 34Z" fill="#fff" stroke="#17161a" stroke-width="2.4" stroke-linejoin="round"/></svg>
+  </div>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+      tl.set($("s11-cursor"), { opacity: 0 }, 0);
+      // 0.00 — the invitation builds; 0.45 the button settles under it.
+      RK.words(tl, $("s11-line"), 0.0, { stagger: 0.08 });
+      RK.pop(tl, $("s11-pill"), 0.45, { from: 0.9, dur: 0.45 });
+      // 0.85–1.40 — a cursor comes up to the button and clicks it (pill ≈ 726–1194 × 580–684; click sfx 1.40).
+      RK.cursor(tl, $("s11-cursor"), 1300, 1020, 1090, 650, 0.85, { dur: 0.5, click: true });
+      RK.press(tl, $("s11-pill"), 1.4);
+      window.__timelines["s11"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

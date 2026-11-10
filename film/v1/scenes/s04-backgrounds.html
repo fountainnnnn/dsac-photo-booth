@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* Pick a background: the capture screen, cropped to the stage (the Doodle frame with Maya and Jun in it) and
+       the rail's Background picker. A fingertip taps Space, then Sunset; the backdrop behind them changes each time
+       (the booth cuts the guests out on the laptop and draws them over the picture).
+       Opens through the full stop of "anywhere." (iris): the first ~0.55s is bare stage.
+       Fixed geometry (frame px), shared by s04–s07:
+         Line 96px on a 104 box, top 90 → 90–194.
+         Frame 1060×663 at (170, 280) (the 1921×1201 artboard at 0.5518). Its photo window (types/frame.ts:
+         x .07132 y .13249 w .8558 h .76998) → (76, 88) 907×511 inside it. The camera picture is the 1920×1080
+         artboard at 0.4727, so avatar and guest coordinates are artboard px (assets/oh/guests.svg notes).
+         Panel 480 wide at left 1270 (60 padding → content 1330–1690). Union 170–1750 → centre x 960.
+       This scene's panel: "Background" 30/40, 20 gap, a 2×2 grid of tiles 170 wide (gap 20): picture 170×96 + a
+       label 30/40 + 8, border 4 → 152 tall. Content 40+20+324 = 384, panel 504 tall, centred on the frame's
+       611 → top 359. Grid top 479: Studio (1330–1500 × 479–631), Sunset (1520–1690 × 479–631), Space
+       (1330–1500 × 651–803), Neon (1520–1690 × 651–803). Taps on the pictures: Space (1415, 703), Sunset (1605, 531). */
+    [data-composition-id="s04"] .s04-line { position: absolute; left: 0; top: 90px; width: 1920px; line-height: 104px; white-space: nowrap; }
+    [data-composition-id="s04"] .s04-frame { position: absolute; left: 170px; top: 280px; width: 1060px; height: 663px; border-radius: 24px; overflow: hidden; background: #fff;
+      box-shadow: var(--ui-shadow-stage); }
+    [data-composition-id="s04"] .s04-cam { position: absolute; left: 76px; top: 88px; width: 907px; height: 511px; overflow: hidden; background: #dcd8d0; }
+    [data-composition-id="s04"] .s04-art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform: scale(0.4727); transform-origin: 0 0; }
+    [data-composition-id="s04"] .s04-art img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="s04"] .s04-artwork { position: absolute; left: 0; top: 0; width: 1060px; height: 663px; }
+
+    [data-composition-id="s04"] .s04-panel { position: absolute; left: 1270px; top: 359px; width: 480px; padding: 60px; background: #fff; border-radius: 48px; color: var(--ink);
+      box-shadow: var(--ui-shadow-stage); }
+    [data-composition-id="s04"] .s04-label { font-size: 30px; line-height: 40px; font-weight: 600; color: var(--ui-muted); white-space: nowrap; }
+    [data-composition-id="s04"] .s04-grid { margin-top: 20px; display: grid; grid-template-columns: 170px 170px; gap: 20px; }
+    [data-composition-id="s04"] .s04-tile { position: relative; width: 170px; height: 152px; border: 4px solid transparent; border-radius: 24px; overflow: hidden; }
+    [data-composition-id="s04"] .s04-tile img { display: block; width: 162px; height: 92px; object-fit: cover; }
+    [data-composition-id="s04"] .s04-tile span { display: block; height: 48px; padding-top: 4px; font-size: 30px; line-height: 40px; font-weight: 600; text-align: center; color: var(--ui-muted); white-space: nowrap; }
+    [data-composition-id="s04"] .s04-tile.is-on { border-color: var(--ui-accent); }
+    [data-composition-id="s04"] .s04-ring { position: absolute; left: 0; top: 0; width: 170px; height: 152px; border: 4px solid var(--ui-accent); border-radius: 24px; opacity: 0; }
+
+    [data-composition-id="s04"] .s04-finger { position: absolute; left: 0; top: 0; z-index: 5; width: 76px; height: 76px; border-radius: 50%; background: rgba(23, 22, 26, 0.16);
+      border: 2px solid rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 1.5px rgba(23, 22, 26, 0.16), 0 8px 22px rgba(0, 0, 0, 0.2); opacity: 0; transform-origin: 50% 50%; }
+    [data-composition-id="s04"] .s04-ripple { position: absolute; z-index: 4; width: 76px; height: 76px; border-radius: 50%; border: 3px solid rgba(23, 22, 26, 0.3); opacity: 0; transform-origin: 50% 50%; }
+  </style>
+
+  <div id="s04-root" class="rk-scene on-stage" data-composition-id="s04" data-width="1920" data-height="1080" data-duration="4.5" data-qa-center="x">
+    <div id="s04-ground" class="rk-ground is-stage clip" data-start="0" data-duration="4.5" data-track-index="0"></div>
+    <div id="s04-world" class="rk-world" data-qa-camera>
+      <div id="s04-line" class="s04-line t-title">Pick where you want to be.</div>
+
+      <div id="s04-frame" class="s04-frame" data-qa="box">
+        <div class="s04-cam">
+          <div class="s04-art">
+            <img src="assets/oh/backgrounds/studio.svg" alt="">
+            <img id="s04-bg1" src="assets/oh/backgrounds/space.svg" alt="" style="opacity: 0">
+            <img id="s04-bg2" src="assets/oh/backgrounds/sunset.svg" alt="" style="opacity: 0">
+            <img src="assets/oh/guests.svg" alt="">
+          </div>
+        </div>
+        <img class="s04-artwork" src="assets/oh/frame-doodle.png" alt="">
+      </div>
+
+      <div id="s04-panel" class="s04-panel" data-qa="box">
+        <p class="s04-label">Background</p>
+        <div class="s04-grid">
+          <div id="s04-t-studio" class="s04-tile is-on"><img src="assets/oh/backgrounds/studio.svg" alt=""><span>Studio</span></div>
+          <div id="s04-t-sunset" class="s04-tile"><img src="assets/oh/backgrounds/sunset.svg" alt=""><span>Sunset</span><i id="s04-r-sunset" class="s04-ring" data-qa-ignore></i></div>
+          <div id="s04-t-space" class="s04-tile"><img src="assets/oh/backgrounds/space.svg" alt=""><span>Space</span><i id="s04-r-space" class="s04-ring" data-qa-ignore></i></div>
+          <div class="s04-tile"><img src="assets/oh/backgrounds/neon.svg" alt=""><span>Neon</span></div>
+        </div>
+      </div>
+
+      <i id="s04-rp0" class="s04-ripple" data-qa-ignore style="left: 1377px; top: 665px"></i>
+      <i id="s04-rp1" class="s04-ripple" data-qa-ignore style="left: 1567px; top: 493px"></i>
+      <i id="s04-finger" class="s04-finger" data-qa-ignore></i>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+      const F = $("s04-finger"), FR = 38;
+
+      // 0.00–0.55 — bare stage while the iris opens from the full stop.
+      // 0.55 — the line builds; the stage and the picker rise in (white goes opaque at once on the dark stage).
+      RK.words(tl, $("s04-line"), 0.55, { stagger: 0.07 });
+      RK.rise(tl, $("s04-frame"), 0.6, { y: 40, dur: 0.7, fade: 0.1 });
+      RK.rise(tl, $("s04-panel"), 0.72, { y: 40, dur: 0.7, fade: 0.1 });
+
+      const at = (x, y) => ({ x: x - FR, y: y - FR });
+      const glide = (a, b, t, dur) => tl.fromTo(F, at(...a), { ...at(...b), duration: dur, ease: RK.E.io, immediateRender: false }, t);
+      const touch = (o0, o1, s0, s1, t, dur) => tl.fromTo(F, { opacity: o0, scale: s0 }, { opacity: o1, scale: s1, duration: dur, ease: RK.E.out, immediateRender: false }, t);
+      const tap = (t, ripple) => {
+        tl.fromTo(F, { scale: 1 }, { scale: 0.82, duration: 0.08, ease: RK.E.in, immediateRender: false }, t - 0.03);
+        tl.fromTo(F, { scale: 0.82 }, { scale: 1, duration: 0.14, ease: RK.E.out, immediateRender: false }, t + 0.07);
+        tl.fromTo(ripple, { scale: 0.9, opacity: 0.8 }, { scale: 1.9, opacity: 0, duration: 0.5, ease: RK.E.out, immediateRender: false }, t);
+      };
+      const select = (from, ring, t) => {
+        tl.set(from, { attr: { class: "s04-tile" } }, t);
+        tl.fromTo(ring, { opacity: 0 }, { opacity: 1, duration: 0.12, ease: RK.E.out, immediateRender: false }, t);
+      };
+
+      // 1.35 — a fingertip comes down onto Space.
+      glide([1460, 760], [1415, 703], 1.35, 0.28);
+      touch(0, 1, 1.25, 1, 1.35, 0.24);
+      // 1.70 — tap (sfx): Space takes the red outline; space fades in behind Maya and Jun.
+      tap(1.70, $("s04-rp0"));
+      select($("s04-t-studio"), $("s04-r-space"), 1.72);
+      tl.fromTo($("s04-bg1"), { opacity: 0, scale: 1.04 }, { opacity: 1, scale: 1, duration: 0.45, ease: RK.E.out, transformOrigin: "960px 540px", immediateRender: false }, 1.74);
+
+      // 2.10–2.55 — the fingertip lifts and moves up to Sunset.
+      touch(1, 0.45, 1, 1.12, 2.1, 0.14);
+      glide([1415, 703], [1605, 531], 2.12, 0.36);
+      touch(0.45, 1, 1.12, 1, 2.42, 0.12);
+      // 2.60 — tap (sfx): Sunset is chosen; the sunset fades in.
+      tap(2.60, $("s04-rp1"));
+      tl.fromTo($("s04-r-space"), { opacity: 1 }, { opacity: 0, duration: 0.1, immediateRender: false }, 2.62);
+      tl.fromTo($("s04-r-sunset"), { opacity: 0 }, { opacity: 1, duration: 0.12, ease: RK.E.out, immediateRender: false }, 2.62);
+      tl.fromTo($("s04-bg2"), { opacity: 0, scale: 1.04 }, { opacity: 1, scale: 1, duration: 0.45, ease: RK.E.out, transformOrigin: "960px 540px", immediateRender: false }, 2.64);
+      // 2.90 — the fingertip lifts away.
+      touch(1, 0, 1, 1.12, 2.9, 0.2);
+      glide([1605, 531], [1650, 600], 2.9, 0.24);
+
+      // A slow push-in over the whole scene keeps the hold alive.
+      tl.fromTo($("s04-world"), { scale: 1 }, { scale: 1.025, duration: 4.5, ease: "none", transformOrigin: "960px 600px" }, 0);
+      window.__timelines["s04"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

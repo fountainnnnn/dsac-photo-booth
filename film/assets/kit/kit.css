@@ -1,0 +1,337 @@
+/* Launch film kit — shared tokens and components (film scale: authored in real 1920x1080 pixels).
+   BRAND: replace the tokens in :root with the product's own design tokens (ink, muted greys, canvas, the dark
+   stage, status colours, font). Chrome stays monochrome; colour arrives only from content (logos, status chips,
+   product UI, the customer's own colours). No gradients, no glows. Loaded once in index.html <head>
+   (tools/build.mjs) and by tools/qa.mjs. Namespace: rk- / window.RK (historical; keep it). */
+
+/* ── Tokens ─────────────────────────────────────────────────────────────── */
+:root {
+  --font: "Roboto", "Helvetica Neue", Arial, sans-serif;   /* the brand font; @font-face rules go in assets/kit/fonts.css */
+  --ink: #17161a;
+  --muted: #65656d;
+  --quiet: #8b8b93;          /* the second tone of a two-tone headline at display sizes */
+  --faint: #b4b4bb;
+  --line: rgba(18, 19, 22, 0.09);
+  --line-strong: rgba(18, 19, 22, 0.16);
+  --canvas: #ffffff;
+  --surface: #f5f5f7;
+  --surface-2: #f8f8f8;
+  --panel: #fbfbfc;
+  --fill: #f1f2f6;
+  --thread: #faf9f7;
+  /* the dark stage (site: pinned product story) */
+  --stage: #0b0a0c;
+  --stage-2: #212126;
+  --stage-ink: #f4f4f6;
+  --stage-quiet: rgba(244, 244, 246, 0.56);
+  --stage-line: rgba(255, 255, 255, 0.09);
+  /* status (content colour: tints, never saturated blocks) */
+  --booked: #0f6f38;
+  --booked-soft: rgba(15, 111, 56, 0.11);
+  --pending: #80520c;
+  --pending-soft: rgba(128, 82, 12, 0.11);
+  --overdue: #c2453c;
+  --overdue-soft: rgba(194, 69, 60, 0.11);
+  /* assistant-panel tints (pastel, from the product's own chat UI) */
+  --ask-peach: #fcf3ec;      /* #f4cfb2 22% on white */
+  --ask-lilac: #f8f4fc;      /* #d9c8ec 22% on white */
+  --ask-sage: #f3f9f5;       /* #c6dfcc 22% on white */
+  --ask-composer: #fdfbfd;   /* #ead9e8 10% on white */
+  /* elevation (design system: wide, soft, low-opacity) */
+  --shadow-lg: 0 40px 140px rgba(0, 0, 0, 0.10), 0 4px 16px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 20px 70px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-stage: 0 36px 100px -24px rgba(0, 0, 0, 0.6);
+  /* legacy names kept so older markup renders on-brand: the "accent" is ink */
+  --accent: #121316;
+  --accent-soft: rgba(18, 19, 22, 0.06);
+  --accent-line: rgba(18, 19, 22, 0.28);
+  --yolk: #121316;
+}
+
+/* ── Scene frame ────────────────────────────────────────────────────────── */
+.rk-scene {
+  position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden;
+  font-family: var(--font); color: var(--ink);
+  -webkit-font-smoothing: antialiased; font-kerning: normal;
+}
+.rk-scene, .rk-scene * { box-sizing: border-box; margin: 0; }  /* same reset as index.html */
+.rk-ground { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: var(--canvas); }
+.rk-ground.is-stage { background: var(--stage); }
+.rk-center { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.rk-world { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 960px 540px; }
+
+/* ── Type (display weight 400, like the site hero) ──────────────────────── */
+.t-hero  { font-size: 128px; line-height: 1.04; font-weight: 400; letter-spacing: -0.035em; text-align: center; white-space: nowrap; }
+.t-title { font-size: 96px;  line-height: 1.08; font-weight: 400; letter-spacing: -0.032em; text-align: center; }
+.t-head  { font-size: 64px;  line-height: 1.12; font-weight: 500; letter-spacing: -0.025em; text-align: center; }
+.t-sub   { font-size: 44px;  line-height: 1.3;  font-weight: 400; letter-spacing: -0.012em; text-align: center; color: var(--muted); }
+.t-cap   { font-size: 34px;  line-height: 1.35; font-weight: 400; letter-spacing: -0.008em; color: var(--muted); }
+.t-accent { color: inherit; }               /* v3: emphasis is the ink half of a two-tone line */
+.t-quiet  { color: var(--quiet); }          /* the muted half */
+.t-muted  { color: var(--muted); }
+.t-num    { font-variant-numeric: tabular-nums; }
+.on-stage .t-hero, .on-stage .t-title, .on-stage .t-head { color: var(--stage-ink); }
+.on-stage .t-sub, .on-stage .t-cap, .on-stage .t-quiet { color: var(--stage-quiet); }
+.rk-line  { display: block; }
+.rk-word  { display: inline-block; will-change: transform, opacity, filter; }
+
+/* Strike-through drawn by RK.strike(): the struck words turn quiet; the line is ink. */
+.rk-strike { position: absolute; left: -1.5%; width: 103%; top: 54%; height: 7px; border-radius: 7px; background: var(--ink); transform-origin: 0 50%; transform: scaleX(0); }
+
+/* ── Surfaces ───────────────────────────────────────────────────────────── */
+.rk-window { position: absolute; background: #fff; border: 1px solid var(--line); border-radius: 32px; box-shadow: var(--shadow-lg); overflow: hidden; }
+.rk-card   { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 32px; box-shadow: var(--shadow-md); }
+.on-stage .rk-card, .on-stage .rk-window { box-shadow: var(--shadow-stage); border-color: rgba(255,255,255,0.06); }
+.rk-card-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 36px 48px 28px; font-size: 34px; font-weight: 500; }
+.rk-card-body { padding: 0 48px 40px; }
+.rk-divider { height: 1px; background: var(--line); }
+
+/* ── Rows ───────────────────────────────────────────────────────────────── */
+.rk-row { display: grid; grid-template-columns: 260px 1fr auto; align-items: center; column-gap: 28px; min-height: 104px; border-top: 1px solid var(--line); font-size: 36px; }
+.rk-row .k { color: var(--muted); font-size: 32px; }
+.rk-row .v { font-weight: 500; }
+.rk-row .v small { display: block; font-size: 30px; font-weight: 400; color: var(--muted); margin-top: 4px; }
+.rk-task { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; column-gap: 28px; min-height: 108px; border-top: 1px solid var(--line); font-size: 38px; }
+.rk-task .v { font-weight: 500; }
+.rk-task .v small { display: block; font-size: 30px; font-weight: 400; color: var(--muted); margin-top: 4px; }
+
+/* ── Chips & buttons (labelled, never dots) ─────────────────────────────── */
+.rk-chip { display: inline-flex; align-items: center; gap: 12px; height: 60px; padding: 0 28px; border-radius: 999px; font-size: 30px; font-weight: 500; white-space: nowrap; }
+.rk-chip.is-booked  { background: var(--booked-soft);  color: var(--booked); }
+.rk-chip.is-pending { background: var(--pending-soft); color: var(--pending); }
+.rk-chip.is-overdue { background: var(--overdue-soft); color: var(--overdue); }
+.rk-chip.is-accent  { background: var(--fill); color: var(--ink); }
+.rk-chip.is-neutral { background: #fff; color: var(--ink); border: 1px solid var(--line-strong); }
+.rk-chip.is-ink     { background: var(--ink); color: #fff; }
+.rk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 14px; height: 104px; padding: 0 52px; border-radius: 999px; font-size: 38px; font-weight: 500; white-space: nowrap; transform-origin: 50% 50%; }
+.rk-btn.is-primary   { background: var(--ink); color: #fff; }
+.rk-btn.is-secondary { background: #fff; color: var(--ink); border: 1px solid var(--line-strong); }
+.rk-btn.is-accent    { background: var(--ink); color: #fff; }
+
+/* ── Messages ───────────────────────────────────────────────────────────── */
+.rk-bubble { display: inline-block; max-width: 1100px; padding: 30px 40px; border-radius: 36px; font-size: 42px; line-height: 1.38; letter-spacing: -0.01em; }
+.rk-bubble.is-in  { background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 12px; box-shadow: var(--shadow-md); }
+.rk-bubble.is-out { background: var(--ink); color: #fff; border-bottom-right-radius: 12px; }
+.rk-bubble .meta { display: block; margin-top: 10px; font-size: 30px; opacity: 0.6; }
+.rk-grounded { white-space: nowrap; text-decoration: underline dotted rgba(18,19,22,0.38); text-decoration-thickness: 3px; text-underline-offset: 10px; }
+
+/* ── Notification card ──────────────────────────────────────────────────── */
+.rk-notif { display: grid; grid-template-columns: 80px 1fr auto; column-gap: 28px; align-items: center; width: 1040px; min-height: 150px; padding: 28px 36px; background: #fff; border: 1px solid var(--line); border-radius: 32px; box-shadow: var(--shadow-md); }
+.rk-notif img { width: 72px; height: 72px; object-fit: contain; }
+.rk-notif .who { font-size: 32px; font-weight: 500; }
+.rk-notif .what { font-size: 32px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 780px; }
+.rk-notif .when { font-size: 30px; color: var(--muted); align-self: start; margin-top: 6px; }
+
+/* ── App tiles & logos ──────────────────────────────────────────────────── */
+.rk-tile { display: flex; align-items: center; justify-content: center; width: 176px; height: 176px; background: #fff; border: 1px solid var(--line); border-radius: 40px; box-shadow: var(--shadow-md); }
+.rk-tile img { width: 104px; height: 104px; object-fit: contain; }
+.rk-tile.is-sm { width: 128px; height: 128px; border-radius: 30px; }
+.rk-tile.is-sm img { width: 72px; height: 72px; }
+
+/* ── People ─────────────────────────────────────────────────────────────── */
+.rk-avatar { display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; border-radius: 50%; background: var(--fill); color: var(--muted); font-size: 30px; font-weight: 500; flex: none; }
+.rk-avatar.is-lg { width: 104px; height: 104px; font-size: 38px; }
+
+/* ── Check mark (booked colour) ─────────────────────────────────────────── */
+.rk-check { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: var(--booked-soft); transform-origin: 50% 50%; }
+.rk-check svg { width: 30px; height: 30px; }
+
+/* ── Composer (legacy) ──────────────────────────────────────────────────── */
+.rk-composer { display: flex; align-items: center; gap: 28px; width: 1440px; height: 152px; padding: 0 28px 0 48px; background: var(--ask-composer); border: 1px solid var(--line-strong); border-radius: 40px; box-shadow: var(--shadow-lg); }
+.rk-composer .field { flex: 1; font-size: 48px; letter-spacing: -0.015em; white-space: nowrap; overflow: hidden; }
+.rk-composer .placeholder { color: var(--faint); }
+.rk-send { display: inline-flex; align-items: center; justify-content: center; width: 104px; height: 104px; border-radius: 50%; background: var(--ink); flex: none; transform-origin: 50% 50%; }
+.rk-caret { display: inline-block; width: 4px; height: 1.02em; margin-left: 4px; vertical-align: -0.14em; background: var(--ink); border-radius: 2px; }
+
+/* ── Assistant chat (an "Ask <Product>" panel) at film scale ───────────── */
+.ask-mascot { width: 64px; height: 64px; object-fit: contain; flex: none; }
+.ask-mascot.is-lg { width: 120px; height: 120px; }
+.ask-head { display: flex; align-items: center; gap: 20px; font-size: 40px; font-weight: 500; letter-spacing: -0.015em; }
+.ask-q { display: inline-block; max-width: 1200px; padding: 28px 40px; border-radius: 28px; background: var(--ink); color: #fff; font-size: 44px; line-height: 1.32; letter-spacing: -0.012em; }
+.ask-a { font-size: 48px; line-height: 1.34; letter-spacing: -0.015em; }
+.ask-status { display: inline-flex; align-items: center; gap: 16px; font-size: 34px; color: var(--muted); }
+.ask-src { font-size: 30px; color: var(--muted); }
+.ask-actionbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 28px 44px; border-top: 1px solid var(--line); font-size: 32px; color: var(--muted); }
+.ask-link { color: var(--ink); font-weight: 500; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 8px; }
+.ask-sparkle { width: 44px; height: 44px; fill: var(--ink); }
+
+/* ── Cursor ─────────────────────────────────────────────────────────────── */
+.rk-cursor { position: absolute; left: 0; top: 0; opacity: 0; width: 60px; height: 80px; z-index: 50; transform-origin: 8% 6%; filter: drop-shadow(0 6px 14px rgba(0,0,0,.22)); }
+
+/* ── Product mark (monochrome stroke logo, drawn on with RK.draw) ─────────── */
+.rk-mark path { fill: none; stroke: var(--ink); stroke-width: 5.2; stroke-linecap: round; stroke-linejoin: round; }
+.on-stage .rk-mark path { stroke: var(--stage-ink); }
+.rk-wordmark { font-size: 176px; font-weight: 500; letter-spacing: -0.045em; line-height: 1; }
+
+/* A whole-scene wrapper for a scene's own camera moves (tools/build.mjs plays the transitions between scenes). */
+.rk-tx { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 960px 540px; }
+
+/* The v2 glow is retired (the design system bans gradients). */
+.rk-bloom { display: none !important; }
+
+/* ── Dark stage (for product-story scenes) ────────────────────────────────── */
+/* Put .on-stage on the scene root and .is-stage on its ground. Text sitting directly on the stage turns
+   light; UI surfaces (cards, windows, bubbles) stay white with ink text, exactly like the site. Card-less
+   UI placed straight on the stage goes inside .stage-ui and takes the app's dark-mode tokens. */
+.on-stage { color: var(--stage-ink); }
+.on-stage .rk-card, .on-stage .rk-window, .on-stage .rk-notif, .on-stage .rk-bubble.is-in, .on-stage .rk-composer { color: var(--ink); }
+.stage-ui .rk-chip.is-booked  { background: rgba(74, 222, 128, 0.14);  color: #4ade80; }
+.stage-ui .rk-chip.is-pending { background: rgba(245, 178, 76, 0.14);  color: #f5b24c; }
+.stage-ui .rk-chip.is-overdue { background: rgba(244, 121, 111, 0.14); color: #f4796f; }
+.stage-ui .rk-chip.is-neutral { background: transparent; color: var(--stage-ink); border-color: rgba(255, 255, 255, 0.18); }
+.stage-ui .rk-btn.is-primary   { background: var(--stage-ink); color: var(--ink); }
+.stage-ui .rk-btn.is-secondary { background: transparent; color: var(--stage-ink); border: 1px solid rgba(255, 255, 255, 0.18); }
+.stage-ui .rk-check { background: rgba(74, 222, 128, 0.14); }
+.stage-ui .rk-check path { stroke: #4ade80; }
+.stage-ui .t-muted, .stage-ui .t-cap { color: #a0a0a9; }
+.stage-ui .rk-grounded { text-decoration-color: rgba(244, 244, 246, 0.42); }
+.stage-ui .rk-caret { background: var(--stage-ink); }
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+   Film UI system (v19)
+   ══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+   The one UI language for every product shot (.tmp/brief-v19.md), measured from the reference films: one large
+   white surface per shot, 60 of padding inside it, airy line height, a single hairline instead of boxes, big soft
+   radii, a soft shadow, almost no tint fills, colour only where it means something. Real 1920x1080 px, used
+   exactly. When content does not fit at these numbers, cut content; never shrink the spacing.
+     Type     title 52/64 500 -0.01em · body 42/60 · secondary 34/46 muted · meta 30/40 muted · button 36 500
+     Spacing  10 · 20 · 30 · 40 · 60 · 80 · 120, plus the component numbers below (12, 16, 24, 36, 44)
+     Layout   one surface per shot, at most ~1500x820, centred, >= 100 of stage around it; a scene line sits
+              80–100 above it. Between groups 40, within a group 12, around a hairline 40.
+   Everything here is prefixed .ui- / --ui-; nothing above this section changes. Text is nowrap: break lines
+   with <br> so geometry never reflows. tools/qa.mjs only counts .rk-* classes as surfaces, so give painted .ui-*
+   elements (surface, bubble, chip, button, input) data-qa="box" in a scene. No CSS filter anywhere (iris-safe).
+   Copy-ready markup: .tmp/ui-kit-preview.html. */
+:root {
+  /* type */
+  --ui-font: var(--font);
+  --ui-title: 52px;      --ui-title-lh: 64px;      /* surface titles, names in headers */
+  --ui-body: 42px;       --ui-body-lh: 60px;       /* messages, row names, input text */
+  --ui-secondary: 34px;  --ui-secondary-lh: 46px;  /* the line under a title or name, status lines */
+  --ui-meta: 30px;       --ui-meta-lh: 40px;       /* times, event rows; sparingly, nothing smaller */
+  --ui-button: 36px;                               /* button labels */
+  --ui-chip: 32px;                                 /* chip labels */
+  /* spacing: the app's 8px grid x2.5 */
+  --ui-10: 10px; --ui-20: 20px; --ui-30: 30px; --ui-40: 40px; --ui-60: 60px; --ui-80: 80px; --ui-120: 120px;
+  --ui-pad: 60px;        /* inside every surface, every side */
+  --ui-gap: 40px;        /* between groups in a surface; between messages; above and below a hairline */
+  --ui-tight: 12px;      /* within a group: a title and its secondary line; a meta line under its bubble */
+  /* radii */
+  --ui-radius: 48px;          /* surfaces */
+  --ui-radius-bubble: 40px;
+  --ui-radius-input: 56px;    /* 112 tall: a pill when it is one line */
+  --ui-radius-chip: 28px;     /* 56 tall: a pill */
+  --ui-radius-card: 28px;     /* a card inside a bubble (link preview) */
+  /* colour: the app's tokens (app/globals.css) */
+  --ui-ink: #17161a;  --ui-accent: #e1262f;   /* SP red: the shutter and the chosen tile, as in the app */
+  --ui-muted: #53515b;
+  --ui-rule: #ececf0;                       /* the 2px hairline inside a surface */
+  --ui-edge: rgba(18, 19, 22, 0.06);        /* a white surface's 2px edge on a white ground */
+  --ui-fill: #f1f2f6;                       /* the app's muted ground: incoming bubbles, neutral chips */
+  --ui-blue: #0066cc;                       /* the app's one accent */
+  --ui-blue-fg: #0057b0;                    /* links, the AI chip's label */
+  --ui-blue-soft: rgba(0, 102, 204, 0.12);  /* AI chip, outgoing bubble */
+  --ui-amber: #80520c;   --ui-amber-soft: rgba(128, 82, 12, 0.13);   /* pending: Needs approval */
+  --ui-green: #0f6f38;   --ui-green-soft: rgba(15, 111, 56, 0.12);   /* done: Approved, Booked */
+  --ui-waiting: #b7b7bd;                    /* the app's --ink-waiting: a streamed word before it is inked */
+  --ui-brand: #0f766e;                      /* CoolBreeze teal */
+  /* elevation */
+  --ui-shadow: 0 0 0 2px var(--ui-edge), 0 30px 90px rgba(18, 19, 22, 0.10);   /* surface on white */
+  --ui-shadow-stage: 0 40px 120px rgba(0, 0, 0, 0.35);                         /* surface on the dark stage */
+}
+
+/* ── Surface: white, radius 48, 60 padding; on white a 2px edge + soft shadow, on the stage a deeper shadow. ── */
+.ui-surface { position: relative; padding: 60px; background: #fff; color: var(--ui-ink); border-radius: 48px; box-shadow: var(--ui-shadow);
+  font-family: var(--ui-font); -webkit-font-smoothing: antialiased; }
+.on-stage .ui-surface, .ui-surface.is-stage { box-shadow: var(--ui-shadow-stage); }
+
+/* ── Type ── */
+.ui-title, .ui-body, .ui-secondary, .ui-meta { display: block; font-family: var(--ui-font); white-space: nowrap; }
+.ui-title     { font-size: 52px; line-height: 64px; font-weight: 500; letter-spacing: -0.01em; color: var(--ui-ink); }
+.ui-body      { font-size: 42px; line-height: 60px; font-weight: 400; color: var(--ui-ink); }
+.ui-secondary { font-size: 34px; line-height: 46px; font-weight: 400; color: var(--ui-muted); }
+.ui-meta      { font-size: 30px; line-height: 40px; font-weight: 400; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
+.ui-strong    { font-weight: 500; }
+.ui-link      { color: var(--ui-blue-fg); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 8px; }
+.ui-group     { display: flex; flex-direction: column; gap: 12px; }      /* a title and its secondary line */
+
+/* ── Row: avatar 72 · 30 · text column · trailing slot; 36 above and below; rows split by one 2px hairline
+      under the text column only (none above the first row). .is-plain: a row without an avatar. ── */
+.ui-row      { position: relative; display: flex; align-items: center; gap: 30px; padding: 36px 0; }
+.ui-row-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.ui-row-end  { flex: none; margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.ui-row + .ui-row::before { content: ""; position: absolute; top: -1px; left: 102px; right: 0; height: 2px; background: var(--ui-rule); }
+.ui-row.is-plain::before { left: 0; }
+/* A list of rows: the first and last rows drop their outer 36, so the list sits 40 (a group gap) from its neighbours. */
+.ui-rows > .ui-row:first-child { padding-top: 0; }
+.ui-rows > .ui-row:last-child { padding-bottom: 0; }
+
+/* ── Avatar: a round portrait. 72 in rows and headers, 64 beside a chat bubble. ── */
+.ui-avatar { display: block; flex: none; width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background: var(--ui-fill); }
+.ui-avatar.is-64 { width: 64px; height: 64px; }
+.ui-avatar > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* ── Chip: 56 tall, 0 24, radius 28, label 32. On their own line, 16 apart, 30 clear above and below.
+      .is-ai the app's blue tint with a sparkle slot (an inline <svg> first), .is-pending amber, .is-done green. ── */
+.ui-chips { display: flex; align-items: center; gap: 16px; }
+.ui-chip  { display: inline-flex; align-items: center; gap: 10px; height: 56px; padding: 0 24px; border-radius: 28px; flex: none;
+  font-family: var(--ui-font); font-size: 32px; line-height: 1; font-weight: 500; white-space: nowrap; background: var(--ui-fill); color: var(--ui-ink); }
+.ui-chip > svg { width: 30px; height: 30px; flex: none; fill: currentColor; margin-left: -4px; }
+.ui-chip.is-ai      { background: var(--ui-blue-soft);  color: var(--ui-blue-fg); }
+.ui-chip.is-pending { background: var(--ui-amber-soft); color: var(--ui-amber); }
+.ui-chip.is-done    { background: var(--ui-green-soft); color: var(--ui-green); }
+
+/* ── Button: 84 tall, 0 44, a pill, label 36 500; 20 between buttons. Primary ink, secondary white + hairline. ── */
+.ui-btns { display: flex; align-items: center; gap: 20px; }
+.ui-btn  { display: inline-flex; align-items: center; justify-content: center; gap: 12px; height: 84px; padding: 0 44px; border-radius: 42px; flex: none;
+  font-family: var(--ui-font); font-size: 36px; line-height: 1; font-weight: 500; white-space: nowrap; transform-origin: 50% 50%; }
+.ui-btn > svg { width: 34px; height: 34px; flex: none; margin-left: -4px; }
+.ui-btn.is-primary   { background: var(--ui-ink); color: #fff; }
+.ui-btn.is-secondary { background: #fff; color: var(--ui-ink); box-shadow: inset 0 0 0 2px var(--ui-rule); }
+.ui-btn.is-disabled  { opacity: 0.4; }
+
+/* ── Input / reply box: 112 tall for one line, 0 44, radius 56, text 42. .is-open: a multi-line box with 40
+      inside and 40 between its strip, text and footer (.ui-input-foot: chips left, button right). Where height
+      is short, drop the strip and put its status/chips in the foot's left (s05: text · 40 · foot = 384 tall). ── */
+.ui-input { position: relative; display: flex; align-items: center; height: 112px; padding: 0 44px; border-radius: 56px; background: #fff;
+  box-shadow: inset 0 0 0 2px var(--ui-rule); font-family: var(--ui-font); font-size: 42px; line-height: 60px; color: var(--ui-ink); white-space: nowrap; }
+.ui-input.is-open  { height: auto; flex-direction: column; align-items: stretch; gap: 40px; padding: 40px; }
+.ui-input-foot     { display: flex; align-items: center; justify-content: space-between; gap: 30px; }
+.ui-placeholder    { color: var(--ui-muted); }
+
+/* ── Chat bubble: 30 40, radius 40, text 42/60; keep it within ~70% of its thread (break lines with <br>).
+      40 between messages; meta (.ui-meta) 12 under its bubble; a 64 avatar 24 from an incoming bubble
+      (.ui-msg lays that out, bottom-aligned). Fill only, no edge: .is-in the app's muted ground, .is-out the
+      app's blue tint for what the business sends. ── */
+.ui-msg    { display: flex; align-items: flex-end; gap: 24px; }
+.ui-msg.is-out { justify-content: flex-end; }
+.ui-bubble { display: inline-block; padding: 30px 40px; border-radius: 40px; font-family: var(--ui-font); font-size: 42px; line-height: 60px;
+  color: var(--ui-ink); white-space: nowrap; }
+.ui-bubble.is-in  { background: var(--ui-fill); }
+.ui-bubble.is-out { background: var(--ui-blue-soft); }
+/* A link preview inside a bubble: a white card (radius 28, 30 inside) 30 under the message text, as wide as the
+   text column, 40 from the bubble's sides and foot (.has-card gives the bubble that 40 below). Inside: the
+   business lockup (.ui-brand) · 20 · the title (.ui-body.ui-strong) · 12 · the description (.ui-secondary). */
+.ui-bubble.has-card { padding-bottom: 40px; }
+.ui-linkcard { display: flex; flex-direction: column; align-items: flex-start; margin-top: 30px; padding: 30px; background: #fff;
+  border-radius: 28px; white-space: nowrap; }
+.ui-linkcard > .ui-brand { height: 44px; }
+.ui-linkcard > .ui-brand + * { margin-top: 20px; }
+.ui-linkcard > .ui-body + .ui-secondary { margin-top: 12px; }
+
+/* ── Hairline: the one way to separate sections (2px, 40 clear each side). .ui-event: a thread event row,
+      the words (.ui-meta) with a hairline each side. ── */
+.ui-hairline { display: block; height: 2px; border: 0; background: var(--ui-rule); }
+.ui-event    { display: flex; align-items: center; gap: 30px; }
+.ui-event > .ui-hairline { flex: 1 1 0; }
+
+/* ── Brand: the CoolBreeze lockup, mark + wordmark in Google Sans 500, one colour (currentColor; default
+      teal). The mark is assets/brand/coolbreeze-mark.svg used as a mask, so it takes the colour and picks up
+      the final mark when that file is replaced. The <img> inside is invisible: it makes the renderer wait for
+      the file (it awaits <img> decode) so the masked mark is ready on its first frame. Size it with
+      font-size (the mark is 1.25em). Markup:
+        <span class="ui-brand"><span class="ui-brand-mark"><img src="assets/brand/coolbreeze-mark.svg" alt=""></span>CoolBreeze</span> */
+.ui-brand { display: inline-flex; align-items: center; gap: 0.3em; color: var(--ui-brand); font-family: var(--ui-font); font-size: 34px; line-height: 1;
+  font-weight: 500; letter-spacing: -0.01em; white-space: nowrap; }
+.ui-brand-mark { position: relative; display: block; flex: none; width: 1.25em; height: 1.25em; background-color: currentColor;
+  -webkit-mask: url("assets/brand/coolbreeze-mark.svg") center / contain no-repeat; mask: url("assets/brand/coolbreeze-mark.svg") center / contain no-repeat; }
+.ui-brand-mark > img { display: block; width: 100%; height: 100%; opacity: 0; }

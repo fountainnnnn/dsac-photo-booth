@@ -1,0 +1,56 @@
+/* Open House film v2 — "Snapshot Pop".
+   Flat colour fields that change per chapter, heavy Roboto type that bounces in, sticker-like cards with a thick
+   ink outline and a hard offset shadow, doodles from the booth's own frame (hexagons, stars, squiggles).
+   Authored at 1920x1080 px. */
+@font-face { font-family: "Roboto"; font-style: normal; font-weight: 100 900; font-display: block;
+  src: url("assets/kit/fonts/Roboto.woff2") format("woff2"); }
+
+:root {
+  --ink: #1b1a1f;
+  --paper: #fff4e3;
+  --red: #ff4b3e;      /* tomato, near SP red */
+  --sp: #e1262f;       /* SP red, used where the app uses it */
+  --sun: #ffd23f;
+  --mint: #2fc59a;
+  --teal: #12817b;     /* the Doodle frame's teal */
+  --sky: #59b6ff;
+  --grape: #7a5cff;
+  --pink: #ff8fc1;
+  --line: 6px;         /* sticker outline */
+  --drop: 10px 10px 0 var(--ink);
+  --font: "Roboto", "Helvetica Neue", Arial, sans-serif;
+}
+
+.oh { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; font-family: var(--font); color: var(--ink);
+  -webkit-font-smoothing: antialiased; }
+.oh, .oh * { box-sizing: border-box; margin: 0; }
+.oh-ground { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+.oh-world { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 960px 540px; }
+
+/* Type */
+.oh-mega  { font-size: 200px; line-height: 0.92; font-weight: 900; letter-spacing: -0.045em; white-space: nowrap; }
+.oh-big   { font-size: 132px; line-height: 0.98; font-weight: 900; letter-spacing: -0.04em; white-space: nowrap; }
+.oh-head  { font-size: 88px;  line-height: 1.02; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
+.oh-sub   { font-size: 48px;  line-height: 1.2;  font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+.oh-tag   { display: inline-flex; align-items: center; height: 72px; padding: 0 34px; border-radius: 36px; background: var(--ink); color: var(--paper);
+  font-size: 36px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; }
+.oh-ch    { display: inline-block; transform-origin: 50% 100%; will-change: transform; }
+.oh-word  { display: inline-block; white-space: nowrap; }
+
+/* Sticker card: white, ink outline, hard offset shadow */
+.oh-card  { position: absolute; background: #fff; border: var(--line) solid var(--ink); border-radius: 40px; box-shadow: var(--drop); }
+.oh-pill  { display: inline-flex; align-items: center; justify-content: center; gap: 16px; border: var(--line) solid var(--ink); border-radius: 999px; box-shadow: 6px 6px 0 var(--ink);
+  font-weight: 800; white-space: nowrap; }
+
+/* App UI rebuilt at film scale (the booth's own tokens) */
+.app       { --a-ink: #17161a; --a-ink2: #53515b; --a-ink3: #8b8993; --a-border: #e6e4e9; --a-accent: #e1262f; color: var(--a-ink); font-family: var(--font); }
+.app-label { font-size: 30px; line-height: 40px; font-weight: 700; color: var(--a-ink2); white-space: nowrap; }
+.app-tile  { position: relative; border: 5px solid transparent; border-radius: 22px; overflow: hidden; background: #fff; }
+.app-tile.on { border-color: var(--a-accent); }
+.app-input { display: flex; align-items: center; height: 84px; padding: 0 26px; border-radius: 22px; box-shadow: inset 0 0 0 3px var(--a-border); font-size: 32px; white-space: nowrap; background: #fff; }
+.app-btn   { display: flex; align-items: center; justify-content: center; height: 84px; border-radius: 22px; background: var(--a-ink); color: #fff; font-size: 32px; font-weight: 700; white-space: nowrap; }
+
+/* Fingertip (kiosk touch) */
+.oh-finger { position: absolute; left: 0; top: 0; width: 84px; height: 84px; border-radius: 50%; background: rgba(27, 26, 31, 0.18); border: 4px solid #fff;
+  box-shadow: 0 0 0 3px var(--ink); opacity: 0; transform-origin: 50% 50%; z-index: 40; }
+.oh-ripple { position: absolute; width: 84px; height: 84px; border-radius: 50%; border: 5px solid var(--ink); opacity: 0; transform-origin: 50% 50%; z-index: 39; }

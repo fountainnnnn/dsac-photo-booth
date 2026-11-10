@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* Saved to your phone: the guest's download page (src/pages/DownloadPage.tsx) on a phone, as it stacks at phone
+       width — the photo on the dark band, the BrandMark header, "Your photo" / "Save your DSAC photo." (the page's
+       own title), its note, and Save photo, which a fingertip taps. The caption section below is off the screen.
+       Fixed geometry (frame px). Line 96px on a 104 line at left 110, top 488 → 110–940 (measured 830).
+       Phone 656×1352 at (1154, 62), radius 96, 16px bezel; runs off the bottom (visible 62–1080). Union 110–1810
+       → centre x 960. Screen 624×1320 at (1170, 78). Screen coords: bar 0–104 (address pill 56 tall at 32) ·
+       dark band 104–506 (photo 592×370 at (16, 120)) · header 506–590 (logo 48 tall at (26, 524)) ·
+       eyebrow 614–650 · title 660–712 · note 732–858 (3 × 42) · Save photo 882–966 (26–598).
+       Tap Save photo at screen (312, 924) → frame (1482, 1002). */
+    [data-composition-id="s09"] .s09-line { position: absolute; left: 110px; top: 488px; line-height: 104px; text-align: left; white-space: nowrap; }
+    [data-composition-id="s09"] .s09-phone { position: absolute; left: 1154px; top: 62px; width: 656px; height: 1352px; border-radius: 96px; background: #0c0c0e;
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.14), var(--shadow-stage); }
+    [data-composition-id="s09"] .s09-screen { position: absolute; left: 16px; top: 16px; width: 624px; height: 1320px; border-radius: 80px; overflow: hidden; background: #fff; color: #18181b; }
+    [data-composition-id="s09"] .s09-bar { position: absolute; left: 0; top: 0; width: 624px; height: 104px; padding-top: 32px; display: flex; justify-content: center; align-items: flex-start;
+      background: #f4f4f6; border-bottom: 2px solid var(--line); }
+    [data-composition-id="s09"] .s09-addr { height: 56px; padding: 0 28px; display: flex; align-items: center; border-radius: 999px; background: #fff; font-size: 30px; color: #52525b; white-space: nowrap; }
+    [data-composition-id="s09"] .s09-band { position: absolute; left: 0; top: 104px; width: 624px; height: 402px; background: #0a0a0b; }
+    [data-composition-id="s09"] .s09-band img { position: absolute; left: 16px; top: 16px; width: 592px; height: 370px; border-radius: 12px; }
+    [data-composition-id="s09"] .s09-head { position: absolute; left: 0; top: 506px; width: 624px; height: 84px; border-bottom: 2px solid #e5e5e8; }
+    [data-composition-id="s09"] .s09-head img { position: absolute; left: 26px; top: 18px; height: 48px; }
+    [data-composition-id="s09"] .s09-eyebrow { position: absolute; left: 26px; top: 614px; font-size: 28px; line-height: 36px; font-weight: 600; letter-spacing: 0.14em; color: #a1a1aa; white-space: nowrap; }
+    [data-composition-id="s09"] .s09-title { position: absolute; left: 26px; top: 660px; font-size: 44px; line-height: 52px; font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; }
+    [data-composition-id="s09"] .s09-note { position: absolute; left: 26px; top: 732px; font-size: 30px; line-height: 42px; color: #52525b; white-space: nowrap; }
+    [data-composition-id="s09"] .s09-save { position: absolute; left: 26px; top: 882px; width: 572px; height: 84px; display: flex; align-items: center; justify-content: center; gap: 14px;
+      border-radius: 16px; background: #18181b; color: #fff; font-size: 32px; font-weight: 600; white-space: nowrap; transform-origin: 50% 50%; }
+    [data-composition-id="s09"] .s09-save svg { width: 34px; height: 34px; }
+
+    [data-composition-id="s09"] .s09-finger { position: absolute; left: 0; top: 0; z-index: 5; width: 76px; height: 76px; border-radius: 50%; background: rgba(18, 19, 22, 0.16);
+      border: 2px solid rgba(255, 255, 255, 0.8); box-shadow: 0 0 0 1.5px rgba(18, 19, 22, 0.16), 0 8px 22px rgba(0, 0, 0, 0.16); opacity: 0; transform-origin: 50% 50%; }
+    [data-composition-id="s09"] .s09-ripple { position: absolute; z-index: 4; width: 76px; height: 76px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.6); opacity: 0; transform-origin: 50% 50%; }
+  </style>
+
+  <div id="s09-root" class="rk-scene on-stage" data-composition-id="s09" data-width="1920" data-height="1080" data-duration="4" data-qa-center="x">
+    <div id="s09-ground" class="rk-ground is-stage clip" data-start="0" data-duration="4" data-track-index="0"></div>
+    <div id="s09-tx" class="rk-tx">
+      <div id="s09-line" class="s09-line t-title">Saved to your phone.</div>
+
+      <div id="s09-phone" class="s09-phone" data-qa="box">
+        <div class="s09-screen">
+          <div class="s09-bar"><span class="s09-addr" data-qa="box">trycloudflare.com</span></div>
+          <div class="s09-band"><img src="assets/oh/photo.png" alt=""></div>
+          <div class="s09-head"><img src="assets/oh/sp-dsac-logo.png" alt=""></div>
+          <p class="s09-eyebrow">YOUR PHOTO</p>
+          <p class="s09-title">Save your DSAC photo.</p>
+          <p class="s09-note">Download your composed event photo.<br>Save it now: the booth deletes it a<br>few minutes after it is taken.</p>
+          <div id="s09-save" class="s09-save" data-qa="box">
+            <svg viewBox="0 0 256 256" aria-hidden="true"><path fill="#fff" d="M224 144v64a8 8 0 0 1-8 8H40a8 8 0 0 1-8-8v-64a8 8 0 0 1 16 0v56h160v-56a8 8 0 0 1 16 0Zm-101.7 5.7a8 8 0 0 0 11.4 0l40-40a8 8 0 0 0-11.4-11.4L136 124.7V32a8 8 0 0 0-16 0v92.7L93.7 98.3a8 8 0 0 0-11.4 11.4Z"/></svg>
+            Save photo</div>
+          <i id="s09-rp0" class="s09-ripple" data-qa-ignore style="left: 274px; top: 886px"></i>
+          <i id="s09-finger" class="s09-finger" data-qa-ignore></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+      const F = $("s09-finger"), FR = 38;
+      const at = (x, y) => ({ x: x - FR, y: y - FR });
+
+      // 0.00 — the line builds while the phone rises onto the stage (opaque at once).
+      RK.words(tl, $("s09-line"), 0.0, { stagger: 0.07 });
+      RK.rise(tl, $("s09-phone"), 0.0, { y: 90, dur: 0.8, fade: 0.1 });
+
+      // 1.00 — a fingertip comes down on Save photo; 1.35 tap (click sfx).
+      tl.fromTo(F, at(380, 1000), { ...at(312, 924), duration: 0.28, ease: RK.E.io, immediateRender: false }, 1.0);
+      tl.fromTo(F, { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.24, ease: RK.E.out, immediateRender: false }, 1.0);
+      tl.fromTo(F, { scale: 1 }, { scale: 0.82, duration: 0.08, ease: RK.E.in, immediateRender: false }, 1.32);
+      tl.fromTo(F, { scale: 0.82 }, { scale: 1, duration: 0.14, ease: RK.E.out, immediateRender: false }, 1.42);
+      tl.fromTo($("s09-rp0"), { scale: 0.9, opacity: 0.8 }, { scale: 1.9, opacity: 0, duration: 0.5, ease: RK.E.out, immediateRender: false }, 1.35);
+      tl.fromTo($("s09-save"), { scale: 1 }, { scale: 0.97, duration: 0.08, ease: RK.E.in, immediateRender: false }, 1.33);
+      tl.fromTo($("s09-save"), { scale: 0.97 }, { scale: 1, duration: 0.3, ease: RK.E.out, immediateRender: false }, 1.41);
+      tl.fromTo(F, { opacity: 1, scale: 1 }, { opacity: 0, scale: 1.12, duration: 0.2, ease: RK.E.out, immediateRender: false }, 1.6);
+
+      // Slow push-in to the join.
+      tl.fromTo($("s09-tx"), { scale: 1 }, { scale: 1.03, duration: 4, ease: "none", transformOrigin: "960px 540px" }, 0);
+      window.__timelines["s09"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

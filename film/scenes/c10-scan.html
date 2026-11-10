@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c10"] .qs { position: absolute; left: 180px; top: 130px; width: 1560px; height: 820px; border-radius: 36px; overflow: hidden; background: #f7f6f8; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; }
+    [data-composition-id="c10"] .qs-l { position: absolute; left: 0; top: 0; width: 1000px; height: 820px; background: #0b0a0c; }
+    [data-composition-id="c10"] .ph { position: absolute; left: 50px; top: 130px; width: 900px; height: 563px; border-radius: 20px; box-shadow: 0 24px 70px -16px rgba(0,0,0,0.6); }
+    [data-composition-id="c10"] .qs-r { position: absolute; left: 1000px; top: 0; width: 560px; height: 820px; box-shadow: inset 2px 0 0 #e6e4e9; }
+    [data-composition-id="c10"] .qs-r > * { position: absolute; }
+    [data-composition-id="c10"] .logo { left: 50px; top: 44px; height: 56px; }
+    [data-composition-id="c10"] .eb { left: 0; top: 150px; width: 560px; text-align: center; font-size: 28px; font-weight: 700; color: #5f5d68; white-space: nowrap; }
+    [data-composition-id="c10"] .ti { left: 0; top: 190px; width: 560px; text-align: center; font-size: 56px; font-weight: 800; letter-spacing: -0.02em; color: #17161a; white-space: nowrap; }
+    [data-composition-id="c10"] .ti i { font-style: normal; color: #e1262f; }
+    [data-composition-id="c10"] .qr { left: 120px; top: 290px; width: 320px; height: 320px; padding: 22px; background: #fff; border-radius: 24px; box-shadow: 0 10px 30px -10px rgba(11,10,12,0.25); }
+    [data-composition-id="c10"] .qr img { width: 276px; height: 276px; display: block; }
+    [data-composition-id="c10"] .ins { left: 0; top: 616px; width: 560px; text-align: center; font-size: 26px; line-height: 32px; color: #5f5d68; white-space: nowrap; }
+    [data-composition-id="c10"] .bt2 { top: 728px; width: 220px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; }
+    [data-composition-id="c10"] .phone { position: absolute; left: 1470px; top: 160px; width: 420px; height: 860px; border-radius: 64px; background: #1b1a1f; box-shadow: 12px 12px 0 rgba(27,26,31,0.25); transform-origin: 210px 430px; z-index: 30; }
+    [data-composition-id="c10"] .screen { position: absolute; left: 16px; top: 16px; width: 388px; height: 828px; border-radius: 50px; overflow: hidden; background: #2a2930; }
+    [data-composition-id="c10"] .screen .vq { position: absolute; left: 64px; top: 260px; width: 260px; height: 260px; background: #fff; padding: 16px; border-radius: 12px; }
+    [data-composition-id="c10"] .screen .vq img { width: 228px; height: 228px; display: block; }
+    [data-composition-id="c10"] .vf { position: absolute; width: 60px; height: 60px; border: 0 solid #ffd23f; }
+    [data-composition-id="c10"] .scan { position: absolute; left: 50px; top: 250px; width: 288px; height: 8px; border-radius: 4px; background: #ffd23f; }
+    [data-composition-id="c10"] .chip { position: absolute; left: 44px; top: 600px; width: 300px; height: 76px; border-radius: 38px; background: #ffd23f; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 800; color: #1b1a1f; }
+    [data-composition-id="c10"] .white { position: absolute; left: 0; top: 0; width: 388px; height: 828px; background: #fff; opacity: 0; }
+  </style>
+  <div id="c10-root" class="oh" data-composition-id="c10" data-width="1920" data-height="1080" data-duration="7.0">
+    <div id="c10-ground" class="oh-ground clip" data-start="0" data-duration="7.0" data-track-index="0" style="background:#fff4e3"></div>
+    <div id="c10-world" class="oh-world">
+
+      <div id="c10-qs" class="qs">
+        <div class="qs-l"><img id="c10-ph" class="ph" src="assets/v2/photo.png" alt=""></div>
+        <div class="qs-r">
+          <img class="logo" src="assets/oh/sp-dsac-logo.png" alt="">
+          <p id="c10-eb" class="eb">Your photo is ready</p>
+          <p id="c10-ti" class="ti">Scan to download<i>.</i></p>
+          <div id="c10-qr" class="qr"><img src="assets/oh/qr.svg" alt=""></div>
+          <p class="ins">Opens a private download page.<br>Save it within 10 minutes: then<br>the photo is deleted from the booth.</p>
+          <div class="bt2" style="left:50px;box-shadow:inset 0 0 0 3px #e6e4e9;color:#17161a">Retake</div>
+          <div class="bt2" style="left:290px;background:#17161a;color:#fff">Done</div>
+        </div>
+      </div>
+      <div id="c10-phone" class="phone"><div class="screen">
+        <div class="vq"><img src="assets/oh/qr.svg" alt=""></div>
+        <i class="vf" style="left:40px;top:236px;border-top-width:8px;border-left-width:8px"></i><i class="vf" style="left:288px;top:236px;border-top-width:8px;border-right-width:8px"></i>
+        <i class="vf" style="left:40px;top:484px;border-bottom-width:8px;border-left-width:8px"></i><i class="vf" style="left:288px;top:484px;border-bottom-width:8px;border-right-width:8px"></i>
+        <i id="c10-scan" class="scan"></i>
+        <div id="c10-chip" class="chip">Open link</div>
+        <div id="c10-white" class="white"></div>
+      </div></div>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      tl.set([$("c10-chip"), $("c10-phone")], { opacity: 0 }, 0);
+      // 0.00 — the photo whips in from the left (continuing c09's throw) and lands on the dark panel; the screen pops.
+      tl.fromTo($("c10-qs"), { scale: 0.9 }, { scale: 1, duration: 0.5, ease: E.back }, 0.0);
+      tl.fromTo($("c10-ph"), { x: -2000, rotation: -18, filter: "blur(14px)" }, { x: 0, rotation: 0, filter: "blur(0px)", duration: 0.75, ease: E.out }, 0.0);
+      tl.fromTo($("c10-ph"), { scaleX: 1, scaleY: 1 }, { scaleX: 0.94, scaleY: 1.05, duration: 0.08, ease: E.out, immediateRender: false }, 0.5);
+      tl.fromTo($("c10-ph"), { scaleX: 0.94, scaleY: 1.05 }, { scaleX: 1, scaleY: 1, duration: 0.4, ease: E.pop, immediateRender: false }, 0.58);
+      OH.bounce(tl, $("c10-ti"), 0.5, { stagger: 0.03, y: 60 });
+      tl.fromTo($("c10-qr"), { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.6, ease: E.io }, 0.9);
+      // 2.10 — a phone rises in front of the QR, its camera finds the code: the scan line sweeps, "Open link".
+      tl.fromTo($("c10-qs"), { x: 0 }, { x: -220, duration: 0.7, ease: E.io, immediateRender: false }, 2.0);
+      tl.fromTo($("c10-phone"), { opacity: 0, y: 900, rotation: 14 }, { opacity: 1, y: 0, rotation: -4, duration: 0.7, ease: E.out, immediateRender: false }, 2.1);
+      [0, 1].forEach((k) => {
+        tl.fromTo($("c10-scan"), { y: 0 }, { y: 270, duration: 0.45, ease: E.io, immediateRender: false }, 2.8 + k * 0.9);
+        tl.fromTo($("c10-scan"), { y: 270 }, { y: 0, duration: 0.45, ease: E.io, immediateRender: false }, 3.25 + k * 0.9);
+      });
+      OH.pop(tl, $("c10-chip"), 3.9, { rot: -6 });
+      tl.fromTo($("c10-chip"), { scale: 1 }, { scale: 0.9, duration: 0.07, ease: E.in, immediateRender: false }, 4.8);
+      tl.fromTo($("c10-chip"), { scale: 0.9 }, { scale: 1, duration: 0.3, ease: E.pop, immediateRender: false }, 4.87);
+      // 5.30 — the page opens white and the phone rushes at the camera until its screen fills the frame (→ c11).
+      tl.fromTo($("c10-white"), { opacity: 0 }, { opacity: 1, duration: 0.25, immediateRender: false }, 5.3);
+      tl.fromTo($("c10-phone"), { x: 0, y: 0, rotation: -4, scale: 1 }, { x: -720, y: 110, rotation: 0, scale: 5.6, duration: 1.4, ease: E.in, immediateRender: false }, 5.6);
+
+      tl.set({}, {}, 7.0);
+      window.__timelines["c10"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c04"] .stage { position: absolute; left: 110px; top: 262px; width: 1180px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 60%; }
+    [data-composition-id="c04"] .cam { position: absolute; left: 84px; top: 98px; width: 1010px; height: 568px; overflow: hidden; background: #d8d4cc; }
+    [data-composition-id="c04"] .art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform: scale(0.526); transform-origin: 0 0; }
+    [data-composition-id="c04"] .art .lay { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c04"] .art .lay > img.full { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c04"] .av { position: absolute; }
+    [data-composition-id="c04"] .frm { position: absolute; left: 0; top: 0; width: 1180px; height: 738px; }
+    [data-composition-id="c04"] .rail { position: absolute; left: 1330px; top: 262px; width: 480px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 50%; }
+    [data-composition-id="c04"] .rail > * { position: absolute; }
+    [data-composition-id="c04"] .r-label { left: 40px; font-size: 32px; line-height: 40px; font-weight: 700; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c04"] .r-note { left: 40px; font-size: 28px; line-height: 36px; color: #5f5d68; white-space: nowrap; }
+    [data-composition-id="c04"] .r-input { left: 40px; width: 400px; height: 84px; padding: 0 20px; display: flex; align-items: center; border-radius: 22px; box-shadow: inset 0 0 0 3px #e6e4e9; font-size: 28px; white-space: nowrap; background: #fff; color: #17161a; }
+    [data-composition-id="c04"] .r-input .ph { color: #7d7b86; }
+    [data-composition-id="c04"] .r-btn { left: 40px; width: 400px; height: 84px; border-radius: 22px; background: #17161a; color: #fff; font-size: 30px; font-weight: 700; transform-origin: 50% 50%; }
+    [data-composition-id="c04"] .r-btn > span { position: absolute; left: 0; top: 0; width: 400px; height: 84px; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+    [data-composition-id="c04"] .caret { display: inline-block; width: 3px; height: 34px; margin-left: 2px; background: #17161a; border-radius: 2px; vertical-align: middle; }
+    [data-composition-id="c04"] .bt { position: absolute; width: 190px; height: 146px; border-radius: 22px; overflow: hidden; background: #fff; }
+    [data-composition-id="c04"] .bt img { position: absolute; left: 5px; top: 5px; width: 180px; height: 101px; border-radius: 16px; object-fit: cover; }
+    [data-composition-id="c04"] .bt span { position: absolute; left: 0; top: 106px; width: 190px; height: 40px; font-size: 28px; line-height: 40px; font-weight: 700; text-align: center; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c04"] .at { position: absolute; width: 120px; height: 120px; border-radius: 22px; background: #fff; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    [data-composition-id="c04"] .at img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    [data-composition-id="c04"] .ring { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 6px solid #e1262f; border-radius: 22px; }
+    [data-composition-id="c04"] .cur { position: absolute; left: -5px; top: -3px; width: 52px; height: 72px; z-index: 60; transform-origin: 5px 3px; filter: drop-shadow(4px 5px 0 rgba(27,26,31,0.35)); }
+    [data-composition-id="c04"] .bub { position: absolute; padding: 0 40px; height: 100px; display: flex; align-items: center; background: #fff; border-radius: 50px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 52px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; transform-origin: 20% 100%; }
+    [data-composition-id="c04"] .hd { position: absolute; left: 110px; top: 92px; font-size: 112px; line-height: 120px; font-weight: 900; letter-spacing: -0.045em; color: #1b1a1f; white-space: nowrap; }
+    [data-composition-id="c04"] .nm { position: absolute; left: 0; top: 0; width: 340px; height: 100px; line-height: 100px; text-align: center; opacity: 0; }
+    [data-composition-id="c04"] .hd2 { position: absolute; left: 110px; top: 92px; font-size: 112px; line-height: 120px; font-weight: 900; letter-spacing: -0.045em; color: #fff; -webkit-text-stroke: 10px #1b1a1f; paint-order: stroke fill; white-space: nowrap; }
+  </style>
+  <div id="c04-root" class="oh" data-composition-id="c04" data-width="1920" data-height="1080" data-duration="8.0">
+    <div id="c04-ground" class="oh-ground clip" data-start="0" data-duration="8.0" data-track-index="0" style="background:#59b6ff"></div>
+    <div id="c04-world" class="oh-world">
+
+      <div id="c04-hd" class="hd">Pick a place.</div>
+      <div id="c04-stage" class="stage"><div class="cam"><div class="art"><div id="c04-b0" class="lay"><img class="full" src="assets/oh/backgrounds/studio.svg" alt=""></div><div id="c04-b1" class="lay" style="opacity:0"><img class="full" src="assets/oh/backgrounds/sunset.svg" alt=""></div><div id="c04-b2" class="lay" style="opacity:0"><img class="full" src="assets/oh/backgrounds/space.svg" alt=""></div><div id="c04-b3" class="lay" style="opacity:0"><img class="full" src="assets/oh/backgrounds/neon.svg" alt=""></div><div id="c04-crew" class="lay"><img class="full" src="assets/v2/crew.svg" alt=""></div></div></div><img class="frm" src="assets/oh/frame-doodle.png" alt=""></div>
+      <div id="c04-rail" class="rail">
+        <p class="r-label" style="top:36px">Background</p>
+        <div class="r-input" style="top:92px"><span class="ph">Where do you want to be?</span></div>
+        <div class="r-btn" style="top:196px;opacity:0.4"><span>Make it</span></div>
+        <p class="r-note" style="top:300px">What you type is sent to<br>an online image service.</p>
+        <div id="c04-t-studio" class="bt" style="left:40px;top:400px"><img src="assets/oh/backgrounds/studio.svg" alt=""><span>Studio</span><i id="c04-r-studio" class="ring"></i></div><div id="c04-t-sunset" class="bt" style="left:250px;top:400px"><img src="assets/oh/backgrounds/sunset.svg" alt=""><span>Sunset</span><i id="c04-r-sunset" class="ring" style="opacity:0"></i></div><div id="c04-t-space" class="bt" style="left:40px;top:560px"><img src="assets/oh/backgrounds/space.svg" alt=""><span>Space</span><i id="c04-r-space" class="ring" style="opacity:0"></i></div><div id="c04-t-neon" class="bt" style="left:250px;top:560px"><img src="assets/oh/backgrounds/neon.svg" alt=""><span>Neon</span><i id="c04-r-neon" class="ring" style="opacity:0"></i></div>
+      </div>
+      <div id="c04-bub" class="bub" style="left:930px;top:196px;width:340px;padding:0"><span id="c04-nb1" class="nm">Sunset!</span><span id="c04-nb2" class="nm">Space!</span><span id="c04-nb3" class="nm">Neon!</span></div>
+      <div id="c04-hd2" class="hd2">Four, ready to go.</div>
+      <svg id="c04-cur" class="cur" viewBox="0 0 32 44"><path d="M3 2 28 24 17 25 23 40 17 43 11 27 3 34Z" fill="#fff" stroke="#1b1a1f" stroke-width="2.6" stroke-linejoin="round"/></svg>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      const cur = $("c04-cur");
+      tl.set(cur, { opacity: 0 }, 0);
+      const mv = (a, b, t, d = 0.45, click = true) => {
+        tl.fromTo(cur, { x: a[0], y: a[1] }, { x: b[0], y: b[1], duration: d, ease: E.io, immediateRender: false }, t);
+        if (click) { tl.fromTo(cur, { scale: 1 }, { scale: 0.78, duration: 0.07, ease: E.in, immediateRender: false }, t + d);
+          tl.fromTo(cur, { scale: 0.78 }, { scale: 1, duration: 0.3, ease: E.back, immediateRender: false }, t + d + 0.08); }
+        return t + d;
+      };
+      const curIn = (t) => tl.fromTo(cur, { opacity: 0 }, { opacity: 1, duration: 0.15, immediateRender: false }, t);
+      const curOut = (t) => tl.fromTo(cur, { opacity: 1 }, { opacity: 0, duration: 0.2, immediateRender: false }, t);
+
+      // 0.05 — the booth screen is thrown up into frame and the rail slides in after it (speed-ramped: fast, then a
+      // long soft landing, a little tilt left over).
+      tl.fromTo($("c04-stage"), { y: 900, rotation: -10 }, { y: 0, rotation: -1.5, duration: 0.9, ease: E.out }, 0.05);
+      tl.fromTo($("c04-rail"), { x: 760, rotation: 12 }, { x: 0, rotation: 1.5, duration: 0.9, ease: E.out }, 0.25);
+      OH.bounce(tl, $("c04-hd"), 0.45, { stagger: 0.04 });
+      tl.set($("c04-bub"), { opacity: 0 }, 0);
+      // Clicks: Sunset 2.0 · Space 3.2 · Neon 4.4. Each new place deals in from the right like a card
+      // (crawl, whip, settle), the guests hop, the name pops in a speech bubble.
+      const T = { studio: (1465, 717), sunset: (1675, 717), space: (1465, 877), neon: (1675, 877) };
+      curIn(1.45);
+      mv([1900, 1120], T.sunset, 1.45, 0.55);
+      mv(T.sunset, T.space, 2.75, 0.45);
+      mv(T.space, T.neon, 3.95, 0.45);
+      tl.fromTo(cur, { x: T.neon[0], y: T.neon[1] }, { x: 1900, y: 1150, duration: 0.6, ease: E.in, immediateRender: false }, 5.0);
+      const seq = [["sunset", "b1", 2.0, "nb1"], ["space", "b2", 3.2, "nb2"], ["neon", "b3", 4.4, "nb3"]];
+      let prev = "studio", prevB = "b0";
+      seq.forEach(([tid, bid, t, label]) => {
+        tl.fromTo($("c04-r-" + prev), { opacity: 1 }, { opacity: 0, duration: 0.08, immediateRender: false }, t);
+        tl.fromTo($("c04-r-" + tid), { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.35, ease: E.pop, immediateRender: false }, t);
+        tl.set($("c04-" + bid), { opacity: 1 }, t + 0.02);
+        tl.fromTo($("c04-" + bid), { x: 1920, rotation: 6 }, { x: 0, rotation: 0, duration: 0.5, ease: E.whip, immediateRender: false }, t + 0.02);
+        tl.fromTo($("c04-" + prevB), { x: 0, scale: 1 }, { x: -700, scale: 0.9, duration: 0.5, ease: E.whip, immediateRender: false }, t + 0.02);
+        tl.fromTo($("c04-crew"), { y: 0 }, { y: -70, duration: 0.18, ease: E.out, immediateRender: false }, t + 0.3);
+        tl.fromTo($("c04-crew"), { y: -70 }, { y: 0, duration: 0.3, ease: E.drop, immediateRender: false }, t + 0.48);
+        tl.set($("c04-" + label), { opacity: 1 }, t + 0.25); tl.set($("c04-" + label), { opacity: 0 }, t + 1.2);
+        tl.fromTo($("c04-bub"), { opacity: 0, scale: 0.2, rotation: -16 }, { opacity: 1, scale: 1, rotation: -4, duration: 0.45, ease: E.pop, immediateRender: false }, t + 0.25);
+        tl.fromTo($("c04-bub"), { opacity: 1, scale: 1 }, { opacity: 0, scale: 0.6, duration: 0.18, ease: E.in, immediateRender: false }, t + 0.98);
+        prev = tid; prevB = bid;
+      });
+      // 5.60 — the headline swaps: its letters fly off, the next line bounces up in the same place.
+      OH.flyOut(tl, $("c04-hd"), 5.6);
+      OH.bounce(tl, $("c04-hd2"), 5.95, { stagger: 0.035 });
+      tl.fromTo($("c04-world"), { scale: 1 }, { scale: 1.05, duration: 8, ease: "none", immediateRender: false }, 0);
+
+      tl.set({}, {}, 8.0);
+      window.__timelines["c04"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="150" viewBox="0 0 400 150">
+<defs><linearGradient id="lens" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b2f3a"/><stop offset="1" stop-color="#05060a"/></linearGradient></defs>
+<path d="M10 40 Q200 20 390 40 L388 52 Q200 34 12 52Z" fill="#111"/>
+<path d="M28 46 H180 Q186 46 184 56 L176 104 Q170 130 140 130 H70 Q40 130 34 104 L24 58 Q22 46 28 46Z" fill="url(#lens)" stroke="#111" stroke-width="8"/>
+<path d="M220 46 H372 Q378 46 376 58 L366 104 Q360 130 330 130 H260 Q230 130 224 104 L216 56 Q214 46 220 46Z" fill="url(#lens)" stroke="#111" stroke-width="8"/>
+<path d="M180 58 Q200 48 220 58" fill="none" stroke="#111" stroke-width="8"/>
+<path d="M50 62 L90 62 L62 96Z" fill="#fff" opacity="0.18"/><path d="M242 62 L282 62 L254 96Z" fill="#fff" opacity="0.18"/>
+</svg>

@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* The end card: the SP DSAC logo (the booth's own BrandMark image, a raster, so it rises in rather than drawing
+       on), held with the last chord, then a plain fade to white.
+       Fixed geometry. Logo 1087×286 shown at 760×200, centred → (580, 440). */
+    [data-composition-id="s12"] .s12-logo { position: absolute; left: 580px; top: 440px; width: 760px; height: 200px; }
+  </style>
+
+  <div id="s12-root" class="rk-scene" data-composition-id="s12" data-width="1920" data-height="1080" data-duration="3" data-qa-center="x" data-qa-endhold="1.2">
+    <div id="s12-ground" class="rk-ground clip" data-start="0" data-duration="3" data-track-index="0"></div>
+    <img id="s12-logo" class="s12-logo" src="assets/oh/sp-dsac-logo.png" alt="SP Data Science and Analytics Centre" data-qa="box">
+  </div>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+      // 0.10 — the logo rises in and settles with a slow push; 2.35 it fades off to white (plain opacity).
+      RK.rise(tl, $("s12-logo"), 0.1, { y: 16, dur: 0.7 });
+      tl.fromTo($("s12-logo"), { scale: 1 }, { scale: 1.03, duration: 2.9, ease: "none", immediateRender: false }, 0.1);
+      tl.fromTo($("s12-logo"), { opacity: 1 }, { opacity: 0, duration: 0.65, ease: "none", immediateRender: false }, 2.35);
+      window.__timelines["s12"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

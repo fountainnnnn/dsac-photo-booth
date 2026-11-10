@@ -1,0 +1,3 @@
+/* Roboto, the face the Open House booth prints on its frame (Apache 2.0, from the repo's public/fonts). */
+@font-face { font-family: "Roboto"; font-style: normal; font-weight: 100 900; font-display: block;
+  src: url("assets/kit/fonts/Roboto.woff2") format("woff2"); }

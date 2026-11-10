@@ -1,0 +1,9 @@
+node_modules/
+.bin/
+.qa/
+.film/
+renders/
+assets/bgm/bed-cut.wav
+.tmp/
+.media/
+.hyperframes/

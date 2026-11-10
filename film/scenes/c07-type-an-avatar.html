@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    [data-composition-id="c07"] .stage { position: absolute; left: 110px; top: 262px; width: 1180px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 60%; }
+    [data-composition-id="c07"] .cam { position: absolute; left: 84px; top: 98px; width: 1010px; height: 568px; overflow: hidden; background: #d8d4cc; }
+    [data-composition-id="c07"] .art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform: scale(0.526); transform-origin: 0 0; }
+    [data-composition-id="c07"] .art .lay { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c07"] .art .lay > img.full { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="c07"] .av { position: absolute; }
+    [data-composition-id="c07"] .frm { position: absolute; left: 0; top: 0; width: 1180px; height: 738px; }
+    [data-composition-id="c07"] .rail { position: absolute; left: 1330px; top: 262px; width: 480px; height: 738px; border-radius: 30px; overflow: hidden; background: #fff; box-shadow: 0 0 0 6px #1b1a1f, 16px 16px 0 6px #1b1a1f; transform-origin: 50% 50%; }
+    [data-composition-id="c07"] .rail > * { position: absolute; }
+    [data-composition-id="c07"] .r-label { left: 40px; font-size: 32px; line-height: 40px; font-weight: 700; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c07"] .r-note { left: 40px; font-size: 28px; line-height: 36px; color: #5f5d68; white-space: nowrap; }
+    [data-composition-id="c07"] .r-input { left: 40px; width: 400px; height: 84px; padding: 0 20px; display: flex; align-items: center; border-radius: 22px; box-shadow: inset 0 0 0 3px #e6e4e9; font-size: 28px; white-space: nowrap; background: #fff; color: #17161a; }
+    [data-composition-id="c07"] .r-input .ph { color: #7d7b86; }
+    [data-composition-id="c07"] .r-btn { left: 40px; width: 400px; height: 84px; border-radius: 22px; background: #17161a; color: #fff; font-size: 30px; font-weight: 700; transform-origin: 50% 50%; }
+    [data-composition-id="c07"] .r-btn > span { position: absolute; left: 0; top: 0; width: 400px; height: 84px; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+    [data-composition-id="c07"] .caret { display: inline-block; width: 3px; height: 34px; margin-left: 2px; background: #17161a; border-radius: 2px; vertical-align: middle; }
+    [data-composition-id="c07"] .bt { position: absolute; width: 190px; height: 146px; border-radius: 22px; overflow: hidden; background: #fff; }
+    [data-composition-id="c07"] .bt img { position: absolute; left: 5px; top: 5px; width: 180px; height: 101px; border-radius: 16px; object-fit: cover; }
+    [data-composition-id="c07"] .bt span { position: absolute; left: 0; top: 106px; width: 190px; height: 40px; font-size: 28px; line-height: 40px; font-weight: 700; text-align: center; color: #53515b; white-space: nowrap; }
+    [data-composition-id="c07"] .at { position: absolute; width: 120px; height: 120px; border-radius: 22px; background: #fff; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    [data-composition-id="c07"] .at img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    [data-composition-id="c07"] .ring { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 6px solid #e1262f; border-radius: 22px; }
+    [data-composition-id="c07"] .cur { position: absolute; left: -5px; top: -3px; width: 52px; height: 72px; z-index: 60; transform-origin: 5px 3px; filter: drop-shadow(4px 5px 0 rgba(27,26,31,0.35)); }
+    [data-composition-id="c07"] .bub { position: absolute; padding: 0 40px; height: 100px; display: flex; align-items: center; background: #fff; border-radius: 50px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 52px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; transform-origin: 20% 100%; }
+    [data-composition-id="c07"] .hd { position: absolute; left: 110px; top: 92px; font-size: 112px; line-height: 120px; font-weight: 900; letter-spacing: -0.045em; white-space: nowrap; }
+    [data-composition-id="c07"] .hd.lt { color: #fff; -webkit-text-stroke: 10px #1b1a1f; paint-order: stroke fill; }
+    [data-composition-id="c07"] .hd .hi { color: #ffd23f; }
+    [data-composition-id="c07"] .sticker { position: absolute; padding: 0 36px; height: 84px; display: flex; align-items: center; gap: 18px; background: #fff; border-radius: 48px; box-shadow: 0 0 0 6px #1b1a1f, 8px 8px 0 6px #1b1a1f; font-size: 38px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; color: #1b1a1f; z-index: 30; }
+    [data-composition-id="c07"] .tag { position: absolute; height: 72px; padding: 0 30px; display: flex; align-items: center; border-radius: 36px; background: #1b1a1f; color: #fff; font-size: 36px; font-weight: 900; letter-spacing: 0.04em; white-space: nowrap; z-index: 30; }
+    [data-composition-id="c07"] .watch { position: absolute; left: 1000px; top: 380px; width: 200px; height: 250px; transform-origin: 50% 40%; z-index: 30; }
+    [data-composition-id="c07"] .watch svg { width: 200px; height: 200px; }
+    [data-composition-id="c07"] .watch span { position: absolute; left: 10px; top: 196px; width: 180px; height: 52px; line-height: 52px; border-radius: 26px; background: #fff; box-shadow: 0 0 0 5px #1b1a1f; text-align: center; font-size: 30px; font-weight: 900; color: #1b1a1f; white-space: nowrap; }
+    [data-composition-id="c07"] #c07-wh { transform-origin: 100px 108px; }
+  </style>
+  <div id="c07-root" class="oh" data-composition-id="c07" data-width="1920" data-height="1080" data-duration="14.0">
+    <div id="c07-ground" class="oh-ground clip" data-start="0" data-duration="14.0" data-track-index="0" style="background:#ff4b3e"></div>
+    <div id="c07-world" class="oh-world">
+
+      <div id="c07-hd" class="hd lt">Or type what to wear.</div>
+      <div id="c07-hd2" class="hd lt">Animals become filters.</div>
+      <div id="c07-stage" class="stage"><div class="cam"><div class="art"><div id="c07-b0" class="lay"><img class="full" src="assets/v2/candy.svg" alt=""></div><div id="c07-crew" class="lay"><img class="full" src="assets/v2/crew.svg" alt=""><img id="c07-party-N" class="av" src="assets/oh/avatars/party-hat.svg" alt="" style="left:503px;top:240px;width:114px;height:148px;transform-origin:50% 100%"><img id="c07-party-R" class="av" src="assets/oh/avatars/party-hat.svg" alt="" style="left:903px;top:204px;width:114px;height:148px;transform-origin:50% 100%"><img id="c07-party-M" class="av" src="assets/oh/avatars/party-hat.svg" alt="" style="left:1303px;top:248px;width:114px;height:148px;transform-origin:50% 100%"><img id="c07-pirate-N" class="av" src="assets/v2/pirate-hat.svg" alt="" style="left:445px;top:273px;width:230px;height:126px;transform-origin:50% 90%"><img id="c07-pirate-R" class="av" src="assets/v2/pirate-hat.svg" alt="" style="left:845px;top:237px;width:230px;height:126px;transform-origin:50% 90%"><img id="c07-pirate-M" class="av" src="assets/v2/pirate-hat.svg" alt="" style="left:1245px;top:281px;width:230px;height:126px;transform-origin:50% 90%"><img id="c07-tears-N" class="av" src="assets/v2/tiger-ears.svg" alt="" style="left:430px;top:285px;width:260px;height:99px;transform-origin:50% 90%"><img id="c07-tears-R" class="av" src="assets/v2/tiger-ears.svg" alt="" style="left:830px;top:249px;width:260px;height:99px;transform-origin:50% 90%"><img id="c07-tears-M" class="av" src="assets/v2/tiger-ears.svg" alt="" style="left:1230px;top:293px;width:260px;height:99px;transform-origin:50% 90%"><img id="c07-tface-N" class="av" src="assets/v2/tiger-face.svg" alt="" style="left:425px;top:454px;width:270px;height:169px;transform-origin:50% 39%"><img id="c07-tface-R" class="av" src="assets/v2/tiger-face.svg" alt="" style="left:825px;top:430px;width:270px;height:169px;transform-origin:50% 39%"><img id="c07-tface-M" class="av" src="assets/v2/tiger-face.svg" alt="" style="left:1225px;top:460px;width:270px;height:169px;transform-origin:50% 39%"><img id="c07-shades-N" class="av" src="assets/oh/avatars/shades.svg" alt="" style="left:469px;top:457px;width:182px;height:68px;transform-origin:50% 42%"><img id="c07-shades-R" class="av" src="assets/oh/avatars/shades.svg" alt="" style="left:869px;top:423px;width:182px;height:68px;transform-origin:50% 42%"><img id="c07-shades-M" class="av" src="assets/oh/avatars/shades.svg" alt="" style="left:1269px;top:463px;width:182px;height:68px;transform-origin:50% 42%"><img id="c07-mous-N" class="av" src="assets/oh/avatars/moustache.svg" alt="" style="left:516px;top:537px;width:88px;height:32px;transform-origin:50% 40%"><img id="c07-mous-R" class="av" src="assets/oh/avatars/moustache.svg" alt="" style="left:916px;top:513px;width:88px;height:32px;transform-origin:50% 40%"><img id="c07-mous-M" class="av" src="assets/oh/avatars/moustache.svg" alt="" style="left:1316px;top:541px;width:88px;height:32px;transform-origin:50% 40%"></div></div></div><img class="frm" src="assets/oh/frame-doodle.png" alt=""></div>
+      <div id="c07-rail" class="rail">
+        <p class="r-label" style="top:36px">Avatars</p>
+        <p class="r-note" style="top:84px">Pick as many as you like,<br>one for each part of<br>the face.</p>
+        <div id="c07-in" class="r-input" style="top:212px"><span id="c07-ph" class="ph">What do you want to wear?</span><div id="c07-w1" style="position:absolute;left:20px;top:0;height:84px;display:flex;align-items:center;opacity:0"><span id="c07-t1"></span><i id="c07-k1" class="caret" style="opacity:0"></i></div><div id="c07-w2" style="position:absolute;left:20px;top:0;height:84px;display:flex;align-items:center;opacity:0"><span id="c07-t2"></span><i id="c07-k2" class="caret" style="opacity:0"></i></div></div>
+        <div id="c07-btn" class="r-btn" style="top:316px;opacity:0.4"><span id="c07-go">Make it</span><span id="c07-busy" style="opacity:0">Making your avatar…</span><span id="c07-go2" style="opacity:0">Make it</span></div>
+        <div id="c07-g1" style="position:absolute;left:0;top:0;width:480px;height:738px"><div id="c07g1-t-none" class="at" style="left:40px;top:432px"><svg viewBox="0 0 256 256" width="56" height="56"><circle cx="128" cy="128" r="96" fill="none" stroke="#a3a1ab" stroke-width="18"/><path d="M60 60 196 196" stroke="#a3a1ab" stroke-width="18" stroke-linecap="round"/></svg><i id="c07g1-r-none" class="ring" style="opacity:0"></i></div><div id="c07g1-t-shades" class="at" style="left:180px;top:432px"><img src="assets/oh/avatars/shades.svg" alt=""><i id="c07g1-r-shades" class="ring"></i></div><div id="c07g1-t-party" class="at" style="left:320px;top:432px"><img src="assets/oh/avatars/party-hat.svg" alt=""><i id="c07g1-r-party" class="ring"></i></div><div id="c07g1-t-cat" class="at" style="left:40px;top:572px"><img src="assets/oh/avatars/cat-ears.svg" alt=""><i id="c07g1-r-cat" class="ring" style="opacity:0"></i></div><div id="c07g1-t-crown" class="at" style="left:180px;top:572px"><img src="assets/oh/avatars/crown.svg" alt=""><i id="c07g1-r-crown" class="ring" style="opacity:0"></i></div><div id="c07g1-t-mous" class="at" style="left:320px;top:572px"><img src="assets/oh/avatars/moustache.svg" alt=""><i id="c07g1-r-mous" class="ring"></i></div></div><div id="c07-g2" style="position:absolute;left:0;top:0;width:480px;height:738px;opacity:0"><div id="c07g2-t-none" class="at" style="left:40px;top:432px"><svg viewBox="0 0 256 256" width="56" height="56"><circle cx="128" cy="128" r="96" fill="none" stroke="#a3a1ab" stroke-width="18"/><path d="M60 60 196 196" stroke="#a3a1ab" stroke-width="18" stroke-linecap="round"/></svg><i id="c07g2-r-none" class="ring" style="opacity:0"></i></div><div id="c07g2-t-pirate" class="at" style="left:180px;top:432px"><img src="assets/v2/pirate-hat.svg" alt=""><i id="c07g2-r-pirate" class="ring"></i></div><div id="c07g2-t-shades" class="at" style="left:320px;top:432px"><img src="assets/oh/avatars/shades.svg" alt=""><i id="c07g2-r-shades" class="ring"></i></div><div id="c07g2-t-party" class="at" style="left:40px;top:572px"><img src="assets/oh/avatars/party-hat.svg" alt=""><i id="c07g2-r-party" class="ring" style="opacity:0"></i></div><div id="c07g2-t-cat" class="at" style="left:180px;top:572px"><img src="assets/oh/avatars/cat-ears.svg" alt=""><i id="c07g2-r-cat" class="ring" style="opacity:0"></i></div><div id="c07g2-t-crown" class="at" style="left:320px;top:572px"><img src="assets/oh/avatars/crown.svg" alt=""><i id="c07g2-r-crown" class="ring" style="opacity:0"></i></div></div><div id="c07-g3" style="position:absolute;left:0;top:0;width:480px;height:738px;opacity:0"><div id="c07g3-t-none" class="at" style="left:40px;top:432px"><svg viewBox="0 0 256 256" width="56" height="56"><circle cx="128" cy="128" r="96" fill="none" stroke="#a3a1ab" stroke-width="18"/><path d="M60 60 196 196" stroke="#a3a1ab" stroke-width="18" stroke-linecap="round"/></svg><i id="c07g3-r-none" class="ring" style="opacity:0"></i></div><div id="c07g3-t-tiger" class="at" style="left:180px;top:432px"><img src="assets/v2/tiger-ears.svg" alt=""><i id="c07g3-r-tiger" class="ring"></i></div><div id="c07g3-t-pirate" class="at" style="left:320px;top:432px"><img src="assets/v2/pirate-hat.svg" alt=""><i id="c07g3-r-pirate" class="ring" style="opacity:0"></i></div><div id="c07g3-t-shades" class="at" style="left:40px;top:572px"><img src="assets/oh/avatars/shades.svg" alt=""><i id="c07g3-r-shades" class="ring" style="opacity:0"></i></div><div id="c07g3-t-party" class="at" style="left:180px;top:572px"><img src="assets/oh/avatars/party-hat.svg" alt=""><i id="c07g3-r-party" class="ring" style="opacity:0"></i></div><div id="c07g3-t-cat" class="at" style="left:320px;top:572px"><img src="assets/oh/avatars/cat-ears.svg" alt=""><i id="c07g3-r-cat" class="ring" style="opacity:0"></i></div></div>
+      </div>
+      <div id="c07-watch" class="watch"><svg viewBox="0 0 200 200"><circle cx="100" cy="108" r="78" fill="#fff" stroke="#1b1a1f" stroke-width="10"/><rect x="84" y="8" width="32" height="22" rx="6" fill="#1b1a1f"/><circle id="c07-wr" cx="100" cy="108" r="60" fill="none" stroke="#ff4b3e" stroke-width="22" stroke-dasharray="377" stroke-dashoffset="377" transform="rotate(-90 100 108)"/><line id="c07-wh" x1="100" y1="108" x2="100" y2="56" stroke="#1b1a1f" stroke-width="10" stroke-linecap="round"/><circle cx="100" cy="108" r="9" fill="#1b1a1f"/></svg><span>about 5 s</span></div>
+      <div id="c07-call" class="sticker" style="left:220px;top:962px">Ears up top. Nose and whiskers on the face.</div>
+      <svg id="c07-cur" class="cur" viewBox="0 0 32 44"><path d="M3 2 28 24 17 25 23 40 17 43 11 27 3 34Z" fill="#fff" stroke="#1b1a1f" stroke-width="2.6" stroke-linejoin="round"/></svg>
+
+    </div>
+  </div>
+  <script>
+    (() => {
+      const $ = (i) => document.getElementById(i);
+      const tl = gsap.timeline({ paused: true });
+      const E = OH.E;
+      const at0 = (els) => tl.set(els, { opacity: 0 }, 0);
+
+      const cur = $("c07-cur");
+      tl.set(cur, { opacity: 0 }, 0);
+      const mv = (a, b, t, d = 0.45, click = true) => {
+        tl.fromTo(cur, { x: a[0], y: a[1] }, { x: b[0], y: b[1], duration: d, ease: E.io, immediateRender: false }, t);
+        if (click) { tl.fromTo(cur, { scale: 1 }, { scale: 0.78, duration: 0.07, ease: E.in, immediateRender: false }, t + d);
+          tl.fromTo(cur, { scale: 0.78 }, { scale: 1, duration: 0.3, ease: E.back, immediateRender: false }, t + d + 0.08); }
+        return t + d;
+      };
+      const curIn = (t) => tl.fromTo(cur, { opacity: 0 }, { opacity: 1, duration: 0.15, immediateRender: false }, t);
+      const curOut = (t) => tl.fromTo(cur, { opacity: 1 }, { opacity: 0, duration: 0.2, immediateRender: false }, t);
+
+      // Typing helper: wrapper n shows, its text types out with a caret that blinks after.
+      const typeIn = (n, text, t, cps) => {
+        tl.set($("c07-w" + n), { opacity: 1 }, t);
+        const end = OH.type(tl, $("c07-t" + n), text, t, { cps });
+        tl.set($("c07-k" + n), { opacity: 1 }, t);
+        for (let k = 0; k < 4; k++) tl.set($("c07-k" + n), { opacity: k % 2 ? 1 : 0 }, end + 0.25 + k * 0.4);
+        return end;
+      };
+      const typeOut = (n, t) => tl.set($("c07-w" + n), { opacity: 0 }, t);
+
+      // The stopwatch: pops on, its ring fills and its hand sweeps (time compressed), pops off.
+      const watch = (t, d) => {
+        OH.pop(tl, $("c07-watch"), t, { dur: 0.45, rot: -20 });
+        tl.fromTo($("c07-wr"), { strokeDashoffset: 377 }, { strokeDashoffset: 0, duration: d, ease: E.io, immediateRender: false }, t + 0.1);
+        tl.fromTo($("c07-wh"), { rotation: 0 }, { rotation: 720, duration: d, ease: E.io, immediateRender: false }, t + 0.1);
+        OH.unpop(tl, $("c07-watch"), t + d + 0.15);
+      };
+      tl.set($("c07-watch"), { opacity: 0 }, 0);
+
+      const A = (k) => ["N", "R", "M"].map((f) => $("c07-" + k + "-" + f));
+      ["pirate", "tears", "tface"].forEach((k) => tl.set(A(k), { opacity: 0 }, 0));
+      tl.set([$("c07-hd2"), $("c07-call")], { opacity: 0 }, 0);
+      OH.bounce(tl, $("c07-hd"), 0.15, { stagger: 0.03 });
+      // 0.90 — click the box, type "a pirate hat", Make it → "Making your avatar…" under the stopwatch.
+      curIn(0.85); mv([1900, 1100], [1570, 516], 0.85, 0.5);
+      tl.fromTo($("c07-in"), { boxShadow: "inset 0 0 0 3px #e6e4e9" }, { boxShadow: "inset 0 0 0 5px #17161a", duration: 0.12, immediateRender: false }, 1.37);
+      tl.set($("c07-ph"), { opacity: 0 }, 1.5);
+      typeIn(1, "a pirate hat", 1.5, 15);
+      tl.fromTo($("c07-btn"), { opacity: 0.4 }, { opacity: 1, duration: 0.15, immediateRender: false }, 1.55);
+      mv([1570, 516], [1570, 620], 2.45, 0.3);
+      OH.press(tl, $("c07-btn"), 2.75);
+      tl.fromTo($("c07-btn"), { opacity: 1 }, { opacity: 0.4, duration: 0.15, immediateRender: false }, 2.8);
+      tl.set($("c07-go"), { opacity: 0 }, 2.8); tl.set($("c07-busy"), { opacity: 1 }, 2.8);
+      watch(2.9, 1.9);
+      // 5.00 — the hat is ready: party hats pop off, pirate hats spin down onto every head; its tile is chosen.
+      tl.set($("c07-busy"), { opacity: 0 }, 5.0); tl.set($("c07-go2"), { opacity: 1 }, 5.0);
+      tl.fromTo($("c07-btn"), { opacity: 0.4 }, { opacity: 1, duration: 0.15, immediateRender: false }, 5.0);
+      OH.unpop(tl, A("party"), 5.0, { stagger: 0.04 });
+      A("pirate").forEach((el, i) => {
+        const t = 5.15 + i * 0.08;
+        tl.fromTo(el, { opacity: 0, y: -500, rotation: -200 }, { opacity: 1, y: 0, rotation: 0, duration: 0.5, ease: E.out, immediateRender: false }, t);
+        tl.fromTo(el, { scaleX: 1, scaleY: 1 }, { scaleX: 1.2, scaleY: 0.8, duration: 0.07, ease: E.out, immediateRender: false }, t + 0.45);
+        tl.fromTo(el, { scaleX: 1.2, scaleY: 0.8 }, { scaleX: 1, scaleY: 1, duration: 0.4, ease: E.pop, immediateRender: false }, t + 0.52);
+      });
+      OH.unpop(tl, $("c07-g1"), 5.0, { dur: 0.18 });
+      tl.set($("c07-g2"), { opacity: 1 }, 5.15);
+      OH.pop(tl, $("c07-g2"), 5.15, { rot: 0, dur: 0.4 });
+      // 6.40 — new heading. "No avatars" clears them all (they pop off), then "a tiger".
+      OH.flyOut(tl, $("c07-hd"), 6.3);
+      tl.set($("c07-hd2"), { opacity: 1 }, 6.6);
+      OH.bounce(tl, $("c07-hd2"), 6.6, { stagger: 0.03 });
+      mv([1570, 620], [1430, 754], 6.6, 0.4);
+      tl.fromTo([$("c07g2-r-pirate"), $("c07g2-r-shades")], { opacity: 1 }, { opacity: 0, duration: 0.08, immediateRender: false }, 7.0);
+      tl.fromTo($("c07g2-r-none"), { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.3, ease: E.pop, immediateRender: false }, 7.0);
+      OH.unpop(tl, [...A("pirate"), ...A("shades"), ...A("mous")], 7.05, { stagger: 0.03 });
+      mv([1430, 754], [1570, 516], 7.6, 0.35);
+      typeOut(1, 7.95);
+      typeIn(2, "a tiger", 7.95, 18);
+      mv([1570, 516], [1570, 620], 8.45, 0.25);
+      OH.press(tl, $("c07-btn"), 8.7);
+      tl.fromTo($("c07-btn"), { opacity: 1 }, { opacity: 0.4, duration: 0.1, immediateRender: false }, 8.72);
+      tl.set($("c07-go2"), { opacity: 0 }, 8.72); tl.set($("c07-busy"), { opacity: 1 }, 8.72);
+      watch(8.8, 1.0);
+      // 10.00 — the tiger filter lands in pieces: ears drop onto heads, noses and whiskers stamp onto faces.
+      tl.set($("c07-busy"), { opacity: 0 }, 10.0); tl.set($("c07-go2"), { opacity: 1 }, 10.0);
+      tl.fromTo($("c07-btn"), { opacity: 0.4 }, { opacity: 1, duration: 0.15, immediateRender: false }, 10.0);
+      A("tears").forEach((el, i) => {
+        const t = 10.05 + i * 0.07;
+        tl.fromTo(el, { opacity: 0, y: -400, scaleY: 1.5 }, { opacity: 1, y: 0, scaleY: 1, duration: 0.4, ease: E.out, immediateRender: false }, t);
+      });
+      A("tface").forEach((el, i) => {
+        const t = 10.3 + i * 0.07;
+        tl.fromTo(el, { opacity: 0, scale: 2.4 }, { opacity: 1, scale: 0.9, duration: 0.18, ease: E.in, immediateRender: false }, t);
+        tl.fromTo(el, { scale: 0.9 }, { scale: 1, duration: 0.35, ease: E.pop, immediateRender: false }, t + 0.18);
+      });
+      tl.set($("c07-g2"), { opacity: 0 }, 10.0);
+      tl.set($("c07-g3"), { opacity: 1 }, 10.0);
+      OH.pop(tl, $("c07-g3"), 10.0, { rot: 0, dur: 0.4 });
+      OH.pop(tl, $("c07-call"), 10.9, { rot: 5 });
+      curOut(11.0);
+      // 12.20 — a roar: the crew leans in and springs back.
+      tl.fromTo($("c07-crew"), { scale: 1 }, { scale: 1.08, duration: 0.15, ease: E.out, transformOrigin: "960px 700px", immediateRender: false }, 12.2);
+      tl.fromTo($("c07-crew"), { scale: 1.08 }, { scale: 1, duration: 0.5, ease: E.pop, transformOrigin: "960px 700px", immediateRender: false }, 12.35);
+      tl.fromTo($("c07-world"), { scale: 1 }, { scale: 1.04, duration: 14, ease: "none", immediateRender: false }, 0);
+
+      tl.set({}, {}, 14.0);
+      window.__timelines["c07"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>

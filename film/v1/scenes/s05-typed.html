@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<template>
+  <style>
+    /* Or type your own: the rail's "type a background" box (CameraView TypeABackground). A fingertip taps the box,
+       "a tropical beach" is typed, Make it is tapped; the button reads "Making your background…" while the image
+       model draws it; the beach lands behind Maya and Jun and a "Yours" tile is chosen. Sunset (s04's last pick)
+       is behind them at the start.
+       Fixed geometry (frame px). Line as s04 (96 on 104, top 90). Frame as s04 but at left 130 (internals the
+       same). Panel 560 wide (the placeholder needs 440 of content) at (1230, 301), 60 padding → content 1290–1730:
+         label 361–401 · input 421–505 (84, radius 24) · Make it 525–609 · note 621–661 · tile row 691–861
+         (tiles 210 wide, gap 20: 1290–1500 | 1520–1730; picture 202×114 + label 48 + border 8 = 170).
+       Panel 620 tall, centred on the frame's 611. Union 130–1790 → centre x 960.
+       Taps: the box (1600, 463); Make it (1510, 567). */
+    [data-composition-id="s05"] .s05-line { position: absolute; left: 0; top: 90px; width: 1920px; line-height: 104px; white-space: nowrap; }
+    [data-composition-id="s05"] .s05-frame { position: absolute; left: 130px; top: 280px; width: 1060px; height: 663px; border-radius: 24px; overflow: hidden; background: #fff;
+      box-shadow: var(--ui-shadow-stage); }
+    [data-composition-id="s05"] .s05-cam { position: absolute; left: 76px; top: 88px; width: 907px; height: 511px; overflow: hidden; background: #dcd8d0; }
+    [data-composition-id="s05"] .s05-art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform: scale(0.4727); transform-origin: 0 0; }
+    [data-composition-id="s05"] .s05-art img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    [data-composition-id="s05"] .s05-artwork { position: absolute; left: 0; top: 0; width: 1060px; height: 663px; }
+
+    [data-composition-id="s05"] .s05-panel { position: absolute; left: 1230px; top: 301px; width: 560px; height: 620px; padding: 60px; background: #fff; border-radius: 48px; color: var(--ink);
+      box-shadow: var(--ui-shadow-stage); }
+    [data-composition-id="s05"] .s05-label { height: 40px; font-size: 30px; line-height: 40px; font-weight: 600; color: var(--ui-muted); white-space: nowrap; }
+    [data-composition-id="s05"] .s05-input { position: relative; margin-top: 20px; height: 84px; padding: 0 24px; display: flex; align-items: center; border-radius: 24px;
+      box-shadow: inset 0 0 0 2px #e6e4e9; font-size: 30px; white-space: nowrap; }
+    [data-composition-id="s05"] .s05-ph { position: absolute; left: 24px; top: 0; line-height: 84px; color: #a3a1ab; }
+    [data-composition-id="s05"] .s05-typed { color: var(--ink); }
+    [data-composition-id="s05"] .s05-caret { display: inline-block; width: 3px; height: 36px; margin-left: 2px; background: var(--ink); border-radius: 2px; opacity: 0; }
+    [data-composition-id="s05"] .s05-btn { position: relative; margin-top: 20px; height: 84px; border-radius: 24px; background: var(--ink); color: #fff; transform-origin: 50% 50%; }
+    [data-composition-id="s05"] .s05-btn span { position: absolute; left: 0; top: 0; width: 440px; height: 84px; display: flex; align-items: center; justify-content: center;
+      font-size: 30px; font-weight: 600; white-space: nowrap; }
+    [data-composition-id="s05"] .s05-note { position: relative; margin-top: 12px; height: 40px; font-size: 30px; line-height: 40px; color: #8b8993; white-space: nowrap; }
+    [data-composition-id="s05"] .s05-note span { position: absolute; left: 0; top: 0; }
+    [data-composition-id="s05"] .s05-row { position: relative; margin-top: 30px; height: 170px; }
+    [data-composition-id="s05"] .s05-tiles { position: absolute; left: 0; top: 0; display: flex; gap: 20px; }
+    [data-composition-id="s05"] .s05-tile { position: relative; width: 210px; height: 170px; border: 4px solid transparent; border-radius: 24px; overflow: hidden; }
+    [data-composition-id="s05"] .s05-tile img { display: block; width: 202px; height: 114px; object-fit: cover; }
+    [data-composition-id="s05"] .s05-tile span { display: block; height: 48px; padding-top: 4px; font-size: 30px; line-height: 40px; font-weight: 600; text-align: center; color: var(--ui-muted); white-space: nowrap; }
+    [data-composition-id="s05"] .s05-tile.is-on { border-color: var(--ui-accent); }
+
+    [data-composition-id="s05"] .s05-finger { position: absolute; left: 0; top: 0; z-index: 5; width: 76px; height: 76px; border-radius: 50%; background: rgba(23, 22, 26, 0.16);
+      border: 2px solid rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 1.5px rgba(23, 22, 26, 0.16), 0 8px 22px rgba(0, 0, 0, 0.2); opacity: 0; transform-origin: 50% 50%; }
+    [data-composition-id="s05"] .s05-ripple { position: absolute; z-index: 4; width: 76px; height: 76px; border-radius: 50%; border: 3px solid rgba(23, 22, 26, 0.3); opacity: 0; transform-origin: 50% 50%; }
+  </style>
+
+  <div id="s05-root" class="rk-scene on-stage" data-composition-id="s05" data-width="1920" data-height="1080" data-duration="5.5" data-qa-center="x">
+    <div id="s05-ground" class="rk-ground is-stage clip" data-start="0" data-duration="5.5" data-track-index="0"></div>
+    <div id="s05-world" class="rk-world" data-qa-camera>
+      <div id="s05-line" class="s05-line t-title">Or type your own.</div>
+
+      <div id="s05-frame" class="s05-frame" data-qa="box">
+        <div class="s05-cam">
+          <div class="s05-art">
+            <img src="assets/oh/backgrounds/sunset.svg" alt="">
+            <img id="s05-beach" src="assets/oh/beach.svg" alt="" style="opacity: 0">
+            <img src="assets/oh/guests.svg" alt="">
+          </div>
+        </div>
+        <img class="s05-artwork" src="assets/oh/frame-doodle.png" alt="">
+      </div>
+
+      <div id="s05-panel" class="s05-panel" data-qa="box">
+        <p class="s05-label">Background</p>
+        <div id="s05-input" class="s05-input" data-qa="box">
+          <span id="s05-ph" class="s05-ph">Where do you want to be?</span>
+          <span id="s05-typed" class="s05-typed"></span><i id="s05-caret" class="s05-caret" data-qa-ignore></i>
+        </div>
+        <div id="s05-btn" class="s05-btn" data-qa="box"><span id="s05-go">Make it</span><span id="s05-busy" style="opacity: 0">Making your background…</span><span id="s05-again" style="opacity: 0">Make it</span></div>
+        <p class="s05-note"><span id="s05-n3">3 tries left.</span><span id="s05-n2" style="opacity: 0">2 tries left.</span></p>
+        <div class="s05-row">
+          <div id="s05-before" class="s05-tiles">
+            <div class="s05-tile"><img src="assets/oh/backgrounds/studio.svg" alt=""><span>Studio</span></div>
+            <div class="s05-tile is-on"><img src="assets/oh/backgrounds/sunset.svg" alt=""><span>Sunset</span></div>
+          </div>
+          <div id="s05-after" class="s05-tiles" style="opacity: 0">
+            <div class="s05-tile is-on"><img src="assets/oh/beach.svg" alt=""><span>Yours</span></div>
+            <div class="s05-tile"><img src="assets/oh/backgrounds/studio.svg" alt=""><span>Studio</span></div>
+          </div>
+        </div>
+      </div>
+
+      <i id="s05-rp0" class="s05-ripple" data-qa-ignore style="left: 1562px; top: 425px"></i>
+      <i id="s05-rp1" class="s05-ripple" data-qa-ignore style="left: 1472px; top: 529px"></i>
+      <i id="s05-finger" class="s05-finger" data-qa-ignore></i>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const tl = gsap.timeline({ paused: true });
+      const F = $("s05-finger"), FR = 38;
+      const at = (x, y) => ({ x: x - FR, y: y - FR });
+      const glide = (a, b, t, dur) => tl.fromTo(F, at(...a), { ...at(...b), duration: dur, ease: RK.E.io, immediateRender: false }, t);
+      const touch = (o0, o1, s0, s1, t, dur) => tl.fromTo(F, { opacity: o0, scale: s0 }, { opacity: o1, scale: s1, duration: dur, ease: RK.E.out, immediateRender: false }, t);
+      const tap = (t, ripple) => {
+        tl.fromTo(F, { scale: 1 }, { scale: 0.82, duration: 0.08, ease: RK.E.in, immediateRender: false }, t - 0.03);
+        tl.fromTo(F, { scale: 0.82 }, { scale: 1, duration: 0.14, ease: RK.E.out, immediateRender: false }, t + 0.07);
+        tl.fromTo(ripple, { scale: 0.9, opacity: 0.8 }, { scale: 1.9, opacity: 0, duration: 0.5, ease: RK.E.out, immediateRender: false }, t);
+      };
+
+      // 0.00 — the line builds as the zoom settles; the screen is already up.
+      RK.words(tl, $("s05-line"), 0.0, { stagger: 0.07 });
+
+      // 0.40 — a fingertip comes down on the box; 0.70 tap: it takes focus (an ink outline).
+      glide([1640, 520], [1600, 463], 0.4, 0.26);
+      touch(0, 1, 1.25, 1, 0.4, 0.22);
+      tap(0.70, $("s05-rp0"));
+      tl.fromTo($("s05-input"), { boxShadow: "inset 0 0 0 2px #e6e4e9" }, { boxShadow: "inset 0 0 0 4px #17161a", duration: 0.14, ease: RK.E.out, immediateRender: false }, 0.72);
+      touch(1, 0, 1, 1.12, 0.92, 0.18);
+
+      // 0.95 — the placeholder clears and "a tropical beach" is typed (typing sfx 0.95–1.65).
+      tl.set($("s05-ph"), { opacity: 0 }, 0.95);
+      const typedEnd = RK.type(tl, $("s05-typed"), "a tropical beach", 0.95, { cps: 23, caret: $("s05-caret"), caretHold: 0.4 });
+
+      // 1.85 — the fingertip comes down on Make it; 2.15 tap (click sfx): it greys while the picture is made.
+      glide([1560, 640], [1510, 567], 1.85, 0.26);
+      touch(0, 1, 1.25, 1, 1.85, 0.22);
+      tap(2.15, $("s05-rp1"));
+      RK.press(tl, $("s05-btn"), 2.13);
+      touch(1, 0, 1, 1.12, 2.4, 0.2);
+      RK.out(tl, $("s05-go"), 2.2, { dur: 0.12 });
+      tl.fromTo($("s05-btn"), { opacity: 1 }, { opacity: 0.4, duration: 0.2, ease: RK.E.out, immediateRender: false }, 2.2);
+      RK.rise(tl, $("s05-busy"), 2.3, { y: 8, dur: 0.3 });
+
+      // 3.40 — the beach lands behind them, and "Yours" is chosen in the row; the button is ready again.
+      tl.fromTo($("s05-beach"), { opacity: 0, scale: 1.05 }, { opacity: 1, scale: 1, duration: 0.6, ease: RK.E.out, transformOrigin: "960px 540px", immediateRender: false }, 3.4);
+      RK.out(tl, $("s05-before"), 3.4, { dur: 0.16 });
+      RK.rise(tl, $("s05-after"), 3.52, { y: 12, dur: 0.45 });
+      RK.out(tl, $("s05-busy"), 3.4, { dur: 0.12 });
+      tl.fromTo($("s05-btn"), { opacity: 0.4 }, { opacity: 1, duration: 0.2, ease: RK.E.out, immediateRender: false }, 3.5);
+      RK.rise(tl, $("s05-again"), 3.52, { y: 8, dur: 0.3 });
+      RK.swap(tl, $("s05-n3"), $("s05-n2"), 3.5);
+
+      // Slow push-in over the whole scene.
+      tl.fromTo($("s05-world"), { scale: 1 }, { scale: 1.025, duration: 5.5, ease: "none", transformOrigin: "960px 600px" }, 0);
+      window.__timelines["s05"] = tl;
+    })();
+  </script>
+</template>
+</body>
+</html>
