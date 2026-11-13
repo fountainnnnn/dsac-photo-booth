@@ -46,7 +46,7 @@ export default function DownloadPage({ token }: DownloadPageProps) {
         <div className="flex flex-col gap-6 px-6 py-6">
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a1a1aa]">Your photo</p>
-            <h1 className="mt-1 text-2xl font-semibold leading-tight tracking-tight">Save your DSAC photo.</h1>
+            <h1 className="mt-1 text-2xl font-semibold leading-tight tracking-tight">Save your Open House photo.</h1>
             <p className="mt-1.5 text-sm leading-6 text-[#52525b]">
               {gone
                 ? 'This photo is no longer available: the booth deletes photos a few minutes after they are taken.'

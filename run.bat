@@ -1,12 +1,12 @@
 @echo off
 setlocal
-title DSAC Photo Booth
+title Open House Photo Booth
 
 cd /d "%~dp0"
 
 echo.
 echo   ============================================
-echo     DSAC Photo Booth
+echo     Open House Photo Booth
 echo   ============================================
 echo.
 
