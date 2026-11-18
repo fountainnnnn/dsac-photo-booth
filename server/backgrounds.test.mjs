@@ -30,7 +30,9 @@ function fakeOpenRouter({
     if (url.endsWith('/images')) return image(body);
     if (body.plugins) return lookup(body);
     const looking = Array.isArray(body.messages[1].content);
-    const verdict = looking ? check : screen;
+    const answer = looking ? check : screen;
+    // A function answers each request in turn: a check that changes its mind.
+    const verdict = typeof answer === 'function' ? answer(body) : answer;
     return verdict instanceof Response ? verdict : chat(verdict);
   });
 }
@@ -106,10 +108,26 @@ describe('the prompt', () => {
   });
 
   it('makes room for the number of people posing', () => {
-    expect(buildPrompt('a forest', 1)).toMatch(/for one person standing there/);
-    expect(buildPrompt('a forest', 3)).toMatch(/wide enough for three people standing side by side/);
+    expect(buildPrompt('a forest', 1)).toMatch(/wide enough for one person, waist up/);
+    expect(buildPrompt('a forest', 3)).toMatch(/wide enough for three people side by side/);
     expect(buildPrompt('a forest', 0)).toMatch(/a small group of people/);
     expect(peoplePhrase(9)).toBe('six people');
+  });
+
+  it('leaves the place empty of people, the visitors included', () => {
+    // Told to leave room for four people, the model drew four people there.
+    const p = buildPrompt('a zoo', 4);
+    expect(p).toMatch(/wide enough for four people side by side/);
+    expect(p).not.toMatch(/people standing/);
+    expect(p).toMatch(/the booth adds the visitors there later, so do not draw them/);
+    expect(p).toMatch(/NO PEOPLE: Show the place deserted/);
+    // Before the layout, so the empty place is decided first.
+    expect(p.indexOf('NO PEOPLE')).toBeLessThan(p.indexOf('COMPOSITION'));
+    expect(p).toMatch(/No visitors, tourists, crowds, staff or passers-by/);
+    // A person the guest asks for is still drawn.
+    expect(p).toMatch(/The only exception is a character, mascot or person the place itself names/);
+    expect(screenRequest('a zoo').messages[0].content).toMatch(/Never add people, visitors, tourists or crowds/);
+    expect(checkRequest({ mime: 'image/png', bytes: PNG }, 'a zoo').messages[0].content).toMatch(/"shows_bystanders"/);
   });
 
   it('trims, collapses and caps what was typed', () => {
@@ -203,7 +221,7 @@ describe('createBackgrounds', () => {
     // The model is given the screened description, never the typed words.
     expect(prompt).toContain('"a quiet beach at sunset"');
     expect(prompt).not.toContain('A Beach');
-    expect(prompt).toMatch(/two people standing side by side/);
+    expect(prompt).toMatch(/two people side by side/);
 
     // The same words for the same group are not paid for, or checked, twice.
     const again = await bg.generate('  a   beach ', { apiKey: 'sk-test', people: 2 });
@@ -280,6 +298,29 @@ describe('createBackgrounds', () => {
       await expect(bg.generate('a beach', { apiKey: 'k' })).rejects.toMatchObject({ code });
       expect(fs.existsSync(dir) ? fs.readdirSync(dir) : []).toHaveLength(0);
     }
+  });
+
+  it('draws a picture with strangers in it once more, and keeps the clean one', async () => {
+    const verdicts = [
+      { safe: true, is_backdrop: false, shows_bystanders: true, reason: 'tourists on the path' },
+      { safe: true, is_backdrop: false, shows_bystanders: false, reason: 'fine' },
+    ];
+    const fetchImpl = fakeOpenRouter({ check: () => verdicts.shift() });
+    const dir = tempDir();
+    const made = await createBackgrounds(dir, { fetchImpl }).generate('a zoo', { apiKey: 'k' });
+    expect(made.cached).toBe(false);
+    expect(calls(fetchImpl, '/images')).toHaveLength(2);
+    expect(fs.readdirSync(dir)).toHaveLength(1);
+  });
+
+  it('gives up after one redraw, and keeps nothing', async () => {
+    const stubborn = { safe: true, is_backdrop: false, shows_bystanders: true, reason: 'a crowd' };
+    const fetchImpl = fakeOpenRouter({ check: stubborn });
+    const dir = tempDir();
+    await expect(createBackgrounds(dir, { fetchImpl }).generate('a zoo', { apiKey: 'k' }))
+      .rejects.toMatchObject({ code: 'failed' });
+    expect(calls(fetchImpl, '/images')).toHaveLength(2);
+    expect(fs.existsSync(dir) ? fs.readdirSync(dir) : []).toHaveLength(0);
   });
 
   it('calls a content refusal the guest’s to fix, anything else ours', async () => {

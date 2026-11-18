@@ -24,7 +24,10 @@ import path from 'node:path';
  *    sees it (`checkRequest`), and turned away if it shows anything it should
  *    not, or is a banner in a room rather than the place itself. (Asked as
  *    "does it fill the frame?", the model read the booth's own frame into it
- *    and failed a picture it called suitable in the same breath.)
+ *    and failed a picture it called suitable in the same breath.) A banner,
+ *    or a scene with people in it the guest did not ask for, is drawn again
+ *    once: the guests are pasted in front of it, so strangers would stand
+ *    among them.
  *
  * What is turned away is violent or sexual content, and only that: memes,
  * games, characters, real people, brands, words in the picture and silly ideas
@@ -72,7 +75,12 @@ const MAX_PEOPLE = 6;
  * Part of every cached picture's name. Raised whenever the instructions
  * change, so a picture made under the old ones is never handed out again.
  */
-const PROMPT_VERSION = 8;
+const PROMPT_VERSION = 9;
+/**
+ * Pictures drawn per request, when one comes out as a backdrop or with people
+ * in it nobody asked for. Each is billed, so one redraw and no more.
+ */
+const DRAW_ATTEMPTS = 2;
 
 /**
  * A guard against a runaway, not a per-guest limit (the capture screen keeps
@@ -206,9 +214,12 @@ export function peoplePhrase(people) {
 export function buildPrompt(place, people = 0, looks = []) {
   const who = peoplePhrase(people);
   const n = Math.round(Number(people));
+  // Told to leave room "for four people standing side by side", the image
+  // model drew the four people, and the guests were pasted over them. So the
+  // room is a width, and the empty place comes first, before any layout.
   const room = n === 1
-    ? 'Keep the middle of the lower two-thirds open and uncluttered for one person standing there, waist up.'
-    : `Keep the lower two-thirds of the middle open and uncluttered, wide enough for ${who} standing side by side, waist up.`;
+    ? 'Keep the middle of the lower two-thirds open and uncluttered, wide enough for one person, waist up.'
+    : `Keep the lower two-thirds of the middle open and uncluttered, wide enough for ${who} side by side, waist up.`;
   return [
     'PURPOSE: This picture is the background for a live photo booth at a school open day, for visitors of all ages.',
     'The booth cuts the visitors out of its camera and places them in front of this picture, so the picture must be the place itself: the world they will appear to be standing in.',
@@ -217,11 +228,15 @@ export function buildPrompt(place, people = 0, looks = []) {
     'Show exactly what it describes, including any pose or action, however unusual, and nothing it does not ask for.',
     ...looks.map(l => `WHAT ${cleanPlace(l.name).toUpperCase()} LOOKS LIKE: ${cleanPlace(l.looks).replace(/"/g, "'")} Draw it like this, recognisably.`),
     '',
+    'NO PEOPLE: Show the place deserted, as if photographed just before it opened. No visitors, tourists, crowds, staff or passers-by anywhere in the picture, near or far, not even small, blurred or in silhouette.',
+    'The only exception is a character, mascot or person the place itself names.',
+    '',
     'FRAMING: Fill the entire frame, edge to edge, with the place, as a photograph taken while standing in it.',
     'Do not show a backdrop, banner, poster, canvas, mural, painting on a wall, picture frame, border, photo studio, stand, curtain or room around the scene. No vignette.',
     '',
-    `COMPOSITION: Eye level, as seen by a camera about two metres in front of ${who}. ${room}`,
-    'Put open ground or floor there, with nothing tall in the middle; let the interesting parts of the place sit around and behind them, at a natural scale for people standing in it.',
+    `COMPOSITION: Eye level, from about two metres in front of the middle of the scene. ${room}`,
+    'Leave that space empty: the booth adds the visitors there later, so do not draw them.',
+    'Put open ground or floor there, with nothing tall in the middle; let the interesting parts of the place sit around and behind it, at a natural scale for someone standing in it.',
     '',
     'LIGHT AND STYLE: Photorealistic unless the place asks for a style. A character, mascot or meme in it keeps its own well-known look, even in a real place: a cartoon character stays a cartoon. Bright, soft, even light from the front, to match people lit indoors. Sharp throughout.',
     '',
@@ -258,6 +273,7 @@ const SCREEN_RULES = [
   'films, characters, mascots, celebrities, brands, food, sport, music, words to show in the picture, and silly or abstract ideas.',
   'Turn anything that is not a place into a fun scene built around it, with any character in it to one side or in the distance.',
   'Keep every detail the visitor gave, exactly: what things are doing, poses, colours and numbers. Never put anything in the centre, which is where the visitors stand.',
+  'Never add people, visitors, tourists or crowds to the scene: the booth adds the visitors itself. Only a character or person the visitor names belongs in it.',
   'Add a style such as whimsical, surreal, dreamy or magical only if the visitor asked for one.',
   'Keep the visitor\x27s own names for characters, memes, people and things, spelled as they typed them, so the image model knows exactly what they mean.',
   'When you do not recognise a name, do not describe it or guess at what it means: it is most likely a meme or character the image model knows.',
@@ -313,9 +329,11 @@ const CHECK_RULES = [
   'Everything else is fine: characters, creatures, memes, people in the scene, brands, words, spooky or silly scenes.',
   'It is a backdrop only if the whole scene is shown as a picture: printed on a backdrop, banner, poster or canvas, framed, on a screen, or hanging in a studio or room.',
   'A scene that fills the whole picture is not a backdrop, whatever it shows.',
+  'It shows bystanders if any human figure is in it, near or far, that the request did not name: visitors, tourists, crowds, staff, passers-by, even small, blurred or in silhouette.',
+  'A character, mascot or person the request names is not a bystander.',
   '',
   'Reply with JSON only, no other text:',
-  '{"safe": true or false, "is_backdrop": true or false, "reason": "a few words"}',
+  '{"safe": true or false, "is_backdrop": true or false, "shows_bystanders": true or false, "reason": "a few words"}',
 ].join('\n');
 
 /** The request that has the small model look at a finished picture. */
@@ -502,42 +520,49 @@ export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
     // How any meme or character named looks, from the web.
     const looks = await lookUp(verdict.look_up, apiKey, checkModel);
 
-    // 3. The picture.
-    const made = await post(
-      IMAGES_ENDPOINT, requestBody(place, model, n, looks), apiKey, TIMEOUT_MS,
-      'Could not reach the image service. Pick one of ours for now.',
-    );
-    if (!made.res.ok) {
-      logFailure('Background generation', made.res, made.json);
-      // A refusal on content is the guest's to fix; anything else is ours.
-      if (made.res.status === 400 || made.res.status === 403) {
+    let image;
+    for (let attempt = 1; ; attempt++) {
+      // 3. The picture.
+      const made = await post(
+        IMAGES_ENDPOINT, requestBody(place, model, n, looks), apiKey, TIMEOUT_MS,
+        'Could not reach the image service. Pick one of ours for now.',
+      );
+      if (!made.res.ok) {
+        logFailure('Background generation', made.res, made.json);
+        // A refusal on content is the guest's to fix; anything else is ours.
+        if (made.res.status === 400 || made.res.status === 403) {
+          throw new BackgroundError('refused', 'The image service would not draw that one; it turns down some well-known characters. Try another place.');
+        }
+        throw new BackgroundError('failed', 'The image service is not answering. Pick one of ours for now.');
+      }
+      image = imageFrom(made.json);
+      if (!image) {
         throw new BackgroundError('refused', 'The image service would not draw that one; it turns down some well-known characters. Try another place.');
       }
-      throw new BackgroundError('failed', 'The image service is not answering. Pick one of ours for now.');
-    }
-    const image = imageFrom(made.json);
-    if (!image) {
-      throw new BackgroundError('refused', 'The image service would not draw that one; it turns down some well-known characters. Try another place.');
-    }
 
-    // 4. Look at it before anyone else does.
-    const looked = await post(CHAT_ENDPOINT, checkRequest(image, place, n, checkModel), apiKey, CHECK_TIMEOUT_MS, noCheck);
-    if (!looked.res.ok) {
-      logFailure('Checking a generated background', looked.res, looked.json);
-      throw new BackgroundError('failed', noCheck);
-    }
-    const seen = jsonFrom(looked.json);
-    if (typeof seen?.safe !== 'boolean') {
-      console.error('  Checking a generated background gave no verdict; turning it away.');
-      throw new BackgroundError('failed', noCheck);
-    }
-    if (!seen.safe) {
-      console.warn(`  A generated background was turned away as unsuitable: ${seen.reason ?? ''}`);
-      throw new BackgroundError('refused', 'That one did not come out suitable. Try another place.');
-    }
-    if (seen.is_backdrop === true) {
-      console.warn(`  A generated background was a backdrop in a room, not the scene: ${seen.reason ?? ''}`);
-      throw new BackgroundError('failed', 'That one did not come out right. Try again, or pick one of ours.');
+      // 4. Look at it before anyone else does.
+      const looked = await post(CHAT_ENDPOINT, checkRequest(image, place, n, checkModel), apiKey, CHECK_TIMEOUT_MS, noCheck);
+      if (!looked.res.ok) {
+        logFailure('Checking a generated background', looked.res, looked.json);
+        throw new BackgroundError('failed', noCheck);
+      }
+      const seen = jsonFrom(looked.json);
+      if (typeof seen?.safe !== 'boolean') {
+        console.error('  Checking a generated background gave no verdict; turning it away.');
+        throw new BackgroundError('failed', noCheck);
+      }
+      if (!seen.safe) {
+        console.warn(`  A generated background was turned away as unsuitable: ${seen.reason ?? ''}`);
+        throw new BackgroundError('refused', 'That one did not come out suitable. Try another place.');
+      }
+      if (seen.is_backdrop === true || seen.shows_bystanders === true) {
+        const why = seen.is_backdrop === true ? 'a backdrop in a room, not the scene' : 'people in it the guest did not ask for';
+        console.warn(`  A generated background was turned away, ${why}: ${seen.reason ?? ''}`);
+        // Usually right the second time; a guest waits for one redraw, not more.
+        if (attempt < DRAW_ATTEMPTS) continue;
+        throw new BackgroundError('failed', 'That one did not come out right. Try again, or pick one of ours.');
+      }
+      break;
     }
 
     try {
