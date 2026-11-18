@@ -102,6 +102,15 @@ export interface AvatarOption {
 export type AvatarPiece = Omit<AvatarOption, 'id' | 'label' | 'pieces'>;
 
 /**
+ * Where a ready-made hat's bottom edge goes: resting on the top of the head,
+ * in eye spans above the face mesh's forehead point. That point is near the
+ * hairline, and the top of a full head of hair measured 0.33 to 0.4 above
+ * it, on a live camera and on a photo. At 0.1 the crown and party hat sat in
+ * the middle of the forehead; at 0.6 they floated clear of the head.
+ */
+const HAT_LIFT = 0.35;
+
+/**
  * A fixed set, made in advance. Guests choose; they do not customise. These
  * are placeholder artwork in the same format the final set should use: a
  * transparent image, upright, facing the camera.
@@ -113,7 +122,7 @@ export const AVATARS: AvatarOption[] = [
   },
   {
     id: 'party-hat', label: 'Party hat', src: '/avatars/party-hat.svg', slot: 'head',
-    anchor: 'forehead', width: 1.1, lift: 0.15, pivot: { x: 0.5, y: 1 },
+    anchor: 'forehead', width: 1.1, lift: HAT_LIFT, pivot: { x: 0.5, y: 1 },
   },
   {
     id: 'cat-ears', label: 'Cat ears', src: '/avatars/cat-ears.svg', slot: 'head',
@@ -121,7 +130,7 @@ export const AVATARS: AvatarOption[] = [
   },
   {
     id: 'crown', label: 'Crown', src: '/avatars/crown.svg', slot: 'head',
-    anchor: 'forehead', width: 1.5, lift: 0.1, pivot: { x: 0.5, y: 0.95 },
+    anchor: 'forehead', width: 1.5, lift: HAT_LIFT, pivot: { x: 0.5, y: 0.95 },
   },
   {
     id: 'moustache', label: 'Moustache', src: '/avatars/moustache.svg', slot: 'upperLip',
