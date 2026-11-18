@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TypedBackground } from '@/types/scene';
+import { knownPlace } from './knownPlaces';
 
 /**
  * Having a background drawn from what a guest types. The server does the
@@ -50,6 +51,12 @@ export function useTypedBackground(refresh: unknown): TypedBackgroundState {
   const generate = useCallback(async (text: string): Promise<TypedBackground | null> => {
     const clean = text.trim();
     if (!clean || busy) return null;
+    // SP, in any form, is the real campus photo: nothing to draw or pay for.
+    const known = knownPlace(clean);
+    if (known) {
+      setError(null);
+      return { src: known.src, text: clean };
+    }
     setBusy(true);
     setError(null);
     try {

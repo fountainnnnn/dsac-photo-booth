@@ -44,9 +44,14 @@ export interface BackgroundOption {
  * Placeholder scenes, drawn as SVG so they ship without a licence question.
  * They are meant to be replaced: by better artwork, and later by backgrounds
  * generated from what the guest types.
+ *
+ * The SP campus is a photo of the real place, chosen for the Open House. It
+ * is also what a guest gets for typing SP in any form (see knownPlaces.ts).
+ * Studio stays first: it is the one every guest starts on.
  */
 export const BACKGROUNDS: BackgroundOption[] = [
   { id: 'studio',  label: 'Studio',  src: '/backgrounds/studio.svg' },
+  { id: 'sp',      label: 'SP campus', src: '/backgrounds/sp-campus.jpg' },
   { id: 'sunset',  label: 'Sunset',  src: '/backgrounds/sunset.svg' },
   { id: 'space',   label: 'Space',   src: '/backgrounds/space.svg' },
   { id: 'neon',    label: 'Neon',    src: '/backgrounds/neon.svg' },
@@ -225,7 +230,10 @@ export const TYPED_BACKGROUND_ID = 'typed';
 
 /** A background drawn from what the guest typed. */
 export interface TypedBackground {
-  /** An object URL for the picture, owned by the capture page. */
+  /**
+   * An object URL for the picture, owned by the capture page; or, for a place
+   * with a photo of its own (knownPlaces.ts), that photo's path.
+   */
   src: string;
   text: string;
 }
