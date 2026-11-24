@@ -38,6 +38,8 @@ export interface BackgroundOption {
   id: string;
   label: string;
   src: string;
+  /** Loaded and ready, but not offered as a tile: only typing reaches it. */
+  hidden?: boolean;
 }
 
 /**
@@ -46,12 +48,13 @@ export interface BackgroundOption {
  * generated from what the guest types.
  *
  * The SP campus is a photo of the real place, chosen for the Open House. It
- * is also what a guest gets for typing SP in any form (see knownPlaces.ts).
+ * is not a tile; it is what a guest gets for typing SP in any form (see
+ * knownPlaces.ts), preloaded with the rest so it shows at once.
  * Studio stays first: it is the one every guest starts on.
  */
 export const BACKGROUNDS: BackgroundOption[] = [
   { id: 'studio',  label: 'Studio',  src: '/backgrounds/studio.svg' },
-  { id: 'sp',      label: 'SP campus', src: '/backgrounds/sp-campus.jpg' },
+  { id: 'sp',      label: 'SP campus', src: '/backgrounds/sp-campus.jpg', hidden: true },
   { id: 'sunset',  label: 'Sunset',  src: '/backgrounds/sunset.svg' },
   { id: 'space',   label: 'Space',   src: '/backgrounds/space.svg' },
   { id: 'neon',    label: 'Neon',    src: '/backgrounds/neon.svg' },

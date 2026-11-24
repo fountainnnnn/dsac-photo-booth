@@ -12,7 +12,6 @@ import { useLivePreview, drawPhoto } from './useLivePreview';
 import { useScene, type SceneStatus } from './scene/useScene';
 import { recordSpeed } from './scene/speed';
 import { useFrameRates } from './scene/frameRate';
-import { MAX_FACES } from './scene/vision';
 import type { TypedBackgroundState } from './scene/useTypedBackground';
 import type { TypedAvatarState } from './scene/useTypedAvatar';
 import {
@@ -22,9 +21,8 @@ import { cameraConstraints, raiseToMaxResolution } from './cameras';
 import { photoOutputSize } from './outputSize';
 import { useFrameCatalogue } from '@/components/features/frames/useFrameCatalogue';
 import {
-  useCaptureSettings, unmirrorCrop, FULL_FRAME, type CameraCrop,
+  useCaptureSettings, unmirrorCrop,
 } from '@/components/features/remote/useCaptureSettings';
-import { clampZoom } from '@/components/features/remote/CameraCropCard';
 import type { FrameConfig, EventDetails } from '@/types/frame';
 import {
   FRAME_ASPECT, FRAME_W as FRAME_W_PX, FRAME_H as FRAME_H_PX,
@@ -113,7 +111,6 @@ export default function CameraView({
 
   const {
     settings: captureSettings,
-    setSettings: setCaptureSettings,
     save: saveCaptureSettings,
     reload: reloadSettings,
     loading: settingsLoading,
@@ -151,87 +148,30 @@ export default function CameraView({
     void saveCaptureSettings({ ...captureSettings, ...patch }).catch(() => {});
   }, [captureSettings, saveCaptureSettings]);
 
-  // ── Pinch / scroll zoom ──────────────────────────────────────────────────────
-  // Gesture zoom on the stage itself, so a finger (or a trackpad) does the same
-  // thing the zoom slider in Settings does: crop the camera tighter,
-  // never a CSS scale on the video. Kept as its own debounced writer, not
-  // `updateCaptureSettings`, because a pinch fires far too often for a raw PUT
-  // per event — the same 350ms coalescing `useCaptureSettingsControl` already
-  // uses for drags, reimplemented here since this screen loads the settings
-  // hook directly rather than through that control.
-  const captureSettingsRef = useRef(captureSettings);
-  captureSettingsRef.current = captureSettings;
-  const zoomSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const applyZoom = useCallback((nextCrop: CameraCrop) => {
-    const next = { ...captureSettingsRef.current, crop: nextCrop, cropEnabled: true };
-    setCaptureSettings(next);
-    if (zoomSaveTimerRef.current) clearTimeout(zoomSaveTimerRef.current);
-    zoomSaveTimerRef.current = setTimeout(() => {
-      void saveCaptureSettings(next).catch(() => {});
-    }, 350);
-  }, [setCaptureSettings, saveCaptureSettings]);
-
-  const applyZoomRef = useRef(applyZoom);
-  applyZoomRef.current = applyZoom;
-
-  useEffect(() => () => { if (zoomSaveTimerRef.current) clearTimeout(zoomSaveTimerRef.current); }, []);
-
+  // ── No pinch zoom here ───────────────────────────────────────────────────────
+  // The camera's zoom is the operator's, set in Settings > Camera, never by a
+  // guest on this screen. A pinch used to crop the camera from the stage and
+  // save it for every photo after. Now a pinch here does nothing at all: it
+  // is swallowed rather than ignored, or the browser would zoom the whole
+  // page instead, and the booth would be left blown up for the next guest.
+  // A trackpad pinch arrives as a wheel event with ctrlKey set (Chrome, Brave,
+  // Edge, Firefox) or as a gesture event (Safari); a two-finger scroll has
+  // ctrlKey clear and is left alone.
   useEffect(() => {
-    const el = canvasAreaRef.current;
-    if (!el) return;
+    const onWheel = (e: WheelEvent) => { if (e.ctrlKey) e.preventDefault(); };
+    const onTouchMove = (e: TouchEvent) => { if (e.touches.length > 1) e.preventDefault(); };
+    const onGesture = (e: Event) => e.preventDefault();
 
-    let pinchStartDist: number | null = null;
-    let pinchStartCrop: CameraCrop | null = null;
-
-    const touchDist = (touches: TouchList) => {
-      const dx = touches[0].clientX - touches[1].clientX;
-      const dy = touches[0].clientY - touches[1].clientY;
-      return Math.hypot(dx, dy);
-    };
-
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 2) return;
-      pinchStartDist = touchDist(e.touches);
-      pinchStartCrop = captureSettingsRef.current.crop ?? FULL_FRAME;
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 2 || pinchStartDist === null || !pinchStartCrop) return;
-      e.preventDefault(); // stops the browser page itself from pinch-zooming
-      const scale = touchDist(e.touches) / pinchStartDist;
-      if (!Number.isFinite(scale) || scale <= 0) return;
-      applyZoomRef.current(clampZoom(pinchStartCrop, pinchStartCrop.w / scale));
-    };
-
-    const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) { pinchStartDist = null; pinchStartCrop = null; }
-    };
-
-    // Trackpad pinch, for the laptop this booth usually runs on. Browsers
-    // report a pinch as a wheel event with ctrlKey set; a plain two-finger
-    // scroll has it clear. Zooming on every wheel event meant anyone brushing
-    // the trackpad over the stage zoomed the camera and saved it.
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey) return;
-      e.preventDefault();
-      const current = captureSettingsRef.current.crop ?? FULL_FRAME;
-      const factor = Math.exp(e.deltaY * 0.0015);
-      applyZoomRef.current(clampZoom(current, current.w * factor));
-    };
-
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('touchend', onTouchEnd, { passive: true });
-    el.addEventListener('touchcancel', onTouchEnd, { passive: true });
-    el.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('gesturestart', onGesture);
+    window.addEventListener('gesturechange', onGesture);
 
     return () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
-      el.removeEventListener('touchcancel', onTouchEnd);
-      el.removeEventListener('wheel', onWheel);
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('gesturestart', onGesture);
+      window.removeEventListener('gesturechange', onGesture);
     };
   }, []);
 
@@ -610,8 +550,8 @@ export default function CameraView({
               width: stageSize.w || undefined,
               height: stageSize.h || undefined,
               containerType: 'size',
-              // Otherwise iOS treats a two-finger pinch here as a page zoom
-              // instead of handing the touches to the listener above.
+              // No touch gesture here does anything: a pinch neither zooms the
+              // camera (Settings does that) nor, on iOS, the page.
               touchAction: 'none',
               // A hairline plus a soft drop shadow. Without these, a frame with
               // a white border (or a blown-out feed) runs straight into the
@@ -721,8 +661,6 @@ export default function CameraView({
             status={sceneStatus}
             typing={typing}
             typingAvatar={typingAvatar}
-            people={captureSettings.maxPeople}
-            onPeople={n => updateCaptureSettings({ maxPeople: n })}
           />
         </aside>
       </div>
@@ -851,43 +789,22 @@ function statusLine(status: SceneStatus, showBackgrounds: boolean, avatarOn: boo
  * The guest's choices, as pictures to tap. Large enough for a finger: this is
  * a kiosk, and whoever is choosing is standing a pace back from it.
  */
-function ScenePickers({ choice, onChange, showBackgrounds, status, typing, typingAvatar, people, onPeople }: {
+function ScenePickers({ choice, onChange, showBackgrounds, status, typing, typingAvatar }: {
   choice: SceneChoice;
   onChange: (update: ChoiceUpdate) => void;
   showBackgrounds: boolean;
   status: SceneStatus;
   typing?: TypedBackgroundState;
   typingAvatar?: TypedAvatarState;
-  /** How many are posing; 0 for not said. The same setting as in Settings. */
-  people: number;
-  onPeople: (people: number) => void;
 }) {
   const note = statusLine(status, showBackgrounds, choice.avatarIds.length > 0);
   // The guest's own avatars first, then the ready-made ones.
   const avatarOptions = [...(choice.typedAvatars ?? []), ...AVATARS];
+  // How many are posing is the operator's to set, in Settings > Background,
+  // not the guest's: it also names the typed backgrounds kept in cache/, so a
+  // guest changing it would make every kept one be drawn again.
   return (
     <div className="mt-6 flex flex-col gap-5">
-      {/* How many are posing: keeps anyone more out of the photo (with "Only
-          the people at the front"), and a typed background leaves room for
-          that many. The same setting as Settings > Background. */}
-      <div>
-        <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">People</p>
-        <div className="mt-2 grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="People in the photo">
-          {[0, ...Array.from({ length: MAX_FACES }, (_, i) => i + 1)].map(n => (
-            <button key={n} type="button" role="radio" aria-checked={people === n}
-              data-testid={`people-${n}`}
-              onClick={() => onPeople(n)}
-              className={`min-h-10 rounded-lg border-2 text-[0.78rem] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-                people === n
-                  ? "border-[var(--accent)] text-[var(--accent)]"
-                  : "border-[var(--border)] text-[var(--ink-2)] hover:border-[var(--ink-3)]"
-              }`}>
-              {n === 0 ? "Any" : n}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {showBackgrounds && (
         <div>
           <p className="text-[0.78rem] font-semibold text-[var(--ink-2)]">Background</p>
@@ -907,7 +824,7 @@ function ScenePickers({ choice, onChange, showBackgrounds, status, typing, typin
                 <span className="block truncate px-1 py-1 text-center text-[0.68rem] font-semibold text-[var(--ink-2)]">Yours</span>
               </button>
             )}
-            {BACKGROUNDS.map(bg => {
+            {BACKGROUNDS.filter(bg => !bg.hidden).map(bg => {
               const on = choice.backgroundId === bg.id;
               return (
                 <button key={bg.id} type="button" role="radio" aria-checked={on}
