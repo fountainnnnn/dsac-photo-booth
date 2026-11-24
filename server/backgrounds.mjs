@@ -74,8 +74,11 @@ const MAX_PEOPLE = 6;
 /**
  * Part of every cached picture's name. Raised whenever the instructions
  * change, so a picture made under the old ones is never handed out again.
+ * The committed cache keeps each version in its own folder
+ * (`cache/backgrounds/v9`): raising this starts an empty one, and the old
+ * folder can go in the same commit.
  */
-const PROMPT_VERSION = 9;
+export const PROMPT_VERSION = 9;
 /**
  * Pictures drawn per request, when one comes out as a backdrop or with people
  * in it nobody asked for. Each is billed, so one redraw and no more.
@@ -444,9 +447,11 @@ export function openRouter(fetchImpl = fetch) {
 }
 
 /**
- * The generator, bound to a folder for its cache. `fetchImpl` is for tests.
+ * The generator, bound to a folder for its cache. A picture is looked for in
+ * `dir` and then in each of `also`, and a new one is kept in `dir`, after
+ * which `onKept` is called. `fetchImpl` is for tests.
  */
-export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
+export function createBackgrounds(dir, { fetchImpl = fetch, also = [], onKept } = {}) {
   const recent = [];
   const { post, logFailure, lookUp } = openRouter(fetchImpl);
 
@@ -458,9 +463,11 @@ export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
   }
 
   function cached(id) {
-    for (const [ext, mime] of Object.entries(MIME)) {
-      const file = path.join(dir, `${id}.${ext}`);
-      if (fs.existsSync(file)) return { mime, bytes: fs.readFileSync(file) };
+    for (const folder of [dir, ...also]) {
+      for (const [ext, mime] of Object.entries(MIME)) {
+        const file = path.join(folder, `${id}.${ext}`);
+        if (fs.existsSync(file)) return { mime, bytes: fs.readFileSync(file) };
+      }
     }
     return null;
   }
@@ -568,6 +575,7 @@ export function createBackgrounds(dir, { fetchImpl = fetch } = {}) {
     try {
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, `${id}.${EXT[image.mime] ?? 'png'}`), image.bytes);
+      onKept?.();
     } catch (err) {
       // The guest still gets their background; only the reuse is lost.
       console.error(`  Could not keep generated background: ${err.message}`);

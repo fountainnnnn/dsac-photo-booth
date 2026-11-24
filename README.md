@@ -61,11 +61,20 @@ stand in. Settings > Background chooses how the room is taken away:
 If an OpenRouter API key is set on the Environment tab (`OPENROUTER_API_KEY`),
 guests can also **type a background** ("a beach at sunset") and an image model
 draws it — Gemini 3.1 Flash Lite Image by default, about US$0.04 each in about
-five seconds, three tries per guest. Only the background is generated: the guests are cut out on the
+five seconds. Only the background is generated: the guests are cut out on the
 laptop and drawn on top, so no model ever redraws a face. The guest's words are
 checked against a short blocked-word list and wrapped in the booth's own prompt
-(no people, no text) in `server/backgrounds.mjs`. Each picture is kept in
-`data/backgrounds/` by its prompt, so the same words are only paid for once.
+(no people, no text) in `server/backgrounds.mjs`. Typed avatars work the same
+way, in `server/avatars.mjs`.
+
+Each typed picture is kept in `cache/` by its words, so the same words are only
+paid for once and load at once. The folder is committed: run from a checkout of
+`open-house`, the booth commits each new picture and pushes it (the commit
+holds only `cache/`), so every laptop that pulls has them. It does not push
+while the branch has other unpushed commits; push those and the pictures go
+with them. Each prompt version has its own folder (`cache/backgrounds/v9`), so
+when the instructions change the old folder can be deleted. The repository is
+public, so these pictures are too.
 Without a key, guests see only the ready-made backgrounds.
 
 Everything else runs on the laptop, offline, on its graphics chip where the

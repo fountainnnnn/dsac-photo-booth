@@ -12,9 +12,11 @@ import { openDatabase } from './db.mjs';
 import { createAuth } from './auth.mjs';
 import { startTunnel } from './tunnel.mjs';
 import {
-  BackgroundError, DEFAULT_CHECK_MODEL, DEFAULT_MODEL, createBackgrounds,
+  BackgroundError, DEFAULT_CHECK_MODEL, DEFAULT_MODEL, PROMPT_VERSION as BACKGROUND_PROMPT_VERSION,
+  createBackgrounds,
 } from './backgrounds.mjs';
-import { createAvatars } from './avatars.mjs';
+import { PROMPT_VERSION as AVATAR_PROMPT_VERSION, createAvatars } from './avatars.mjs';
+import { createCacheSync } from './cacheSync.mjs';
 import {
   ENV_FIELDS, applyToProcessEnv, parseEnv, pickEditable, readEnvFile, writeEnvFile,
 } from './env-file.mjs';
@@ -83,10 +85,28 @@ const DATA_DIR = process.env.STORAGE_DIR
   ? path.resolve(process.env.STORAGE_DIR)
   : path.join(ROOT_DIR, 'data');
 const store = openDatabase(DATA_DIR);
-// Typed backgrounds, kept by prompt so the same words are only paid for once.
-const backgrounds = createBackgrounds(path.join(DATA_DIR, 'backgrounds'));
-// Typed avatars, the same way.
-const avatars = createAvatars(path.join(DATA_DIR, 'avatars'));
+
+/**
+ * Typed backgrounds and avatars, kept by prompt so the same words are only
+ * paid for once.
+ *
+ * Run from a checkout, the booth keeps them in `cache/`, which is committed,
+ * and commits and pushes each new one: every checkout of open-house then has
+ * them, and the same words load at once on any laptop. Each prompt version
+ * has its own folder there, so nothing made under older instructions is
+ * mixed in. A packaged app cannot write inside itself, so it keeps new ones
+ * in its data folder and only reads the ones it was built with.
+ */
+const IN_CHECKOUT = fs.existsSync(path.join(ROOT_DIR, '.git'));
+const cacheSync = IN_CHECKOUT ? createCacheSync({ root: ROOT_DIR, dir: 'cache' }) : null;
+function typedCache(kind, version) {
+  const shared = path.join(ROOT_DIR, 'cache', kind, `v${version}`);
+  return IN_CHECKOUT
+    ? [shared, { onKept: cacheSync.kept }]
+    : [path.join(DATA_DIR, kind), { also: [shared] }];
+}
+const backgrounds = createBackgrounds(...typedCache('backgrounds', BACKGROUND_PROMPT_VERSION));
+const avatars = createAvatars(...typedCache('avatars', AVATAR_PROMPT_VERSION));
 
 /**
  * The organiser's own copy of the event, as ordinary files.
@@ -1035,6 +1055,9 @@ const server = app.listen(port, '0.0.0.0', async () => {
   banner('Photo folder', PHOTOS_DIR);
   banner('Photo lifetime', `deleted ${photoMinutes()} minute(s) after the QR code, set in Settings`);
   banner('Frontend', SERVES_FRONTEND ? 'served from ./dist' : 'dev server (Vite)');
+  banner('Typed pictures', IN_CHECKOUT ? 'cache/, pushed to GitHub as they are made' : `${DATA_DIR} (backgrounds, avatars)`);
+  // Anything kept but not pushed last time, say with no network, goes up now.
+  cacheSync?.flush();
 
   // The booth runs on a laptop now, with nothing hosting it. The tunnel is
   // the only way a guest's phone reaches it, so it always starts — there is

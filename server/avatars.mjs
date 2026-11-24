@@ -85,8 +85,12 @@ export const BACKDROPS = { magenta: '#FF00FF', green: '#00FF00' };
 
 const RESOLUTION = '1K';
 const ASPECT_RATIO = '1:1';
-/** Part of every cached avatar's name; raised whenever the instructions change. */
-const PROMPT_VERSION = 5;
+/**
+ * Part of every cached avatar's name; raised whenever the instructions change.
+ * As for backgrounds, the committed cache keeps each version in its own
+ * folder (`cache/avatars/v5`).
+ */
+export const PROMPT_VERSION = 5;
 /** Drawings per request, when one comes out with more than the item. */
 const DRAW_ATTEMPTS = 2;
 /** A guard against a runaway, as for backgrounds. */
@@ -279,8 +283,12 @@ export function readFit(json) {
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 const MIME = Object.fromEntries(Object.entries(EXT).map(([m, e]) => [e, m]));
 
-/** The generator, bound to a folder for its cache. `fetchImpl` is for tests. */
-export function createAvatars(dir, { fetchImpl = fetch } = {}) {
+/**
+ * The generator, bound to a folder for its cache, which works as it does for
+ * backgrounds: looked for in `dir` then `also`, kept in `dir`, then `onKept`.
+ * `fetchImpl` is for tests.
+ */
+export function createAvatars(dir, { fetchImpl = fetch, also = [], onKept } = {}) {
   const recent = [];
   const { post, logFailure, lookUp } = openRouter(fetchImpl);
 
@@ -293,20 +301,22 @@ export function createAvatars(dir, { fetchImpl = fetch } = {}) {
 
   /** A kept avatar: the picture, and where it goes, kept beside it. */
   function cached(id) {
-    let placement;
-    try {
-      placement = JSON.parse(fs.readFileSync(path.join(dir, `${id}.json`), 'utf8'));
-    } catch {
-      return null;
-    }
-    for (const [ext, mime] of Object.entries(MIME)) {
-      const file = path.join(dir, `${id}.${ext}`);
-      if (fs.existsSync(file)) {
-        // The fit was checked by readFit when it was kept.
-        return {
-          mime, bytes: fs.readFileSync(file), ...readPlacement(placement),
-          fit: placement.fit ?? null, item: placement.item,
-        };
+    for (const folder of [dir, ...also]) {
+      let placement;
+      try {
+        placement = JSON.parse(fs.readFileSync(path.join(folder, `${id}.json`), 'utf8'));
+      } catch {
+        continue;
+      }
+      for (const [ext, mime] of Object.entries(MIME)) {
+        const file = path.join(folder, `${id}.${ext}`);
+        if (fs.existsSync(file)) {
+          // The fit was checked by readFit when it was kept.
+          return {
+            mime, bytes: fs.readFileSync(file), ...readPlacement(placement),
+            fit: placement.fit ?? null, item: placement.item,
+          };
+        }
       }
     }
     return null;
@@ -419,6 +429,7 @@ export function createAvatars(dir, { fetchImpl = fetch } = {}) {
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, `${id}.${EXT[image.mime] ?? 'png'}`), image.bytes);
       fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ ...placement, fit, item }));
+      onKept?.();
     } catch (err) {
       console.error(`  Could not keep generated avatar: ${err.message}`);
     }

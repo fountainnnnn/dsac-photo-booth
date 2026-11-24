@@ -150,6 +150,19 @@ describe('generate', () => {
     expect(calls(fetchImpl, '/images')).toHaveLength(1);
   });
 
+  it('says when it keeps an avatar, and hands out one kept in another folder', async () => {
+    const made = tempDir();
+    const onKept = vi.fn();
+    await createAvatars(made, { fetchImpl: fakeOpenRouter(), onKept }).generate('a red cap', { apiKey: 'k' });
+    expect(onKept).toHaveBeenCalledTimes(1);
+
+    const elsewhere = fakeOpenRouter();
+    const hit = await createAvatars(tempDir(), { fetchImpl: elsewhere, also: [made] })
+      .generate('A red cap', { apiKey: 'k' });
+    expect(hit).toMatchObject({ cached: true, where: 'head', fit: { x: 0.5, y: 0.7, faceWidth: 0.4 } });
+    expect(elsewhere).not.toHaveBeenCalled();
+  });
+
   it('turns away a film-studio character at the screen, before drawing anything', async () => {
     const fetchImpl = fakeOpenRouter({
       screen: {

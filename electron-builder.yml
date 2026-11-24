@@ -22,6 +22,7 @@ directories:
 files:
   - dist/**            # the built frontend, served by Express
   - server/**
+  - cache/**           # typed pictures already made, so their words load at once
   - electron/**
   - package.json
   # Frontend libraries are production dependencies because Vite needs them at

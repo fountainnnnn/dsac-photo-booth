@@ -234,6 +234,20 @@ describe('createBackgrounds', () => {
     expect(calls(fetchImpl, '/images')).toHaveLength(2);
   });
 
+  it('says when it keeps a new picture, and hands out one kept in another folder', async () => {
+    const made = tempDir();
+    const onKept = vi.fn();
+    await createBackgrounds(made, { fetchImpl: fakeOpenRouter(), onKept }).generate('a beach', { apiKey: 'k' });
+    expect(onKept).toHaveBeenCalledTimes(1);
+
+    // Another laptop, reading the first one's pictures as its shared cache.
+    const elsewhere = fakeOpenRouter();
+    const hit = await createBackgrounds(tempDir(), { fetchImpl: elsewhere, also: [made] })
+      .generate('A Beach', { apiKey: 'k' });
+    expect(hit).toMatchObject({ cached: true, bytes: PNG });
+    expect(elsewhere).not.toHaveBeenCalled();
+  });
+
   it('looks up how a named meme looks, and tells the image model', async () => {
     const fetchImpl = fakeOpenRouter({
       screen: {
