@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowClockwise, Camera, DownloadSimple, FolderOpen, Trash, X,
+  ArrowClockwise, Camera, DownloadSimple, FolderOpen, Heart, MonitorPlay, Trash, X,
 } from '@phosphor-icons/react';
 import StudioShell, { type StudioSection } from '@/components/ui/StudioShell';
 
@@ -22,6 +22,8 @@ interface RecentPhoto {
   expiresAt?: string | null;
   /** The link has lapsed. The photo is still here — only the QR is dead. */
   expired?: boolean;
+  /** The guest let us keep it: it is not deleted, and it is on the photo wall. */
+  kept?: boolean;
 }
 
 export default function GalleryPage() {
@@ -110,7 +112,8 @@ export default function GalleryPage() {
           <p className="mt-1 text-[0.85rem] text-[var(--ink-2)]">
             The photos from the last few minutes. Each is deleted from this
             laptop a few minutes after its QR code is shown, as set in
-            Settings &gt; Event.
+            Settings &gt; Event, unless its guest lets us keep it. Kept photos
+            stay, and go on the photo wall.
           </p>
         </div>
 
@@ -128,6 +131,14 @@ export default function GalleryPage() {
             <ArrowClockwise size={17} />
             Refresh
           </button>
+
+          {/* A new tab, so the wall can be dragged onto the venue screen
+              while this one stays with the operator. */}
+          <a href="/wall" target="_blank" rel="noopener"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--border)] px-5 text-[0.85rem] font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
+            <MonitorPlay size={17} />
+            Photo wall
+          </a>
 
           <button type="button" onClick={() => void openFolder()}
             className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--border)] px-5 text-[0.85rem] font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
@@ -175,6 +186,12 @@ export default function GalleryPage() {
                     about the photo, which is still here and still good. */}
                 <span className="flex items-center gap-2 px-3 py-2 text-[0.72rem] text-[var(--ink-3)]">
                   {stamp(photo.createdAt)}
+                  {photo.kept && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] px-2 py-0.5 text-[0.66rem] font-semibold text-[var(--accent)]">
+                      <Heart size={11} weight="fill" />
+                      Kept
+                    </span>
+                  )}
                   {photo.expired && (
                     <span className="rounded-full bg-[var(--shell-bg)] px-2 py-0.5 text-[0.66rem] font-semibold text-[var(--ink-3)]">
                       Link expired

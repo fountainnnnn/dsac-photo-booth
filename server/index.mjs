@@ -80,6 +80,12 @@ const DEFAULT_PHOTO_MINUTES = 10;
 
 const hasExpired = (expiresAt) => Date.now() > new Date(expiresAt).getTime();
 
+/**
+ * Whether a photo's time is up. A photo the guest let us keep never lapses:
+ * it stays, link and all, until they untick the box or the operator deletes it.
+ */
+const hasLapsed = (photo) => !photo.keptAt && hasExpired(photo.expiresAt);
+
 // One SQLite file holds photos, uploaded frames, and every setting.
 const DATA_DIR = process.env.STORAGE_DIR
   ? path.resolve(process.env.STORAGE_DIR)
@@ -410,7 +416,7 @@ app.post('/api/photos/composed', booth, upload.single('file'), validateImage, as
  * be refused.
  */
 function expiredForGuest(req, photo) {
-  if (!hasExpired(photo.expiresAt)) return false;
+  if (!hasLapsed(photo)) return false;
   return !auth.isAuthed(req, 'booth');
 }
 
@@ -470,7 +476,68 @@ app.get('/api/photos/recent', booth, (_req, res) => {
       token: p.token,
       createdAt: p.createdAt,
       expiresAt: p.expiresAt,
-      expired: hasExpired(p.expiresAt),
+      expired: hasLapsed(p),
+      kept: Boolean(p.keptAt),
+      src: `/api/preview/${encodeURIComponent(p.token)}`,
+    })),
+  });
+});
+
+/**
+ * Keeping a photo: the box on the guest's download page.
+ *
+ * Open like the download itself, because holding the link is what makes
+ * someone the guest. Ticked, the photo is kept: it is no longer deleted when
+ * its time is up, and it goes on the photo wall. Unticked, it goes back to
+ * being deleted on time, and at once if that time has already passed, because
+ * unticking is the guest taking back their permission.
+ *
+ * Only while the link works: once a photo nobody kept has lapsed, the guest
+ * has nothing left to tick.
+ */
+app.get('/api/keep/:token', (req, res) => {
+  const photo = store.photos.get(req.params.token);
+  if (!photo) return res.status(404).json({ error: 'Photo not found' });
+  if (expiredForGuest(req, photo)) return res.status(410).json(GONE);
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({ kept: Boolean(photo.keptAt) });
+});
+
+app.put('/api/keep/:token', (req, res) => {
+  const { token } = req.params;
+  const photo = store.photos.get(token);
+  if (!photo) return res.status(404).json({ error: 'Photo not found' });
+  if (expiredForGuest(req, photo)) return res.status(410).json(GONE);
+  if (typeof req.body?.keep !== 'boolean') {
+    return res.status(400).json({ error: 'Send { "keep": true } or { "keep": false }.' });
+  }
+
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.body.keep) {
+    if (!photo.keptAt) store.photos.setKept(token, new Date().toISOString());
+    return res.json({ kept: true });
+  }
+
+  store.photos.setKept(token, null);
+  if (hasExpired(photo.expiresAt)) {
+    deletePhoto(token);
+    store.compact();
+    return res.json({ kept: false, deleted: true });
+  }
+  return res.json({ kept: false });
+});
+
+/**
+ * The photo wall: every photo a guest let us keep, oldest first so a new one
+ * joins the end and the wall does not reshuffle. Behind the booth password
+ * like the gallery, since it is the operator who puts it up on a screen.
+ */
+app.get('/api/wall', booth, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    photos: store.photos.kept().map(p => ({
+      token: p.token,
+      keptAt: p.keptAt,
       src: `/api/preview/${encodeURIComponent(p.token)}`,
     })),
   });
@@ -877,7 +944,7 @@ app.get('/api/frames/:id/image', booth, (req, res) => {
 app.get('/api/share/:token/image', (req, res) => {
   const photo = store.photos.get(req.params.token);
   if (!photo) return res.status(404).json({ error: 'Photo not found' });
-  if (hasExpired(photo.expiresAt)) return res.status(410).json(GONE);
+  if (hasLapsed(photo)) return res.status(410).json(GONE);
 
   res.setHeader('Content-Type', photo.mime);
   res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -966,7 +1033,8 @@ app.use((err, _req, res, next) => {
  * photos whose timer never fired — the booth was closed, or restarted, while
  * they came due — and for any taken under a longer lifetime than Settings now
  * says. A photo goes when its own expiry passes, or when it is older than the
- * lifetime as set now, whichever comes first.
+ * lifetime as set now, whichever comes first. Photos a guest let us keep are
+ * never due (see `dueBy`).
  */
 function sweepPhotos() {
   const now = new Date();
@@ -994,7 +1062,11 @@ function deleteWhenDue(token, expiresAt) {
   const ms = Math.max(0, new Date(expiresAt).getTime() - Date.now());
   setTimeout(() => {
     try {
-      if (!store.photos.get(token)) return; // deleted by hand already
+      const photo = store.photos.get(token);
+      if (!photo) return; // deleted by hand already
+      // Kept by the guest. Unticked later, past this moment, it is deleted
+      // by the keep route itself, so nothing needs to come back for it.
+      if (photo.keptAt) return;
       deletePhoto(token);
       store.compact();
     } catch (err) {
@@ -1051,9 +1123,10 @@ const server = app.listen(port, '0.0.0.0', async () => {
   console.log('\n  Open House Photo Booth\n');
   banner('Local', `http://localhost:${SERVES_FRONTEND ? port : frontendPort}`);
   banner('Database', store.file);
-  banner('Photos stored', `${store.photos.count()}`);
+  banner('Photos stored', `${store.photos.count()} (${store.photos.kept().length} kept by their guests)`);
   banner('Photo folder', PHOTOS_DIR);
-  banner('Photo lifetime', `deleted ${photoMinutes()} minute(s) after the QR code, set in Settings`);
+  banner('Photo lifetime', `deleted ${photoMinutes()} minute(s) after the QR code unless the guest keeps it, set in Settings`);
+  banner('Photo wall', `http://localhost:${SERVES_FRONTEND ? port : frontendPort}/wall`);
   banner('Frontend', SERVES_FRONTEND ? 'served from ./dist' : 'dev server (Vite)');
   banner('Typed pictures', IN_CHECKOUT ? 'cache/, pushed to GitHub as they are made' : `${DATA_DIR} (backgrounds, avatars)`);
   // Anything kept but not pushed last time, say with no network, goes up now.

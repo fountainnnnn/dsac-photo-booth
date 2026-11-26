@@ -31,6 +31,25 @@ minutes after a photo's QR code goes up, the booth deletes it: the guest's link
 stops working and the photo leaves the gallery, the database and the folder for
 good. Settings > Event changes the span (5 to 60 minutes).
 
+The one exception is a photo its guest lets us keep. Under the Save button on
+their download page is a box, unticked until they tick it: "Let us keep this
+photo". Ticked, the photo is never deleted on its timer or by the sweep, its
+link keeps working, and it goes on the photo wall. The guest can untick it
+while they still have the page open: the photo then goes back to being deleted
+on time, or at once if its time has already passed. The Gallery marks kept
+photos, and the operator can still delete any of them there.
+
+## Photo wall
+
+http://localhost:3001/wall (or **Photo wall** in the Gallery, which opens it in
+a new tab) shows every kept photo, in lanes that drift past, each the opposite
+way to the one beside it: columns moving up and down, or rows moving left and
+right. It is behind the booth password, fills the window, and checks for newly
+kept photos every 15 seconds. Its controls (layout, full screen) show while the
+mouse moves. With few photos every lane shows all of them; once there are
+enough, each photo is in one lane. It holds still for a viewer whose system asks
+for reduced motion.
+
 One password guards the booth: capture, gallery and settings. Set it on the
 Environment tab in Settings, as `BOOTH_PASSWORD`; unset leaves the booth open.
 Guests need no password: each photo link carries a random UUID, so only someone

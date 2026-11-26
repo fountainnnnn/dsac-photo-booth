@@ -90,6 +90,19 @@ export function openDatabase(dir) {
     // Already present.
   }
 
+  /*
+   * When the guest let the booth keep the photo, from the box on their
+   * download page; null when they have not. A kept photo is never deleted on
+   * its timer or by the sweep, and its link keeps working: it stays until the
+   * guest unticks the box or the operator deletes it. Added the same way as
+   * `faces`, for booths whose photos table already exists.
+   */
+  try {
+    db.exec('ALTER TABLE photos ADD COLUMN kept_at TEXT');
+  } catch {
+    // Already present.
+  }
+
   const asBuffer = (v) => (v == null ? null : Buffer.from(v));
 
   const photos = {
@@ -141,7 +154,29 @@ export function openDatabase(dir) {
         qr: asBuffer(row.qr),
         createdAt: row.created_at,
         expiresAt: row.expires_at,
+        keptAt: row.kept_at ?? null,
       };
+    },
+
+    /**
+     * Record the guest's answer: kept from `keptAtIso`, or not kept (null).
+     * Returns false when there is no such photo.
+     */
+    setKept(token, keptAtIso) {
+      const { changes } = db.prepare('UPDATE photos SET kept_at = ? WHERE token = ?')
+        .run(keptAtIso ?? null, token);
+      return Number(changes ?? 0) > 0;
+    },
+
+    /**
+     * Every photo a guest let the booth keep, oldest first, metadata only: the
+     * photo wall. Oldest first so a photo kept later joins the end of the wall
+     * and the ones already up do not move.
+     */
+    kept() {
+      return db.prepare(
+        'SELECT token, created_at, kept_at FROM photos WHERE kept_at IS NOT NULL ORDER BY kept_at, token',
+      ).all().map(r => ({ token: r.token, createdAt: r.created_at, keptAt: r.kept_at }));
     },
 
     delete(token) {
@@ -150,7 +185,7 @@ export function openDatabase(dir) {
 
     /**
      * Tokens of every photo whose expiry has passed by `nowIso`, or that was
-     * taken before `takenBeforeIso`, for the sweep.
+     * taken before `takenBeforeIso`, for the sweep. Kept photos are never due.
      *
      * Tokens only: the sweep has a row and an archive file to remove and needs
      * nothing else to find either. Oldest first, so a run cut short has at
@@ -158,7 +193,7 @@ export function openDatabase(dir) {
      */
     dueBy(nowIso, takenBeforeIso) {
       return db.prepare(
-        'SELECT token FROM photos WHERE expires_at <= ? OR created_at < ? ORDER BY created_at',
+        'SELECT token FROM photos WHERE kept_at IS NULL AND (expires_at <= ? OR created_at < ?) ORDER BY created_at',
       ).all(nowIso, takenBeforeIso).map(r => r.token);
     },
 
@@ -173,12 +208,13 @@ export function openDatabase(dir) {
      */
     recent(limit = 60) {
       return db.prepare(
-        'SELECT token, mime, created_at, expires_at FROM photos ORDER BY created_at DESC LIMIT ?',
+        'SELECT token, mime, created_at, expires_at, kept_at FROM photos ORDER BY created_at DESC LIMIT ?',
       ).all(limit).map(r => ({
         token: r.token,
         mime: r.mime,
         createdAt: r.created_at,
         expiresAt: r.expires_at,
+        keptAt: r.kept_at ?? null,
       }));
     },
   };

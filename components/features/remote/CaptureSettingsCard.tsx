@@ -177,7 +177,9 @@ export function EventSettingsCard({ settings, push, saved, loading }: CaptureSet
           How long a photo is kept after its QR code is shown. When the time is
           up the booth <strong className="font-semibold text-[var(--ink)]">deletes
           the photo</strong> — the guest&rsquo;s link stops working and the photo
-          is gone from the gallery and from this laptop, for good.
+          is gone from the gallery and from this laptop, for good. A guest who
+          ticks &ldquo;Let us keep this photo&rdquo; on their download page is
+          the exception: their photo stays, and goes on the photo wall.
         </p>
         <div className="flex gap-2">
           {PHOTO_MINUTE_OPTIONS.map(m => (

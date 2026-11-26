@@ -3,6 +3,7 @@ import DownloadPage from './pages/DownloadPage';
 import FramesPage from './pages/FramesPage';
 import GalleryPage from './pages/GalleryPage';
 import SettingsPage from './pages/SettingsPage';
+import WallPage from './pages/WallPage';
 import PasswordGate from '@/components/features/auth/PasswordGate';
 
 function getDownloadToken(pathname: string): string | null {
@@ -30,6 +31,7 @@ export default function App() {
   if (pathname === '/settings') return boothGated(<SettingsPage />);
   if (pathname === '/gallery') return boothGated(<GalleryPage />);
   if (pathname === '/frames') return boothGated(<FramesPage />);
+  if (pathname === '/wall') return boothGated(<WallPage />);
 
   // The guest side, with no password: the token in the link is unguessable,
   // so holding the link is what lets a guest in.
